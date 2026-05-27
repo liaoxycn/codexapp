@@ -36,7 +36,7 @@ npm run build
 可选输出名：
 
 ```powershell
-.\scripts\build-apk.ps1 -OutputName app-release.apk
+.\scripts\build-apk.ps1 -OutputName CodexMobile.apk
 ```
 
 脚本会：
@@ -49,7 +49,7 @@ npm run build
 ## GitHub Release
 
 - `push` tag `v*` 会触发 GitHub Actions 构建 release APK
-- 构建产物会上传为 `app-release-min-plus.apk`
+- 构建产物会上传为 `CodexMobile.apk`
 - 也可以在 Actions 里手动触发 workflow
 
 ## 说明

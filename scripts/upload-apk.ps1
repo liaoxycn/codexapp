@@ -3,7 +3,7 @@ param(
     [string]$WebDavUser = $env:CODEX_WEBDAV_USER,
     [string]$WebDavPassword = $env:CODEX_WEBDAV_PASSWORD,
     [string]$RemotePath = "codex",
-    [string]$ApkPath = (Join-Path (Split-Path -Parent $PSScriptRoot) "app\build\outputs\apk\release\app-release-min-plus.apk")
+    [string]$ApkPath = (Join-Path (Split-Path -Parent $PSScriptRoot) "app\build\outputs\apk\release\CodexMobile.apk")
 )
 
 $ErrorActionPreference = "Stop"

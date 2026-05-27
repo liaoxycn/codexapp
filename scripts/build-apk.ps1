@@ -1,5 +1,5 @@
 param(
-    [string]$OutputName = "app-release-min-plus.apk"
+    [string]$OutputName = "CodexMobile.apk"
 )
 
 $ErrorActionPreference = "Stop"

@@ -43,7 +43,7 @@ jobs:
           APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
           APK_DIR="app/build/outputs/apk/release"
           UNSIGNED_APK="$APK_DIR/app-release-unsigned.apk"
-          OUTPUT_APK="$APK_DIR/app-release-min-plus.apk"
+          OUTPUT_APK="$APK_DIR/CodexMobile.apk"
           KEYSTORE="$HOME/.android/debug.keystore"
 
           mkdir -p "$HOME/.android"
@@ -73,11 +73,11 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-min-plus
-          path: app/build/outputs/apk/release/app-release-min-plus.apk
+          name: CodexMobile
+          path: app/build/outputs/apk/release/CodexMobile.apk
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/app-release-min-plus.apk
+          files: app/build/outputs/apk/release/CodexMobile.apk
