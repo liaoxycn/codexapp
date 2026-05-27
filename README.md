@@ -46,6 +46,12 @@ npm run build
 3. 使用 `~\.android\debug.keystore` 签名
 4. 输出到 `app/build/outputs/apk/release/`
 
+## GitHub Release
+
+- `push` tag `v*` 会触发 GitHub Actions 构建 release APK
+- 构建产物会上传为 `app-release-min-plus.apk`
+- 也可以在 Actions 里手动触发 workflow
+
 ## 说明
 
 - Android 端只处理已有会话。
