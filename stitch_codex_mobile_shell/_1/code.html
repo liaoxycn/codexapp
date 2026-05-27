@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Codex - New Session</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "secondary": "#585f6c",
+                        "on-tertiary-fixed": "#1c1b1a",
+                        "on-error": "#ffffff",
+                        "surface-container-highest": "#e1e3e4",
+                        "background": "#f8f9fa",
+                        "on-primary-fixed": "#1c1b1b",
+                        "on-error-container": "#93000a",
+                        "surface-container": "#edeeef",
+                        "on-primary-fixed-variant": "#474746",
+                        "surface-bright": "#f8f9fa",
+                        "on-surface-variant": "#444748",
+                        "on-secondary-fixed": "#151c27",
+                        "inverse-surface": "#2e3132",
+                        "on-background": "#191c1d",
+                        "primary": "#000000",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#191c1d",
+                        "inverse-primary": "#c8c6c5",
+                        "tertiary-container": "#1c1b1a",
+                        "surface": "#f8f9fa",
+                        "primary-container": "#1c1b1b",
+                        "secondary-fixed-dim": "#c0c7d6",
+                        "on-secondary": "#ffffff",
+                        "primary-fixed": "#e5e2e1",
+                        "surface-container-high": "#e7e8e9",
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed-variant": "#484645",
+                        "tertiary-fixed-dim": "#cac6c4",
+                        "surface-tint": "#5f5e5e",
+                        "outline-variant": "#c4c7c7",
+                        "tertiary-fixed": "#e6e2df",
+                        "surface-variant": "#e1e3e4",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary": "#000000",
+                        "on-primary-container": "#858383",
+                        "outline": "#747878",
+                        "on-primary": "#ffffff",
+                        "secondary-fixed": "#dce2f3",
+                        "on-secondary-fixed-variant": "#404754",
+                        "secondary-container": "#dce2f3",
+                        "primary-fixed-dim": "#c8c6c5",
+                        "on-secondary-container": "#5e6572",
+                        "surface-dim": "#d9dadb",
+                        "surface-container-low": "#f3f4f5",
+                        "on-tertiary": "#ffffff",
+                        "inverse-on-surface": "#f0f1f2",
+                        "on-tertiary-container": "#868382"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "gutter-md": "12px",
+                        "input-padding": "16px",
+                        "base": "4px",
+                        "margin-mobile": "20px",
+                        "stack-lg": "24px"
+                    },
+                    fontFamily: {
+                        "body-md": ["Geist", "sans-serif"],
+                        "code-block": ["JetBrains Mono", "monospace"],
+                        "body-lg": ["Geist", "sans-serif"],
+                        "headline-md": ["Geist", "sans-serif"],
+                        "label-sm": ["Geist", "sans-serif"],
+                        "headline-lg": ["Geist", "sans-serif"]
+                    },
+                    fontSize: {
+                        "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+                        "code-block": ["13px", { lineHeight: "20px", fontWeight: "400" }],
+                        "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+                        "headline-md": ["20px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }],
+                        "label-sm": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "500" }],
+                        "headline-lg": ["24px", { lineHeight: "32px", letterSpacing: "-0.02em", fontWeight: "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            -webkit-tap-highlight-color: transparent;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface text-on-background h-screen w-full flex flex-col overflow-hidden font-body-md">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-surface fixed top-0 w-full z-50">
+<div class="flex justify-between items-center px-margin-mobile h-14 w-full">
+<button aria-label="Menu" class="text-primary dark:text-primary active:scale-95 duration-100 hover:bg-surface-container-low dark:hover:bg-surface-container-high transition-colors p-2 -ml-2 rounded-full">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md text-primary dark:text-primary tracking-tight">Codex</h1>
+<button aria-label="New Chat" class="text-primary dark:text-primary active:scale-95 duration-100 hover:bg-surface-container-low dark:hover:bg-surface-container-high transition-colors p-2 -mr-2 rounded-full">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 overflow-y-auto pt-14 pb-32 px-margin-mobile flex flex-col items-center justify-center">
+<!-- Welcome Message -->
+<div class="text-center mb-12 animate-fade-in-up">
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-2">How can I help you today?</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Select a suggestion or start typing.</p>
+</div>
+<!-- Suggestion Cards (Bento Grid Style) -->
+<div class="w-full max-w-md grid grid-cols-2 gap-3 mb-8">
+<button class="bg-surface-container-lowest border border-outline-variant rounded-[20px] p-4 flex flex-col items-start gap-2 hover:bg-surface-container-low transition-colors text-left group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors" data-icon="code">code</span>
+<span class="font-body-md text-body-md text-on-surface">Help me code...</span>
+</button>
+<button class="bg-surface-container-lowest border border-outline-variant rounded-[20px] p-4 flex flex-col items-start gap-2 hover:bg-surface-container-low transition-colors text-left group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors" data-icon="summarize">summarize</span>
+<span class="font-body-md text-body-md text-on-surface">Summarize this...</span>
+</button>
+<button class="bg-surface-container-lowest border border-outline-variant rounded-[20px] p-4 flex flex-col items-start gap-2 hover:bg-surface-container-low transition-colors text-left group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors" data-icon="edit_document">edit_document</span>
+<span class="font-body-md text-body-md text-on-surface">Draft an email...</span>
+</button>
+<button class="bg-surface-container-lowest border border-outline-variant rounded-[20px] p-4 flex flex-col items-start gap-2 hover:bg-surface-container-low transition-colors text-left group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors" data-icon="lightbulb">lightbulb</span>
+<span class="font-body-md text-body-md text-on-surface">Brainstorm ideas...</span>
+</button>
+</div>
+</main>
+<!-- Bottom Input Area Anchor -->
+<footer class="fixed bottom-0 w-full bg-surface pb-safe pt-2 px-margin-mobile">
+<div class="max-w-3xl mx-auto mb-4">
+<div class="flex items-end bg-surface-container-lowest border border-outline-variant rounded-[24px] p-2 focus-within:border-outline focus-within:ring-1 focus-within:ring-outline transition-all shadow-sm">
+<button aria-label="Add attachment" class="p-2 text-on-surface-variant hover:text-on-surface transition-colors flex-shrink-0 rounded-full hover:bg-surface-container-low">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+</button>
+<textarea class="flex-1 bg-transparent border-none focus:ring-0 resize-none font-body-lg text-body-lg text-on-surface placeholder:text-on-surface-variant py-2 px-2 max-h-32 overflow-y-auto" oninput="this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 120) + 'px'" placeholder="Message Codex" rows="1"></textarea>
+<button aria-label="Send message" class="p-2 text-outline-variant transition-colors flex-shrink-0 rounded-full" disabled="">
+<span class="material-symbols-outlined" data-icon="arrow_upward">arrow_upward</span>
+</button>
+</div>
+<div class="text-center mt-2">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Codex can make mistakes. Verify important information.</span>
+</div>
+</div>
+</footer>
+<style>
+        /* Safe area padding for modern mobile devices */
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            .pb-safe {
+                padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+            }
+        }
+        @supports not (padding-bottom: env(safe-area-inset-bottom)) {
+            .pb-safe {
+                padding-bottom: 1rem;
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-fade-in-up {
+            animation: fadeInUp 0.5s ease-out forwards;
+        }
+    </style>
+<script>
+        // Simple script to handle textarea input and enable/disable send button
+        document.addEventListener('DOMContentLoaded', () => {
+            const textarea = document.querySelector('textarea');
+            const sendBtn = document.querySelector('button[aria-label="Send message"]');
+            
+            textarea.addEventListener('input', () => {
+                if (textarea.value.trim().length > 0) {
+                    sendBtn.disabled = false;
+                    sendBtn.classList.remove('text-outline-variant');
+                    sendBtn.classList.add('text-on-surface', 'bg-surface-container-high', 'hover:bg-surface-variant');
+                } else {
+                    sendBtn.disabled = true;
+                    sendBtn.classList.add('text-outline-variant');
+                    sendBtn.classList.remove('text-on-surface', 'bg-surface-container-high', 'hover:bg-surface-variant');
+                }
+            });
+        });
+    </script>
+</body></html>

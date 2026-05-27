@@ -1,0 +1,23 @@
+{
+  "name": "codex-mobile-desktop-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "build:exe": "node scripts/build-exe.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^0.28.0",
+    "postject": "^1.0.0-alpha.6",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

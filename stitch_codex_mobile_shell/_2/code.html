@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Codex - Generating</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary": "#585f6c",
+                        "on-tertiary-fixed": "#1c1b1a",
+                        "on-error": "#ffffff",
+                        "surface-container-highest": "#e1e3e4",
+                        "background": "#f8f9fa",
+                        "on-primary-fixed": "#1c1b1b",
+                        "on-error-container": "#93000a",
+                        "surface-container": "#edeeef",
+                        "on-primary-fixed-variant": "#474746",
+                        "surface-bright": "#f8f9fa",
+                        "on-surface-variant": "#444748",
+                        "on-secondary-fixed": "#151c27",
+                        "inverse-surface": "#2e3132",
+                        "on-background": "#191c1d",
+                        "primary": "#000000",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#191c1d",
+                        "inverse-primary": "#c8c6c5",
+                        "tertiary-container": "#1c1b1a",
+                        "surface": "#f8f9fa",
+                        "primary-container": "#1c1b1b",
+                        "secondary-fixed-dim": "#c0c7d6",
+                        "on-secondary": "#ffffff",
+                        "primary-fixed": "#e5e2e1",
+                        "surface-container-high": "#e7e8e9",
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed-variant": "#484645",
+                        "tertiary-fixed-dim": "#cac6c4",
+                        "surface-tint": "#5f5e5e",
+                        "outline-variant": "#c4c7c7",
+                        "tertiary-fixed": "#e6e2df",
+                        "surface-variant": "#e1e3e4",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary": "#000000",
+                        "on-primary-container": "#858383",
+                        "outline": "#747878",
+                        "on-primary": "#ffffff",
+                        "secondary-fixed": "#dce2f3",
+                        "on-secondary-fixed-variant": "#404754",
+                        "secondary-container": "#dce2f3",
+                        "primary-fixed-dim": "#c8c6c5",
+                        "on-secondary-container": "#5e6572",
+                        "surface-dim": "#d9dadb",
+                        "surface-container-low": "#f3f4f5",
+                        "on-tertiary": "#ffffff",
+                        "inverse-on-surface": "#f0f1f2",
+                        "on-tertiary-container": "#868382"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter-md": "12px",
+                        "input-padding": "16px",
+                        "base": "4px",
+                        "margin-mobile": "20px",
+                        "stack-lg": "24px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Geist"],
+                        "code-block": ["JetBrains Mono"],
+                        "body-lg": ["Geist"],
+                        "headline-md": ["Geist"],
+                        "label-sm": ["Geist"],
+                        "headline-lg": ["Geist"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "code-block": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .pulse-dot {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1); }
+        }
+        .pulse-dot:nth-child(2) { animation-delay: 0.2s; }
+        .pulse-dot:nth-child(3) { animation-delay: 0.4s; }
+        
+        .cursor-blink {
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased h-screen flex flex-col overflow-hidden">
+<!-- NavigationDrawer (Overlay State for structural completeness, hidden by default) -->
+<!-- Implementation omitted for primary canvas focus, but architecture respects it -->
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 border-b border-outline-variant bg-surface flex justify-between items-center px-margin-mobile h-14">
+<button class="text-on-surface-variant hover:bg-surface-container-low transition-colors active:scale-95 duration-100 p-2 -ml-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<div class="font-headline-md text-headline-md text-primary tracking-tight">Codex</div>
+<button class="text-on-surface-variant hover:bg-surface-container-low transition-colors active:scale-95 duration-100 p-2 -mr-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+</button>
+</header>
+<!-- Main Chat Canvas -->
+<main class="flex-1 overflow-y-auto pt-[80px] pb-[140px] px-margin-mobile flex flex-col gap-stack-lg">
+<!-- Turn 1 -->
+<div class="flex flex-col gap-base">
+<!-- User Message -->
+<div class="self-end max-w-[85%] bg-primary text-on-primary rounded-[24px] rounded-br-lg px-4 py-3 shadow-sm">
+<p class="font-body-md text-body-md">Can you write a python script to parse a CSV and calculate the average of the 'revenue' column?</p>
+</div>
+<!-- AI Message -->
+<div class="self-start max-w-[90%] bg-surface-container text-on-surface rounded-[24px] rounded-bl-lg px-4 py-3 border border-surface-variant shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+<p class="font-body-md text-body-md mb-3">Certainly. Here is a Python script using the built-in `csv` module to accomplish that.</p>
+<!-- Code Block -->
+<div class="bg-[#1F2937] text-white rounded-xl overflow-hidden border border-[#374151] mb-2 relative group">
+<div class="flex justify-between items-center px-3 py-1.5 bg-[#111827] border-b border-[#374151]">
+<span class="font-label-sm text-label-sm text-gray-400">python</span>
+<button class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-gray-400 hover:text-white">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+</button>
+</div>
+<pre class="p-3 overflow-x-auto"><code class="font-code-block text-code-block text-gray-300">import csv
+
+def calculate_average_revenue(file_path):
+    total = 0
+    count = 0
+    with open(file_path, mode='r') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            if 'revenue' in row:
+                total += float(row['revenue'])
+                count += 1
+    return total / count if count &gt; 0 else 0</code></pre>
+</div>
+</div>
+</div>
+<!-- Turn 2: Generating State -->
+<div class="flex flex-col gap-base">
+<!-- User Message -->
+<div class="self-end max-w-[85%] bg-primary text-on-primary rounded-[24px] rounded-br-lg px-4 py-3 shadow-sm">
+<p class="font-body-md text-body-md">Can we modify it to handle missing values gracefully?</p>
+</div>
+<!-- AI Message (Generating) -->
+<div class="self-start max-w-[90%] bg-surface-container text-on-surface rounded-[24px] rounded-bl-lg px-4 py-3 border border-surface-variant shadow-[0_2px_8px_rgba(0,0,0,0.04)] min-h-[44px] flex items-center">
+<div class="flex gap-1 items-center h-full">
+<div class="w-1.5 h-1.5 rounded-full bg-secondary pulse-dot"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-secondary pulse-dot"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-secondary pulse-dot"></div>
+</div>
+</div>
+</div>
+<!-- Scroll Anchor -->
+<div id="scroll-anchor"></div>
+</main>
+<!-- Input Anchor Area -->
+<div class="fixed bottom-0 left-0 w-full bg-surface/90 backdrop-blur-md border-t border-surface-variant px-margin-mobile py-4 z-40 flex flex-col gap-2">
+<!-- Status Indicator -->
+<div class="flex items-center gap-2 pl-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant animate-pulse">Generating...</span>
+</div>
+<!-- Input Field Container -->
+<div class="relative flex items-end gap-2">
+<div class="flex-1 bg-surface-container-lowest border border-outline-variant rounded-[24px] min-h-[48px] max-h-[120px] overflow-hidden flex items-center px-4 py-3 focus-within:border-outline focus-within:shadow-sm transition-all shadow-sm">
+<textarea class="w-full bg-transparent border-none p-0 m-0 font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:ring-0 resize-none max-h-[96px] overflow-y-auto disabled:opacity-50" disabled="" placeholder="Message Codex..." rows="1"></textarea>
+</div>
+<!-- Stop Button -->
+<button class="flex-shrink-0 w-12 h-12 bg-primary rounded-full flex items-center justify-center text-on-primary hover:bg-on-surface-variant active:scale-95 transition-all shadow-md">
+<span class="material-symbols-outlined" data-icon="stop" data-weight="fill">stop</span>
+</button>
+</div>
+<!-- Safe area padding for modern devices -->
+<div class="h-2"></div>
+</div>
+<script>
+        // Auto-scroll to bottom functionality to maintain conversational context
+        const main = document.querySelector('main');
+        main.scrollTop = main.scrollHeight;
+    </script>
+</body></html>

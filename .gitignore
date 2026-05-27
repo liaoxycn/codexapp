@@ -1,0 +1,8 @@
+/.idea/
+/.gradle/
+/.kotlin/
+/build/
+/app/build/
+/desktop-gateway/node_modules/
+/desktop-gateway/dist/
+/desktop-gateway/run-logs/
