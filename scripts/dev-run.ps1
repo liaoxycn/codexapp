@@ -7,6 +7,7 @@ param(
     [int]$GatewayPort = 8765,
     [string]$GatewayPath = "/mobile",
     [string]$AvdName = "codexflow_api35",
+    [int]$FinishDelaySeconds = 8,
     [switch]$SkipOpenApp
 )
 
@@ -21,7 +22,7 @@ function Write-Log {
     param([string]$Message)
     $line = "[{0}] {1}" -f (Get-Date -Format "HH:mm:ss"), $Message
     Write-Host $line
-    Add-Content -LiteralPath $scriptLog -Value $line
+    Add-Content -Encoding utf8 -LiteralPath $scriptLog -Value $line
 }
 
 function Stop-ProcessByName {
@@ -103,7 +104,7 @@ function Ensure-EmulatorRunning {
     $runningEmulator = & $AdbExe devices | Select-String '^emulator-\d+\s+device\b'
 
     if (-not $runningEmulator) {
-        Write-Log "启动模拟器 $AvdName"
+        Write-Log "Starting emulator $AvdName"
         Start-Process -FilePath $EmulatorExe -ArgumentList @(
             "-avd", $AvdName,
             "-netdelay", "none",
@@ -111,7 +112,7 @@ function Ensure-EmulatorRunning {
         ) -WindowStyle Hidden | Out-Null
     }
 
-    Write-Log "等待模拟器启动"
+    Write-Log "Waiting for emulator boot"
     & $AdbExe wait-for-device | Out-Null
     $deadline = (Get-Date).AddMinutes(4)
     while ((Get-Date) -lt $deadline) {
@@ -121,7 +122,7 @@ function Ensure-EmulatorRunning {
         }
         Start-Sleep -Seconds 2
     }
-    throw "模拟器启动超时: $AvdName"
+    throw "Emulator boot timeout: $AvdName"
 }
 
 function Tail-LogIfExists {
@@ -129,7 +130,7 @@ function Tail-LogIfExists {
     if (Test-Path -LiteralPath $Path) {
         Write-Host ""
         Write-Host "---- $Path ----"
-        Get-Content -LiteralPath $Path -Tail $Lines | ForEach-Object { Write-Host $_ }
+        Get-Content -Encoding utf8 -LiteralPath $Path -Tail $Lines | ForEach-Object { Write-Host $_ }
     }
 }
 
@@ -153,48 +154,56 @@ function Test-PortOpen {
     return $false
 }
 
-New-Item -ItemType Directory -Path $artifactsDir -Force | Out-Null
-Set-Content -LiteralPath $scriptLog -Value ""
+function Main {
+    New-Item -ItemType Directory -Path $artifactsDir -Force | Out-Null
 
-try {
-    Write-Log "1/5 停旧进程"
-    Stop-ProcessByName -Names @("node", "tsx", "desktop-gateway", "emulator")
+    try {
+        Write-Log "1/5 stop old processes"
+        Stop-ProcessByName -Names @("node", "tsx", "desktop-gateway", "emulator")
+        Start-Sleep -Milliseconds 800
 
-    $adbExe = Get-PlatformToolsAdb
-    $emulatorExe = Get-AvdBin
-    Write-Log "2/5 启动模拟器并等待就绪"
-    Ensure-EmulatorRunning -AvdName $AvdName -AdbExe $adbExe -EmulatorExe $emulatorExe
+        Set-Content -Encoding utf8 -LiteralPath $scriptLog -Value ""
+        Set-Content -Encoding utf8 -LiteralPath $gatewayLog -Value ""
+        Set-Content -Encoding utf8 -LiteralPath $gatewayErr -Value ""
+        $adbExe = Get-PlatformToolsAdb
+        $emulatorExe = Get-AvdBin
 
-    Write-Log "3/5 启动 gateway dev"
-    $gatewayRoot = Resolve-Path $GatewayDir
-    $gatewayPathArg = $GatewayPath.Replace('"', '\"')
-    $envLine = 'set CODEX_MOBILE_GATEWAY_HOST=' + $GatewayBindHost + ' && set CODEX_MOBILE_GATEWAY_PORT=' + $GatewayPort + ' && set CODEX_MOBILE_GATEWAY_PATH=' + $gatewayPathArg + ' && npm run dev'
-    $cmdLine = $envLine + ' 1>> "' + $gatewayLog + '" 2>> "' + $gatewayErr + '"'
-    Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", $cmdLine) -WorkingDirectory $gatewayRoot -WindowStyle Hidden | Out-Null
+        Write-Log "2/5 start emulator and wait"
+        Ensure-EmulatorRunning -AvdName $AvdName -AdbExe $adbExe -EmulatorExe $emulatorExe
 
-    Write-Log "等待 gateway 监听 $GatewayHost`:$GatewayPort"
-    if (-not (Wait-ForPort -Address $GatewayHost -Port $GatewayPort -TimeoutSeconds 50)) {
-        throw "gateway 未在 50 秒内监听 $GatewayHost`:$GatewayPort"
+        Write-Log "3/5 start gateway dev"
+        $gatewayRoot = Resolve-Path $GatewayDir
+        $gatewayPathArg = $GatewayPath.Replace('"', '\"')
+        $cmdLine = 'set "CODEX_MOBILE_GATEWAY_HOST=' + $GatewayBindHost.Trim() + '" && set "CODEX_MOBILE_GATEWAY_PORT=' + $GatewayPort + '" && set "CODEX_MOBILE_GATEWAY_PATH=' + $gatewayPathArg.Trim() + '" && npm run dev 1>> "' + $gatewayLog + '" 2>> "' + $gatewayErr + '"'
+        Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", $cmdLine) -WorkingDirectory $gatewayRoot -WindowStyle Hidden | Out-Null
+
+        Write-Log "waiting for gateway on $GatewayHost`:$GatewayPort"
+        if (-not (Wait-ForPort -Address $GatewayHost -Port $GatewayPort -TimeoutSeconds 50)) {
+            throw "gateway not listening within 50 seconds: $GatewayHost`:$GatewayPort"
+        }
+        if (-not (Test-PortOpen -Address $GatewayHost -Port $GatewayPort)) {
+            throw "gateway port check failed: $GatewayHost`:$GatewayPort"
+        }
+
+        Write-Log "4/5 install debug apk"
+        Invoke-Checked -FilePath (Join-Path $root "gradlew.bat") -Arguments @(":app:installDebug") -WorkingDirectory $root -DisplayName "installDebug"
+
+        Write-Log "5/5 open app"
+        if (-not $SkipOpenApp) {
+            Invoke-Checked -FilePath $adbExe -Arguments @("shell", "am", "start", "-n", "$AppId/$Activity") -WorkingDirectory $root -DisplayName "adb start activity"
+        }
+
+        Tail-LogIfExists -Path $gatewayLog -Lines 20
+        Write-Log "all steps done, waiting before exit"
+        Start-Sleep -Seconds $FinishDelaySeconds
+        Write-Log "done"
+    } catch {
+        Write-Log "FAILED: $($_.Exception.Message)"
+        Tail-LogIfExists -Path $gatewayLog
+        Tail-LogIfExists -Path $gatewayErr
+        Tail-LogIfExists -Path $scriptLog
+        throw
     }
-    if (-not (Test-PortOpen -Address $GatewayHost -Port $GatewayPort)) {
-        throw "gateway 端口检查失败: $GatewayHost`:$GatewayPort"
-    }
-
-    Write-Log "4/5 安装 debug 包"
-    Invoke-Checked -FilePath (Join-Path $root "gradlew.bat") -Arguments @(":app:installDebug") -WorkingDirectory $root -DisplayName "installDebug"
-
-    Write-Log "5/5 打开 app"
-    if (-not $SkipOpenApp) {
-        Invoke-Checked -FilePath $adbExe -Arguments @("shell", "am", "start", "-n", "$AppId/$Activity") -WorkingDirectory $root -DisplayName "adb start activity"
-    }
-
-    Tail-LogIfExists -Path $gatewayLog -Lines 20
-    Write-Log "done"
 }
-catch {
-    Write-Log "FAILED: $($_.Exception.Message)"
-    Tail-LogIfExists -Path $gatewayLog
-    Tail-LogIfExists -Path $gatewayErr
-    Tail-LogIfExists -Path $scriptLog
-    throw
-}
+
+Main

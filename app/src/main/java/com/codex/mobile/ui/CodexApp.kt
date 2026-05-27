@@ -197,8 +197,6 @@ fun CodexApp(
                     val selectedThread = state.threads.firstOrNull { it.id == state.selectedThreadId }
                     TopBar(
                         title = selectedThread?.title ?: "Codex",
-                        status = selectedThread?.status,
-                        isGenerating = state.isGenerating,
                         onOpenDrawer = { scope.launch { drawerState.open() } },
                         onCreateThread = viewModel::createThread,
                         onOpenConnection = { showGatewayDialog = true }
@@ -216,8 +214,6 @@ fun CodexApp(
                     onChange = viewModel::updateComposer,
                     onInsertText = viewModel::insertComposerText,
                     onApplySlashCommand = viewModel::applySlashCommand,
-                    onInsertGoal = viewModel::insertGoalTemplate,
-                    onInsertShell = viewModel::insertShellTemplate,
                     onClearComposer = viewModel::clearComposer,
                     onSend = viewModel::send,
                     onStop = viewModel::stopGenerating
@@ -230,7 +226,6 @@ fun CodexApp(
                 state = state,
                 compactMode = compactMode,
                 onOpenConnection = { showGatewayDialog = true },
-                onLoadOlderMessages = viewModel::loadOlderMessages,
                 onRefreshCurrent = viewModel::refreshCurrentThreadAnimated,
                 onApprovePending = viewModel::approvePending,
                 onRejectPending = viewModel::rejectPending
@@ -349,8 +344,6 @@ private fun GatewayDialog(
 @Composable
 private fun TopBar(
     title: String,
-    status: ThreadStatus?,
-    isGenerating: Boolean,
     onOpenDrawer: () -> Unit,
     onCreateThread: () -> Unit,
     onOpenConnection: () -> Unit
@@ -374,12 +367,11 @@ private fun TopBar(
             Text(
                 text = title,
                 color = CodexTheme.colors.textPrimary,
-                fontSize = 17.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            ThreadStatusBadge(status = status, isGenerating = isGenerating)
         }
         HeaderIconButton(
             icon = Icons.Filled.Add,
@@ -396,55 +388,6 @@ private fun TopBar(
 }
 
 @Composable
-private fun ThreadStatusBadge(
-    status: ThreadStatus?,
-    isGenerating: Boolean
-) {
-    val label = when {
-        isGenerating || status == ThreadStatus.RUNNING -> "运行中"
-        status == ThreadStatus.NEEDS_APPROVAL -> "待审批"
-        status == ThreadStatus.FAILED -> "失败"
-        status == ThreadStatus.IDLE -> "空闲"
-        else -> null
-    } ?: return
-
-    val color = when {
-        isGenerating || status == ThreadStatus.RUNNING -> Color(0xFF2563EB)
-        status == ThreadStatus.NEEDS_APPROVAL -> Color(0xFFF59E0B)
-        status == ThreadStatus.FAILED -> Color(0xFFDC2626)
-        else -> CodexTheme.colors.textSecondary
-    }
-
-    Row(
-        modifier = Modifier.padding(top = 1.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (isGenerating || status == ThreadStatus.RUNNING) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(8.dp),
-                strokeWidth = 1.2.dp,
-                color = color
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(5.dp)
-                    .clip(CircleShape)
-                    .background(color)
-            )
-        }
-        Spacer(Modifier.width(4.dp))
-        Text(
-            text = label,
-            color = color,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Normal,
-            maxLines = 1
-        )
-    }
-}
-
-@Composable
 private fun HeaderIconButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
@@ -452,8 +395,8 @@ private fun HeaderIconButton(
 ) {
     Box(
         modifier = Modifier
-            .size(38.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .size(36.dp)
+            .clip(RoundedCornerShape(11.dp))
             .background(CodexTheme.colors.surfaceSubtle)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
@@ -462,7 +405,7 @@ private fun HeaderIconButton(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = CodexTheme.colors.textPrimary,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(18.dp)
         )
     }
 }
@@ -486,11 +429,11 @@ private fun DrawerContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .width(300.dp)
-            .clip(RoundedCornerShape(topEnd = 22.dp, bottomEnd = 22.dp))
+            .width(304.dp)
+            .clip(RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp))
             .background(CodexTheme.colors.surface)
             .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 11.dp, vertical = 8.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -501,7 +444,7 @@ private fun DrawerContent(
                 Text(
                     text = "会话",
                     color = CodexTheme.colors.textPrimary,
-                    fontSize = 20.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold
                 )
                 ConnectionStatusLine(
@@ -522,13 +465,13 @@ private fun DrawerContent(
                 )
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
         DrawerSearchBar(
             query = query,
             onChange = { query = it }
         )
-        Spacer(Modifier.height(6.dp))
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Spacer(Modifier.height(4.dp))
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (activeThreads.isEmpty()) {
                 item {
                     Text(
@@ -570,7 +513,7 @@ private fun ConnectionStatusLine(
             ConnectionStatus.ERROR -> Color(0xFFDC2626)
             ConnectionStatus.DISCONNECTED -> Color(0xFFF59E0B)
         },
-        fontSize = 10.sp,
+        fontSize = 9.sp,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )
@@ -584,18 +527,18 @@ private fun DrawerHeaderAction(
 ) {
     Box(
         modifier = Modifier
-            .size(34.dp)
-            .clip(RoundedCornerShape(11.dp))
+            .size(32.dp)
+            .clip(RoundedCornerShape(10.dp))
             .background(CodexTheme.colors.surfaceSubtle)
             .clickable(onClick = onClick)
-            .padding(6.dp),
+            .padding(5.dp),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = CodexTheme.colors.textPrimary,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(16.dp)
         )
     }
 }
@@ -640,26 +583,26 @@ private fun DrawerSearchBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(13.dp))
             .background(CodexTheme.colors.surfaceSubtle)
-            .border(1.dp, CodexTheme.colors.border, RoundedCornerShape(14.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .border(1.dp, CodexTheme.colors.border, RoundedCornerShape(13.dp))
+            .padding(horizontal = 9.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("⌕", color = CodexTheme.colors.textTertiary, fontSize = 12.sp)
-        Spacer(Modifier.width(6.dp))
+        Text("⌕", color = CodexTheme.colors.textTertiary, fontSize = 11.sp)
+        Spacer(Modifier.width(5.dp))
         BasicTextField(
             value = query,
             onValueChange = onChange,
             singleLine = true,
             textStyle = TextStyle(
                 color = CodexTheme.colors.textPrimary,
-                fontSize = 12.sp
+                fontSize = 11.sp
             ),
             modifier = Modifier.fillMaxWidth(),
             decorationBox = { innerTextField ->
                 if (query.isBlank()) {
-                    Text("搜索会话", color = CodexTheme.colors.textTertiary, fontSize = 12.sp)
+                    Text("搜索会话", color = CodexTheme.colors.textTertiary, fontSize = 11.sp)
                 }
                 innerTextField()
             }
@@ -677,21 +620,21 @@ private fun ThreadRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(13.dp))
             .background(if (selected) CodexTheme.colors.surfaceSubtle else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 9.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         StatusDot(summary.status)
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(7.dp))
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = summary.title,
                     modifier = Modifier.weight(1f),
                     color = CodexTheme.colors.textPrimary,
-                    fontSize = 13.sp,
+                    fontSize = 12.sp,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -699,13 +642,13 @@ private fun ThreadRow(
                 ThreadStatusText(
                     status = summary.status,
                     isGenerating = showGenerating,
-                    modifier = Modifier.padding(start = 6.dp)
+                    modifier = Modifier.padding(start = 4.dp)
                 )
             }
             Text(
                 text = summary.preview,
                 color = CodexTheme.colors.textSecondary,
-                fontSize = 11.sp,
+                fontSize = 10.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -735,7 +678,7 @@ private fun ThreadStatusText(
         text = text,
         modifier = modifier,
         color = color,
-        fontSize = 8.sp,
+        fontSize = 6.sp,
         fontWeight = FontWeight.Normal,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
@@ -764,7 +707,6 @@ private fun ThreadScreen(
     state: HomeUiState,
     compactMode: Boolean,
     onOpenConnection: () -> Unit,
-    onLoadOlderMessages: () -> Unit,
     onRefreshCurrent: () -> Unit,
     onApprovePending: () -> Unit,
     onRejectPending: () -> Unit
@@ -772,7 +714,6 @@ private fun ThreadScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val imeVisible = WindowInsets.ime.getBottom(density) > 0
     val composerPadding = when {
         state.showComposerDetails && compactMode -> 278.dp
         state.showComposerDetails -> 298.dp
@@ -781,7 +722,6 @@ private fun ThreadScreen(
     }
     val lastMessageRevision = state.messages.lastOrNull()?.revisionKey()
     val totalItems = 1 +
-        (if (state.hasMoreHistory) 1 else 0) +
         (if (state.pendingApproval != null) 1 else 0) +
         (if (state.messages.isEmpty()) 1 else state.messages.size)
     val lastItemIndex = (totalItems - 1).coerceAtLeast(0)
@@ -799,7 +739,6 @@ private fun ThreadScreen(
         animationSpec = spring(stiffness = 420f),
         label = "pull-progress"
     )
-    val pullVisualOffset = (pullProgress * 14f).coerceAtMost(14f)
     val showPullHint = pullDistance > 0f || state.isManualRefreshing || SystemClock.uptimeMillis() < pullHintVisibleUntil
     val showJumpToBottom by remember {
         derivedStateOf {
@@ -883,24 +822,7 @@ private fun ThreadScreen(
         ) {
             if (state.hasMoreHistory) {
                 item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        TextButton(
-                            onClick = onLoadOlderMessages,
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
-                        ) {
-                            Text(
-                                text = "加载更早消息",
-                                color = CodexTheme.colors.textSecondary,
-                                fontSize = 10.sp,
-                                maxLines = 1
-                            )
-                        }
-                    }
+                    Spacer(Modifier.height(2.dp))
                 }
             }
 
@@ -1436,8 +1358,6 @@ private fun Composer(
     onChange: (String) -> Unit,
     onInsertText: (String) -> Unit,
     onApplySlashCommand: (String) -> Unit,
-    onInsertGoal: () -> Unit,
-    onInsertShell: () -> Unit,
     onClearComposer: () -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit
@@ -1517,12 +1437,12 @@ private fun Composer(
     ) {
         AnimatedVisibility(visible = state.showComposerDetails) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.padding(top = 6.dp, bottom = 6.dp)
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+                modifier = Modifier.padding(top = 5.dp, bottom = 5.dp)
             ) {
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     MiniAction("清空", "■") {
                         onActivePanelChange("none")
@@ -1543,7 +1463,7 @@ private fun Composer(
                 if (state.cwd.isNotBlank() || state.permissionSummary.isNotBlank()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (state.cwd.isNotBlank()) {
@@ -1589,23 +1509,23 @@ private fun Composer(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
+                .clip(RoundedCornerShape(22.dp))
                 .background(CodexTheme.colors.surface)
-                .border(1.dp, CodexTheme.colors.border, RoundedCornerShape(24.dp))
-                .padding(horizontal = 6.dp, vertical = 4.dp),
+                .border(1.dp, CodexTheme.colors.border, RoundedCornerShape(22.dp))
+                .padding(horizontal = 6.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             ComposerIconButton(
                 onClick = onToggleDetails,
-                size = 30.dp,
+                size = 32.dp,
                 shape = RoundedCornerShape(10.dp)
             ) {
-                Text("+", color = CodexTheme.colors.textPrimary, fontSize = 14.sp, textAlign = TextAlign.Center)
+                Text("+", color = CodexTheme.colors.textPrimary, fontSize = 15.sp, textAlign = TextAlign.Center)
             }
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .defaultMinSize(minHeight = 30.dp)
+                    .defaultMinSize(minHeight = 32.dp)
                     .clickable(
                         enabled = composerEnabled,
                         interactionSource = inputInteractionSource,
@@ -1638,7 +1558,7 @@ private fun Composer(
                         }
                     },
                     minLines = 1,
-                    maxLines = if (compactMode) 4 else 5,
+                    maxLines = if (compactMode) 4 else 4,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(
                         onSend = { sendNow() },
@@ -1651,7 +1571,7 @@ private fun Composer(
                     textStyle = TextStyle(
                         color = if (composerEnabled) CodexTheme.colors.textPrimary else CodexTheme.colors.textTertiary,
                         fontSize = if (compactMode) 11.sp else 12.sp,
-                        lineHeight = if (compactMode) 13.sp else 14.sp,
+                        lineHeight = if (compactMode) 14.sp else 15.sp,
                         platformStyle = PlatformTextStyle(includeFontPadding = false)
                     ),
                     decorationBox = { inner ->
@@ -1667,22 +1587,31 @@ private fun Composer(
                                 fontSize = if (compactMode) 11.sp else 13.sp
                             )
                         }
-                        inner()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minHeight = 32.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            inner()
+                        }
                     }
                 )
             }
             if (state.isGenerating) {
                 ComposerIconButton(
                     onClick = onStop,
-                    size = 30.dp,
+                    size = 32.dp,
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text("■", color = CodexTheme.colors.textPrimary, fontSize = 12.sp, textAlign = TextAlign.Center)
                 }
             }
             ComposerIconButton(
-                onClick = { if (sendEnabled) sendNow() },
-                size = 30.dp,
+                onClick = {
+                    if (sendEnabled) sendNow()
+                },
+                size = 32.dp,
                 shape = CircleShape,
                 fill = when {
                     sendEnabled -> Color(0xFF111827)
@@ -1771,9 +1700,9 @@ private fun SlashCommandPanel(
 ) {
     Column(
         modifier = Modifier
-            .heightIn(max = 220.dp)
+            .heightIn(max = 180.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(5.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Row(
             modifier = Modifier
@@ -1781,30 +1710,30 @@ private fun SlashCommandPanel(
                 .clip(RoundedCornerShape(12.dp))
                 .background(CodexTheme.colors.surfaceSubtle)
                 .border(1.dp, CodexTheme.colors.border, RoundedCornerShape(12.dp))
-                .padding(horizontal = 10.dp, vertical = 5.dp),
+                .padding(horizontal = 9.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("⌕", color = CodexTheme.colors.textSecondary, fontSize = 11.sp)
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(5.dp))
             BasicTextField(
                 value = query,
                 onValueChange = onQueryChange,
                 singleLine = true,
                 textStyle = TextStyle(
                     color = CodexTheme.colors.textPrimary,
-                    fontSize = 13.sp,
+                    fontSize = 12.sp,
                     platformStyle = PlatformTextStyle(includeFontPadding = false)
                 ),
                 modifier = Modifier.fillMaxWidth(),
                 decorationBox = { innerTextField ->
                     if (query.isBlank()) {
-                        Text("搜索命令", color = CodexTheme.colors.textTertiary, fontSize = 13.sp)
+                        Text("搜索命令", color = CodexTheme.colors.textTertiary, fontSize = 12.sp)
                     }
                     innerTextField()
                 }
             )
         }
-        if (commands.isEmpty()) {
+                if (commands.isEmpty()) {
             SlashCommandRow(command = "没有匹配的命令", supporting = "修改搜索词")
         } else {
             commands.forEach { command ->
@@ -1830,13 +1759,13 @@ private fun SlashCommandRow(
             .clip(RoundedCornerShape(10.dp))
             .background(CodexTheme.colors.surfaceSubtle)
             .clickable(enabled = onClick != null) { onClick?.invoke() }
-            .padding(horizontal = 10.dp, vertical = 5.dp),
+            .padding(horizontal = 9.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = command,
             color = CodexTheme.colors.textPrimary,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1846,7 +1775,7 @@ private fun SlashCommandRow(
             Text(
                 text = supporting,
                 color = CodexTheme.colors.textSecondary,
-                fontSize = 9.sp,
+                fontSize = 8.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1867,7 +1796,7 @@ private fun MiniAction(
             .clickable(enabled = onClick != null) {
                 onClick?.invoke()
             }
-            .padding(horizontal = 8.dp, vertical = 5.dp),
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(icon, color = CodexTheme.colors.textSecondary, fontSize = 9.sp)
