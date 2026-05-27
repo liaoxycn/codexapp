@@ -25,7 +25,9 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Build release APK
-        run: ./gradlew :app:assembleRelease
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease
 
       - name: Sign APK with debug keystore
         env:
