@@ -31,6 +31,7 @@ class HomeViewModel(
     private var lastSelectedThreadId: String = repository.state.value.selectedThreadId
     private var liveRefreshJob: Job? = null
     private var liveRefreshTargetId: String? = null
+    private var manualRefreshJob: Job? = null
     private var reconnectJob: Job? = null
     private var reconnectAttempts: Int = 0
     private var manualDisconnect: Boolean = false
@@ -88,6 +89,23 @@ class HomeViewModel(
     fun refreshThreads() {
         viewModelScope.launch {
             repository.refreshThreads()
+        }
+    }
+
+    fun refreshThreadsAnimated() {
+        refreshCurrentThreadAnimated()
+    }
+
+    fun refreshCurrentThreadAnimated() {
+        if (manualRefreshJob?.isActive == true) return
+        manualRefreshJob = viewModelScope.launch {
+            repository.markManualRefreshing(true)
+            try {
+                repository.refreshThreads()
+                delay(650)
+            } finally {
+                repository.markManualRefreshing(false)
+            }
         }
     }
 
@@ -286,15 +304,13 @@ class HomeViewModel(
     }
 
     private fun syncLiveRefresh(snapshot: SessionRemoteState) {
-        val selectedThread = snapshot.threads.firstOrNull { it.id == snapshot.selectedThreadId }
         val shouldPoll =
             snapshot.connectionStatus == com.codex.mobile.model.ConnectionStatus.CONNECTED &&
                 snapshot.selectedThreadId.isNotBlank() &&
                 (
                     snapshot.isGenerating ||
-                        snapshot.pendingApproval != null ||
-                        snapshot.isThreadSwitching ||
-                        selectedThread?.status == ThreadStatus.RUNNING
+                    snapshot.pendingApproval != null ||
+                    snapshot.isThreadSwitching
                     )
         val targetId = snapshot.selectedThreadId.takeIf { it.isNotBlank() }
 
@@ -315,18 +331,19 @@ class HomeViewModel(
             while (true) {
                 delay(1200)
                 val current = repository.state.value
-                val currentSelected = current.threads.firstOrNull { it.id == current.selectedThreadId }
                 val stillRunning =
                     current.connectionStatus == com.codex.mobile.model.ConnectionStatus.CONNECTED &&
                         current.selectedThreadId == targetId &&
                         (
                             current.isGenerating ||
                                 current.pendingApproval != null ||
-                                current.isThreadSwitching ||
-                                currentSelected?.status == ThreadStatus.RUNNING
-                            )
+                                current.isThreadSwitching
+                )
                 if (!stillRunning) {
                     break
+                }
+                if (!current.isManualRefreshing) {
+                    repository.markManualRefreshing(true)
                 }
                 repository.refreshThreads()
             }
@@ -355,5 +372,6 @@ private fun SessionRemoteState.toHomeState(
     connectionStatus = connectionStatus,
     connectionDetail = connectionDetail,
     gatewayConfig = gatewayConfig,
-    isDemoMode = isDemoMode
+    isDemoMode = isDemoMode,
+    isManualRefreshing = isManualRefreshing
 )

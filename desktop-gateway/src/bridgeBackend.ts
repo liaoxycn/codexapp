@@ -11,6 +11,7 @@ import type {
   ThreadResumeResult,
 } from "./appServerTypes.js";
 import { AppServerClient } from "./appServerClient.js";
+import { getThreadStatusType, isThreadActivelyGenerating } from "./threadState.js";
 import type {
   ClientSnapshot,
   GatewayChipPayload,
@@ -65,6 +66,9 @@ export class AppServerBridgeBackend {
     });
     this.appServer.onRequest((request) => {
       this.handleServerRequest(request);
+    });
+    this.appServer.onExit((event) => {
+      this.markAllThreadsFailed(`app-server exited: code=${event.code ?? "null"} signal=${event.signal ?? "null"}`);
     });
   }
 
@@ -371,7 +375,7 @@ export class AppServerBridgeBackend {
           },
         });
       } else {
-        existing.summary = summary;
+        existing.summary = { ...summary, status: existing.summary.status };
         existing.snapshot.threads = summaries;
       }
     }
@@ -517,7 +521,7 @@ export class AppServerBridgeBackend {
           state,
           itemId,
           "assistant",
-          { kind: "status", value: delta },
+          { kind: "reasoning", value: delta },
           true
         );
         this.emitChanged();
@@ -580,6 +584,9 @@ export class AppServerBridgeBackend {
         }
         if (state.transientOperation === "compact") {
           state.currentTurnId = turnId;
+          if (item.type === "contextCompaction" && notification.method === "item/completed") {
+            await this.finalizeCompactState(threadId);
+          }
           return;
         }
         state.currentTurnId = turnId;
@@ -691,7 +698,9 @@ export class AppServerBridgeBackend {
       : allThreadMessages;
     const historyWindow = existing?.historyWindow ?? INITIAL_HISTORY_WINDOW;
     const runtimeState: ThreadRuntimeState = {
-      summary: mapThreadToSummary(thread),
+      summary: existing
+        ? { ...mapThreadToSummary(thread), status: existing.summary.status }
+        : mapThreadToSummary(thread),
       thread,
       historyWindow: existing?.historyWindow ?? INITIAL_HISTORY_WINDOW,
       currentTurnId: existing?.currentTurnId ?? thread.turns.at(-1)?.id ?? null,
@@ -798,7 +807,9 @@ export class AppServerBridgeBackend {
   private buildSummaries(preferredThreadId?: string): GatewayThreadPayload[] {
     const items = [...this.threads.values()]
       .filter((entry) => entry.thread != null || entry.snapshot.threads.length > 0)
-      .map((entry) => entry.thread ? mapThreadToSummary(entry.thread, entry.summary.archived) : entry.summary)
+      .map((entry) => entry.thread
+        ? { ...mapThreadToSummary(entry.thread, entry.summary.archived), status: entry.summary.status }
+        : entry.summary)
       .filter((value): value is GatewayThreadPayload => value != null);
     return dedupeSummaries(items);
   }
@@ -830,6 +841,25 @@ export class AppServerBridgeBackend {
         thread.id === threadId ? { ...thread, status } : thread
       );
     }
+  }
+
+  private markAllThreadsFailed(detail: string): void {
+    for (const state of this.threads.values()) {
+      if (state.snapshot.isGenerating || state.currentTurnId || state.transientOperation) {
+        state.snapshot.messages = state.snapshot.messages.concat(systemStatus(detail));
+      }
+      state.currentTurnId = null;
+      state.activeAssistantMessageId = null;
+      state.liveAssistantItemId = null;
+      state.transientOperation = null;
+      state.pendingApproval = null;
+      state.snapshot.pendingApproval = null;
+      state.snapshot.isGenerating = false;
+      state.stopRequested = false;
+      state.isFinalizing = false;
+      this.updateSummaryStatus(state.summary.id, state.summary.archived ? "idle" : "failed");
+    }
+    this.emitChanged();
   }
 
   private emitChanged(): void {
@@ -1061,6 +1091,7 @@ function mapThreadToSnapshot(
   resume: Pick<ThreadResumeResult, "model" | "approvalPolicy" | "approvalsReviewer" | "sandbox" | "reasoningEffort" | "instructionSources"> | null,
   allMessages: GatewayMessagePayload[]
 ): ClientSnapshot {
+  const threadIsGenerating = isThreadActivelyGenerating(thread);
   return {
     threads,
     selectedThreadId,
@@ -1071,17 +1102,20 @@ function mapThreadToSnapshot(
     slashCommands: ["/compact  压缩上下文", "/goal  设置目标", "! ls  运行 shell 命令"],
     cwd: thread.cwd,
     permissionSummary: buildPermissionSummary(resume?.approvalPolicy ?? null, resume?.sandbox ?? null),
-    isGenerating: getThreadStatusType(thread.status) === "active",
+    isGenerating: threadIsGenerating,
   };
 }
 
 function mapThreadToSummary(thread: AppServerThread, archived = false): GatewayThreadPayload {
   const grouping = deriveThreadGrouping(thread);
+  const status = isThreadActivelyGenerating(thread)
+    ? "running"
+    : mapLifecycleStatus(thread.status, false);
   return {
     id: thread.id,
     title: thread.name ?? buildThreadTitle(thread.preview),
     preview: thread.preview,
-    status: mapLifecycleStatus(thread.status, false),
+    status,
     updatedAt: thread.updatedAt,
     groupKind: grouping.kind,
     groupLabel: grouping.label,
@@ -1108,10 +1142,12 @@ function mapItemToMessages(item: AppServerThreadItem): GatewayMessagePayload[] {
         {
           id: item.id,
           role: "assistant",
-          blocks: [{
-            kind: "status",
-            value: [...asStringArray(item.summary), ...asStringArray(item.content)].join("\n") || "思考中",
-          }],
+          blocks: [
+            {
+              kind: "reasoning",
+              value: [...asStringArray(item.summary), ...asStringArray(item.content)].join("\n") || "思考中",
+            },
+          ],
         },
       ];
     case "commandExecution":
@@ -1256,13 +1292,6 @@ function mapLifecycleStatus(
     default:
       return "idle";
   }
-}
-
-function getThreadStatusType(status: AppServerThreadStatus): string {
-  if (typeof status === "string") {
-    return status.toLowerCase();
-  }
-  return status.type.toLowerCase();
 }
 
 function systemStatus(text: string): GatewayMessagePayload {
@@ -1444,7 +1473,9 @@ function mergeSnapshotMessages(
     (entry) => entry.role === "assistant" && entry.blocks.some((block) => block.kind === "text" && block.value.trim().length > 0)
   );
   for (const message of liveMessages) {
-    if (merged.some((entry) => entry.id === message.id)) {
+    const existingIndex = merged.findIndex((entry) => entry.id === message.id);
+    if (existingIndex >= 0) {
+      merged[existingIndex] = mergeMessageBlocks(merged[existingIndex], message);
       continue;
     }
     if (isOptimisticUserMessage(message) && merged.some((entry) => isSameUserMessage(entry, message))) {
@@ -1506,8 +1537,22 @@ function normalizeMessageText(message: GatewayMessagePayload): string {
 }
 
 function mergeMessageBlocks(primary: GatewayMessagePayload, secondary: GatewayMessagePayload): GatewayMessagePayload {
-  const blocks = primary.blocks.length >= secondary.blocks.length ? primary.blocks : secondary.blocks;
-  return { ...primary, blocks };
+  const mergedBlocks = [...primary.blocks];
+  for (const block of secondary.blocks) {
+    const index = mergedBlocks.findIndex((entry) => entry.kind === block.kind);
+    if (index < 0) {
+      mergedBlocks.push(block);
+      continue;
+    }
+    const current = mergedBlocks[index]!;
+    if (block.value.length > current.value.length) {
+      mergedBlocks[index] = block;
+    }
+  }
+  return {
+    ...primary,
+    blocks: mergedBlocks,
+  };
 }
 
 function toResumeMetadata(

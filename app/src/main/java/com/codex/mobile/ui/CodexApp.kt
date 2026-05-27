@@ -1,9 +1,15 @@
 package com.codex.mobile.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +28,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -41,6 +48,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.AlertDialog
 import androidx.compose.material.Button
+import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Divider
 import androidx.compose.material.DrawerValue
 import androidx.compose.material.Icon
@@ -51,7 +59,14 @@ import androidx.compose.material.Scaffold
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.material.rememberDrawerState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,13 +75,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -81,8 +100,10 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.os.SystemClock
 import com.codex.mobile.model.ComposerChip
 import com.codex.mobile.model.ComposerChipIcon
 import com.codex.mobile.model.ConnectionStatus
@@ -210,6 +231,7 @@ fun CodexApp(
                 compactMode = compactMode,
                 onOpenConnection = { showGatewayDialog = true },
                 onLoadOlderMessages = viewModel::loadOlderMessages,
+                onRefreshCurrent = viewModel::refreshCurrentThreadAnimated,
                 onApprovePending = viewModel::approvePending,
                 onRejectPending = viewModel::rejectPending
             )
@@ -337,15 +359,14 @@ private fun TopBar(
         modifier = Modifier
             .fillMaxWidth()
             .background(CodexTheme.colors.surface)
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(
-            onClick = onOpenDrawer,
-            modifier = Modifier.size(36.dp)
-        ) {
-            Text("≡", color = CodexTheme.colors.textPrimary, fontSize = 18.sp)
-        }
+        HeaderIconButton(
+            icon = Icons.Filled.Menu,
+            contentDescription = "打开抽屉",
+            onClick = onOpenDrawer
+        )
         Column(
             modifier = Modifier.weight(1f),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -353,45 +374,97 @@ private fun TopBar(
             Text(
                 text = title,
                 color = CodexTheme.colors.textPrimary,
-                fontSize = 16.sp,
+                fontSize = 17.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            val badgeText = when {
-                isGenerating -> "运行中"
-                status == ThreadStatus.NEEDS_APPROVAL -> "待审批"
-                status == ThreadStatus.FAILED -> "失败"
-                else -> null
-            }
-            if (badgeText != null) {
-                Text(
-                    text = badgeText,
-                    color = when {
-                        isGenerating -> Color(0xFF2563EB)
-                        status == ThreadStatus.NEEDS_APPROVAL -> Color(0xFFD97706)
-                        else -> CodexTheme.colors.textSecondary
-                    },
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1
-                )
-            }
+            ThreadStatusBadge(status = status, isGenerating = isGenerating)
         }
-        IconButton(
-            onClick = onCreateThread,
-            modifier = Modifier.size(32.dp)
-        ) {
-            Text("+", color = CodexTheme.colors.textPrimary, fontSize = 16.sp)
-        }
-        IconButton(
-            onClick = onOpenConnection,
-            modifier = Modifier.size(32.dp)
-        ) {
-            Text("···", color = CodexTheme.colors.textPrimary, fontSize = 16.sp)
-        }
+        HeaderIconButton(
+            icon = Icons.Filled.Add,
+            contentDescription = "新建会话",
+            onClick = onCreateThread
+        )
+        HeaderIconButton(
+            icon = Icons.Filled.MoreVert,
+            contentDescription = "连接设置",
+            onClick = onOpenConnection
+        )
     }
     Divider(color = CodexTheme.colors.border)
+}
+
+@Composable
+private fun ThreadStatusBadge(
+    status: ThreadStatus?,
+    isGenerating: Boolean
+) {
+    val label = when {
+        isGenerating || status == ThreadStatus.RUNNING -> "运行中"
+        status == ThreadStatus.NEEDS_APPROVAL -> "待审批"
+        status == ThreadStatus.FAILED -> "失败"
+        status == ThreadStatus.IDLE -> "空闲"
+        else -> null
+    } ?: return
+
+    val color = when {
+        isGenerating || status == ThreadStatus.RUNNING -> Color(0xFF2563EB)
+        status == ThreadStatus.NEEDS_APPROVAL -> Color(0xFFF59E0B)
+        status == ThreadStatus.FAILED -> Color(0xFFDC2626)
+        else -> CodexTheme.colors.textSecondary
+    }
+
+    Row(
+        modifier = Modifier.padding(top = 1.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (isGenerating || status == ThreadStatus.RUNNING) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(8.dp),
+                strokeWidth = 1.2.dp,
+                color = color
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(5.dp)
+                    .clip(CircleShape)
+                    .background(color)
+            )
+        }
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = label,
+            color = color,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Normal,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun HeaderIconButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(CodexTheme.colors.surfaceSubtle)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = CodexTheme.colors.textPrimary,
+            modifier = Modifier.size(20.dp)
+        )
+    }
 }
 
 @Composable
@@ -413,7 +486,7 @@ private fun DrawerContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .width(288.dp)
+            .width(300.dp)
             .clip(RoundedCornerShape(topEnd = 22.dp, bottomEnd = 22.dp))
             .background(CodexTheme.colors.surface)
             .windowInsetsPadding(WindowInsets.safeDrawing)
@@ -428,22 +501,25 @@ private fun DrawerContent(
                 Text(
                     text = "会话",
                     color = CodexTheme.colors.textPrimary,
-                    fontSize = 18.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.SemiBold
                 )
-                if (state.connectionStatus == ConnectionStatus.CONNECTED) {
-                    Text(
-                        text = "已同步 ${state.threads.size} 个会话",
-                        color = CodexTheme.colors.textSecondary,
-                        fontSize = 10.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                ConnectionStatusLine(
+                    status = state.connectionStatus,
+                    detail = state.connectionDetail
+                )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                DrawerHeaderAction(label = "新建", onClick = onCreateThread)
-                DrawerHeaderAction(label = "刷新", onClick = onRefreshThreads)
+                DrawerHeaderAction(
+                    icon = Icons.Filled.Add,
+                    contentDescription = "新建会话",
+                    onClick = onCreateThread
+                )
+                DrawerHeaderAction(
+                    icon = Icons.Filled.Refresh,
+                    contentDescription = "刷新会话",
+                    onClick = onRefreshThreads
+                )
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -462,35 +538,64 @@ private fun DrawerContent(
                     )
                 }
             } else {
-                items(activeThreads) { thread ->
-                    ThreadRow(
-                        summary = thread,
-                        selected = thread.id == state.selectedThreadId,
-                        onClick = { onSelectThread(thread.id) }
-                    )
-                }
+            items(activeThreads) { thread ->
+                ThreadRow(
+                    summary = thread,
+                    selected = thread.id == state.selectedThreadId,
+                    showGenerating = state.selectedThreadId == thread.id && state.isGenerating,
+                    onClick = { onSelectThread(thread.id) }
+                )
             }
+        }
         }
     }
 }
 
 @Composable
+private fun ConnectionStatusLine(
+    status: ConnectionStatus,
+    detail: String
+) {
+    val statusText = when (status) {
+        ConnectionStatus.CONNECTED -> "已连接 desktop gateway"
+        ConnectionStatus.CONNECTING -> "正在连接 desktop gateway"
+        ConnectionStatus.ERROR -> detail.ifBlank { "连接异常" }
+        ConnectionStatus.DISCONNECTED -> "未连接 desktop gateway"
+    }
+    Text(
+        text = statusText,
+        color = when (status) {
+            ConnectionStatus.CONNECTED -> Color(0xFF059669)
+            ConnectionStatus.CONNECTING -> Color(0xFF2563EB)
+            ConnectionStatus.ERROR -> Color(0xFFDC2626)
+            ConnectionStatus.DISCONNECTED -> Color(0xFFF59E0B)
+        },
+        fontSize = 10.sp,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
+}
+
+@Composable
 private fun DrawerHeaderAction(
-    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(999.dp))
+            .size(34.dp)
+            .clip(RoundedCornerShape(11.dp))
             .background(CodexTheme.colors.surfaceSubtle)
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(6.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = label,
-            color = CodexTheme.colors.textPrimary,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Medium
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = CodexTheme.colors.textPrimary,
+            modifier = Modifier.size(18.dp)
         )
     }
 }
@@ -566,37 +671,75 @@ private fun DrawerSearchBar(
 private fun ThreadRow(
     summary: ThreadSummary,
     selected: Boolean,
+    showGenerating: Boolean,
     onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(14.dp))
             .background(if (selected) CodexTheme.colors.surfaceSubtle else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 9.dp, vertical = 6.dp),
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         StatusDot(summary.status)
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = summary.title,
-                color = CodexTheme.colors.textPrimary,
-                fontSize = 12.sp,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = summary.title,
+                    modifier = Modifier.weight(1f),
+                    color = CodexTheme.colors.textPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                ThreadStatusText(
+                    status = summary.status,
+                    isGenerating = showGenerating,
+                    modifier = Modifier.padding(start = 6.dp)
+                )
+            }
             Text(
                 text = summary.preview,
                 color = CodexTheme.colors.textSecondary,
-                fontSize = 10.sp,
+                fontSize = 11.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
     }
+}
+
+@Composable
+private fun ThreadStatusText(
+    status: ThreadStatus,
+    isGenerating: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val text = when {
+        isGenerating || status == ThreadStatus.RUNNING -> "运行中"
+        status == ThreadStatus.NEEDS_APPROVAL -> "待审批"
+        status == ThreadStatus.FAILED -> "失败"
+        else -> "空闲"
+    }
+    val color = when {
+        isGenerating || status == ThreadStatus.RUNNING -> Color(0xFF2563EB)
+        status == ThreadStatus.NEEDS_APPROVAL -> Color(0xFFF59E0B)
+        status == ThreadStatus.FAILED -> Color(0xFFDC2626)
+        else -> CodexTheme.colors.textTertiary
+    }
+    Text(
+        text = text,
+        modifier = modifier,
+        color = color,
+        fontSize = 8.sp,
+        fontWeight = FontWeight.Normal,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
 }
 
 @Composable
@@ -609,7 +752,7 @@ private fun StatusDot(status: ThreadStatus) {
     }
     Box(
         modifier = Modifier
-            .size(6.dp)
+            .size(8.dp)
             .clip(CircleShape)
             .background(color)
     )
@@ -622,17 +765,19 @@ private fun ThreadScreen(
     compactMode: Boolean,
     onOpenConnection: () -> Unit,
     onLoadOlderMessages: () -> Unit,
+    onRefreshCurrent: () -> Unit,
     onApprovePending: () -> Unit,
     onRejectPending: () -> Unit
-) {
+    ) {
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
     val composerPadding = when {
         state.showComposerDetails && compactMode -> 278.dp
         state.showComposerDetails -> 298.dp
-        compactMode -> 96.dp
-        else -> 104.dp
+        compactMode -> 106.dp
+        else -> 114.dp
     }
     val lastMessageRevision = state.messages.lastOrNull()?.revisionKey()
     val totalItems = 1 +
@@ -640,6 +785,75 @@ private fun ThreadScreen(
         (if (state.pendingApproval != null) 1 else 0) +
         (if (state.messages.isEmpty()) 1 else state.messages.size)
     val lastItemIndex = (totalItems - 1).coerceAtLeast(0)
+    var pullDistance by rememberSaveable(state.selectedThreadId) { mutableFloatStateOf(0f) }
+    var pullVelocity by rememberSaveable(state.selectedThreadId) { mutableFloatStateOf(0f) }
+    var lastPullSampleAt by rememberSaveable(state.selectedThreadId) { mutableStateOf(0L) }
+    var pullHintVisibleUntil by rememberSaveable(state.selectedThreadId) { mutableStateOf(0L) }
+    val pullThreshold = remember(pullVelocity) {
+        val speedBoost = (pullVelocity / 900f).coerceIn(0f, 0.35f)
+        (160f * (1f - speedBoost)).coerceIn(110f, 160f)
+    }
+    val rawProgress = (pullDistance / pullThreshold).coerceIn(0f, 1f)
+    val pullProgress by animateFloatAsState(
+        targetValue = rawProgress,
+        animationSpec = spring(stiffness = 420f),
+        label = "pull-progress"
+    )
+    val pullVisualOffset = (pullProgress * 14f).coerceAtMost(14f)
+    val showPullHint = pullDistance > 0f || state.isManualRefreshing || SystemClock.uptimeMillis() < pullHintVisibleUntil
+    val showJumpToBottom by remember {
+        derivedStateOf {
+            val totalCount = listState.layoutInfo.totalItemsCount
+            val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            totalCount > 0 && lastVisibleIndex < lastItemIndex
+        }
+    }
+    val pullConnection = remember(state.selectedThreadId, state.isGenerating, state.isManualRefreshing, lastItemIndex) {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (state.isGenerating || state.isManualRefreshing) {
+                    return Offset.Zero
+                }
+                val atBottom = !listState.canScrollForward || listState.layoutInfo.totalItemsCount == 0
+                if (!atBottom) {
+                    if (pullDistance != 0f) {
+                        pullDistance = 0f
+                        pullVelocity = 0f
+                    }
+                    return Offset.Zero
+                }
+                if (available.y < 0f) {
+                    val now = SystemClock.uptimeMillis()
+                    val elapsed = (now - lastPullSampleAt).coerceAtLeast(1L).toFloat()
+                    pullVelocity = ((-available.y) / elapsed) * 1000f
+                    lastPullSampleAt = now
+                    pullDistance = (pullDistance - available.y).coerceAtMost(260f)
+                } else if (available.y > 0f && pullDistance > 0f) {
+                    pullDistance = 0f
+                    pullVelocity = 0f
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPostFling(
+                consumed: Velocity,
+                available: Velocity
+            ): Velocity {
+                val atBottom = !listState.canScrollForward || listState.layoutInfo.totalItemsCount == 0
+                if (atBottom && !state.isGenerating && !state.isManualRefreshing && pullDistance >= pullThreshold) {
+                    pullHintVisibleUntil = SystemClock.uptimeMillis() + 700L
+                    onRefreshCurrent()
+                }
+                pullDistance = 0f
+                pullVelocity = 0f
+                return Velocity.Zero
+            }
+        }
+    }
 
     LaunchedEffect(lastMessageRevision, state.pendingApproval, state.selectedThreadId, state.isGenerating) {
         if (state.messages.isNotEmpty()) {
@@ -654,6 +868,7 @@ private fun ThreadScreen(
         modifier = modifier
             .fillMaxSize()
             .background(CodexTheme.colors.background)
+            .nestedScroll(pullConnection)
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -662,20 +877,10 @@ private fun ThreadScreen(
                 start = 12.dp,
                 end = 12.dp,
                 top = 2.dp,
-                bottom = composerPadding
+                bottom = composerPadding + 28.dp
             ),
             verticalArrangement = Arrangement.spacedBy(if (compactMode) 4.dp else 5.dp)
         ) {
-            item {
-                ConnectionBanner(
-                    state = state,
-                    compact = state.connectionStatus == ConnectionStatus.CONNECTED &&
-                        state.messages.isNotEmpty() &&
-                        !state.isThreadSwitching,
-                    onOpenConnection = onOpenConnection
-                )
-            }
-
             if (state.hasMoreHistory) {
                 item {
                     Row(
@@ -730,7 +935,89 @@ private fun ThreadScreen(
                 }
             }
         }
+        if (showPullHint) {
+            PullRefreshHint(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = composerPadding + 8.dp)
+                    .offset(y = (-((pullProgress * 12f).coerceAtMost(12f))).dp),
+                refreshing = state.isManualRefreshing,
+                generating = state.isGenerating,
+                progress = pullProgress,
+                compactMode = compactMode
+            )
+        }
+        AnimatedVisibility(
+            visible = showJumpToBottom,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 8.dp, bottom = composerPadding + 72.dp),
+            enter = fadeIn(tween(120)),
+            exit = fadeOut(tween(120))
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(CodexTheme.colors.surface)
+                    .border(1.dp, CodexTheme.colors.border, CircleShape)
+            ) {
+                IconButton(
+                    onClick = {
+                        if (state.messages.isNotEmpty()) {
+                            scope.launch {
+                                listState.animateScrollToItem(lastItemIndex)
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.ArrowDownward,
+                        contentDescription = "滚到底部",
+                        tint = CodexTheme.colors.textPrimary
+                    )
+                }
+            }
+        }
+    }
+}
 
+@Composable
+private fun PullRefreshHint(
+    modifier: Modifier = Modifier,
+    refreshing: Boolean,
+    generating: Boolean,
+    progress: Float,
+    compactMode: Boolean,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        AnimatedVisibility(
+            visible = progress > 0f || refreshing || generating,
+            modifier = Modifier.align(Alignment.Center),
+            enter = fadeIn(tween(120)),
+            exit = fadeOut(tween(180))
+        ) {
+            Text(
+                text = when {
+                    refreshing || generating -> "刷新会话中"
+                    progress >= 1f -> "松开刷新"
+                    else -> "继续上滑"
+                },
+                color = CodexTheme.colors.textSecondary,
+                fontSize = if (compactMode) 10.sp else 11.sp,
+                maxLines = 1,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(CodexTheme.colors.surface.copy(alpha = 0.92f))
+                    .border(1.dp, CodexTheme.colors.border, RoundedCornerShape(999.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            )
+        }
     }
 }
 
@@ -975,6 +1262,7 @@ private fun UserMessage(message: ThreadMessage, compactMode: Boolean) {
 @Composable
 private fun AssistantMessage(message: ThreadMessage, compactMode: Boolean) {
     var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
+    var reasoningExpanded by rememberSaveable(message.id + ":reasoning") { mutableStateOf(false) }
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(if (compactMode) 3.dp else 5.dp)
@@ -993,7 +1281,58 @@ private fun AssistantMessage(message: ThreadMessage, compactMode: Boolean) {
 
                 is MessageBlock.Code -> CodeBlock(block.language, block.value, compactMode)
                 is MessageBlock.Status -> InlineStatus(block.value)
+                is MessageBlock.Reasoning -> ReasoningBlock(
+                    text = block.value,
+                    expanded = reasoningExpanded,
+                    onToggle = { reasoningExpanded = !reasoningExpanded },
+                    compactMode = compactMode
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun ReasoningBlock(
+    text: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    compactMode: Boolean
+) {
+    val displayText = text.trimEnd()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(if (compactMode) 10.dp else 12.dp))
+            .background(CodexTheme.colors.surfaceSubtle)
+            .border(1.dp, CodexTheme.colors.border, RoundedCornerShape(if (compactMode) 10.dp else 12.dp))
+            .padding(horizontal = if (compactMode) 9.dp else 10.dp, vertical = if (compactMode) 7.dp else 8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.clickable(onClick = onToggle)
+        ) {
+            Text(
+                text = if (expanded) "思考详情" else "思考中",
+                color = CodexTheme.colors.textSecondary,
+                fontSize = if (compactMode) 10.sp else 11.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = if (expanded) "收起" else "展开",
+                color = CodexTheme.colors.textTertiary,
+                fontSize = 10.sp
+            )
+        }
+        if (expanded) {
+            Text(
+                text = displayText,
+                color = CodexTheme.colors.textPrimary,
+                fontSize = if (compactMode) 11.sp else 12.sp,
+                lineHeight = if (compactMode) 15.sp else 17.sp
+            )
         }
     }
 }
@@ -1008,10 +1347,11 @@ private fun ExpandableText(
     lineHeight: androidx.compose.ui.unit.TextUnit,
     maxCollapsedLines: Int
 ) {
-    val shouldCollapse = text.length > 120 || text.count { it == '\n' } >= 3
+    val displayText = text.trimEnd()
+    val shouldCollapse = displayText.length > 120 || displayText.count { it == '\n' } >= 3
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
-            text = text,
+            text = displayText,
             color = textColor,
             fontSize = fontSize,
             lineHeight = lineHeight,
@@ -1365,11 +1705,12 @@ private fun Composer(
 }
 
 private fun ThreadMessage.revisionKey(): String {
-    val contentSize = blocks.sumOf { block ->
+    val contentSize = blocks.sumOf { block: MessageBlock ->
         when (block) {
             is MessageBlock.Text -> block.value.length
             is MessageBlock.Code -> block.language.length + block.value.length
             is MessageBlock.Status -> block.value.length
+            is MessageBlock.Reasoning -> block.value.length
         }
     }
     return "$id:${blocks.size}:$contentSize"

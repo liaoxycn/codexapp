@@ -420,6 +420,34 @@ gateway -> Android：
   - snapshot 节流与事件 patch
   - 独立测试线程 / 自动化回归脚本
 
+## 17. 本地开发标准流程
+
+### 17.1 一键启动
+本项目本地联调标准入口是：
+
+```powershell
+.\scripts\dev-run.ps1
+```
+
+该脚本必须完成：
+- 杀掉旧的 gateway / node / tsx 进程
+- 自动拉起 `codexflow_api35` 模拟器并等待开机完成
+- 启动 `desktop-gateway` dev 模式并等待端口监听
+- 安装 `debug` APK 到当前模拟器/设备
+- 打开 `com.codex.mobile/.MainActivity`
+- 将日志写入 `artifacts/`
+
+### 17.2 例外情况
+只有在排障时，才允许手工拆开执行：
+- `cd desktop-gateway && npm run dev`
+- `.\gradlew.bat :app:installDebug`
+- `adb shell am start -n com.codex.mobile/.MainActivity`
+
+### 17.3 约定
+- 后续所有调试记录默认以 `scripts/dev-run.ps1` 为准。
+- 如果脚本失效，先修脚本，不要每次临时探索部署流程。
+- 真实验证时优先 debug 包，不用 release 包做日常联调。
+
 ## 16. 依据
 - [openai/codex app-server README](https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md)
 - [OpenAI: Unlocking the Codex harness](https://openai.com/index/unlocking-the-codex-harness/)

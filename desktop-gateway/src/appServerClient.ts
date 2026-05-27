@@ -103,6 +103,7 @@ export class AppServerClient {
       this.pending.clear();
       this.child = null;
       this.initialized = false;
+      this.events.emit("exit", { code, signal });
     });
 
     const init = await this.request<
@@ -134,6 +135,11 @@ export class AppServerClient {
   onRequest(listener: (message: JsonRpcServerRequest) => void): () => void {
     this.events.on("request", listener);
     return () => this.events.off("request", listener);
+  }
+
+  onExit(listener: (event: { code: number | null; signal: NodeJS.Signals | null }) => void): () => void {
+    this.events.on("exit", listener);
+    return () => this.events.off("exit", listener);
   }
 
   async threadList(archived = false): Promise<AppServerThread[]> {

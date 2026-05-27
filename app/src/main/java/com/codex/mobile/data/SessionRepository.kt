@@ -36,6 +36,7 @@ interface SessionRepository {
     suspend fun selectThread(id: String)
     suspend fun refreshThreads()
     suspend fun loadOlderMessages()
+    fun markManualRefreshing(refreshing: Boolean)
     suspend fun sendPrompt(prompt: String): Boolean
     suspend fun stopTurn()
     suspend fun approvePending()
@@ -226,6 +227,7 @@ class DefaultSessionRepository(
 
     override suspend fun sendPrompt(prompt: String): Boolean {
         if (prompt.isBlank()) return false
+        val targetThreadId = _state.value.selectedThreadId.ifBlank { null }
         if (_state.value.connectionStatus == ConnectionStatus.CONNECTING) {
             _state.update {
                 it.copy(connectionDetail = "正在同步会话，请稍后再发")
@@ -239,7 +241,7 @@ class DefaultSessionRepository(
         val sent = gatewayClient.send(
             json.encodeToString(
                 GatewaySendPromptMessage.serializer(),
-                GatewaySendPromptMessage(text = prompt)
+                GatewaySendPromptMessage(text = prompt, threadId = targetThreadId)
             )
         )
         Log.d(tag, "send_prompt sent=$sent")
@@ -345,8 +347,6 @@ class DefaultSessionRepository(
                 updatedAt = it.updatedAt ?: 0L
             )
         }
-        val selectedThread = threads.firstOrNull { it.id == snapshot.selectedThreadId }
-        val selectedIsRunning = selectedThread?.status == ThreadStatus.RUNNING
         val messages = snapshot.messages.map { message ->
             ThreadMessage(
                 id = message.id,
@@ -359,6 +359,7 @@ class DefaultSessionRepository(
                         )
 
                         "status" -> MessageBlock.Status(block.value)
+                        "reasoning" -> MessageBlock.Reasoning(block.value)
                         else -> MessageBlock.Text(block.value)
                     }
                 }
@@ -382,7 +383,8 @@ class DefaultSessionRepository(
                 slashCommands = snapshot.slashCommands,
                 cwd = snapshot.cwd.orEmpty(),
                 permissionSummary = snapshot.permissionSummary.orEmpty(),
-                isGenerating = snapshot.isGenerating || selectedIsRunning,
+                isGenerating = snapshot.isGenerating,
+                isManualRefreshing = false,
                 connectionStatus = ConnectionStatus.CONNECTED,
                 connectionDetail = if (threads.isEmpty()) "已连接，暂无会话" else "已同步 ${threads.size} 个会话",
                 isDemoMode = false
@@ -410,6 +412,12 @@ class DefaultSessionRepository(
                 connectionDetail = detail,
                 isGenerating = false
             )
+        }
+    }
+
+    override fun markManualRefreshing(refreshing: Boolean) {
+        _state.update {
+            it.copy(isManualRefreshing = refreshing)
         }
     }
 
@@ -581,7 +589,8 @@ private data class GatewayLoadOlderMessagesMessage(
 @Serializable
 private data class GatewaySendPromptMessage(
     val type: String = "send_prompt",
-    val text: String
+    val text: String,
+    val threadId: String? = null
 )
 
 @Serializable

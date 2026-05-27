@@ -55,6 +55,7 @@ export interface GatewayLoadOlderMessagesMessage {
 export interface GatewaySendPromptMessage {
   type: "send_prompt";
   text: string;
+  threadId?: string;
 }
 
 export interface GatewayStopTurnMessage {
@@ -107,7 +108,7 @@ export interface GatewayMessagePayload {
 }
 
 export interface GatewayBlockPayload {
-  kind: "text" | "code" | "status";
+  kind: "text" | "code" | "status" | "reasoning";
   value: string;
   language?: string;
 }

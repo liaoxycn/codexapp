@@ -1,4 +1,5 @@
 import process from "node:process";
+import { URL } from "node:url";
 import { WebSocketServer, type WebSocket } from "ws";
 import { InMemoryDesktopBackend } from "./backend.js";
 import { AppServerBridgeBackend } from "./bridgeBackend.js";
@@ -11,7 +12,6 @@ import type {
 } from "./protocol.js";
 
 interface GatewayServerOptions {
-  host: string;
   port: number;
   path: string;
   pairToken?: string;
@@ -57,12 +57,15 @@ export class GatewayServer {
   async start(): Promise<WebSocketServer> {
     await this.tryStartRealBackend();
     const wss = new WebSocketServer({
-      host: this.options.host,
       port: this.options.port,
-      path: this.options.path,
     });
 
-    wss.on("connection", (socket) => {
+    wss.on("connection", (socket, request) => {
+      const requestPath = new URL(request.url ?? "/", "ws://localhost").pathname.replace(/\/+$/, "");
+      const expectedPath = this.options.path.replace(/\/+$/, "");
+      if (requestPath !== expectedPath) {
+        console.warn(`[gateway] path mismatch request=${requestPath} expected=${expectedPath}`);
+      }
       console.log("[gateway] android client connected");
       const context: ClientContext = {
         socket,
@@ -108,7 +111,7 @@ export class GatewayServer {
     });
 
     wss.on("listening", () => {
-      console.log(`[gateway] listening on ws://${this.options.host}:${this.options.port}${this.options.path}`);
+      console.log(`[gateway] listening on ws://0.0.0.0:${this.options.port}${this.options.path}`);
       console.log(`[gateway] pair token ${this.options.pairToken ? "enabled" : "disabled"}`);
       console.log(`[gateway] backend ${this.useRealBackend ? "app-server" : "mock"}`);
     });
@@ -200,7 +203,7 @@ export class GatewayServer {
         break;
       case "send_prompt":
         await this.runBackendAction(context, async () =>
-          this.backend().sendPrompt(context.selectedThreadId, message.text)
+          this.backend().sendPrompt(message.threadId?.trim() || context.selectedThreadId, message.text)
         );
         break;
       case "stop_turn":

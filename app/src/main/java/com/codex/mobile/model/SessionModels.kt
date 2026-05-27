@@ -18,6 +18,7 @@ sealed interface MessageBlock {
     data class Text(val value: String) : MessageBlock
     data class Code(val language: String, val value: String) : MessageBlock
     data class Status(val value: String) : MessageBlock
+    data class Reasoning(val value: String) : MessageBlock
 }
 
 enum class MessageRole {
@@ -63,6 +64,7 @@ data class SessionRemoteState(
     val messages: List<ThreadMessage> = emptyList(),
     val hasMoreHistory: Boolean = false,
     val isGenerating: Boolean = false,
+    val isManualRefreshing: Boolean = false,
     val chips: List<ComposerChip> = emptyList(),
     val slashCommands: List<String> = emptyList(),
     val pendingApproval: String? = null,
@@ -83,6 +85,7 @@ data class HomeUiState(
     val hasMoreHistory: Boolean,
     val composerText: String,
     val isGenerating: Boolean,
+    val isManualRefreshing: Boolean,
     val showComposerDetails: Boolean,
     val chips: List<ComposerChip>,
     val slashCommands: List<String>,
