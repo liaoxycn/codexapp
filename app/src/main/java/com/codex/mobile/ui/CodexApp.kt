@@ -68,6 +68,7 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.collectAsState
@@ -91,7 +92,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -110,6 +113,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -433,7 +437,7 @@ private fun DrawerContent(
     onSelectThread: (String) -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    var expandedGroups by rememberSaveable { mutableStateOf(setOf("普通会话")) }
+    var expandedProjectGroups by rememberSaveable { mutableStateOf(setOf<String>()) }
     val normalizedQuery = query.trim()
     val matches: (ThreadSummary) -> Boolean = { thread ->
         normalizedQuery.isBlank() ||
@@ -441,27 +445,30 @@ private fun DrawerContent(
             thread.preview.contains(normalizedQuery, ignoreCase = true)
     }
     val activeThreads = state.threads.filter(matches)
+    val projectThreads = activeThreads.filter { it.groupKind == ThreadGroupKind.PROJECT && it.groupLabel.isNotBlank() }
+    val chatThreads = activeThreads.filter { it.groupKind != ThreadGroupKind.PROJECT || it.groupLabel.isBlank() }
     val selectedThread = state.threads.firstOrNull { it.id == state.selectedThreadId }
-    val currentGroupLabel = selectedThread?.let { thread ->
+    val currentProjectGroupLabel = selectedThread?.let { thread ->
         if (thread.groupKind == ThreadGroupKind.PROJECT && thread.groupLabel.isNotBlank()) {
             thread.groupLabel
         } else {
-            "普通会话"
+            null
         }
-    } ?: "普通会话"
-    val groupedThreads = activeThreads
+    }
+    val groupedProjectThreads = projectThreads
+        .sortedWith(threadListSortOrder())
         .groupBy { thread ->
-            if (thread.groupKind == ThreadGroupKind.PROJECT && thread.groupLabel.isNotBlank()) {
-                thread.groupLabel
-            } else {
-                "普通会话"
-            }
+            thread.groupLabel
         }
         .filterValues { threads -> threads.isNotEmpty() }
-        .filterKeys { key -> key == "普通会话" || key.isNotBlank() }
+    val orderedProjectGroups = groupedProjectThreads.keys.sortedWith(
+        compareByDescending<String> { groupLabel ->
+            groupedProjectThreads[groupLabel].orEmpty().maxOfOrNull { it.updatedAt } ?: 0L
+        }.thenBy<String> { groupLabel -> groupLabel }
+    )
 
-    LaunchedEffect(currentGroupLabel) {
-        expandedGroups = setOf(currentGroupLabel)
+    LaunchedEffect(orderedProjectGroups) {
+        expandedProjectGroups = expandedProjectGroups + orderedProjectGroups
     }
 
     Column(
@@ -482,7 +489,7 @@ private fun DrawerContent(
                 Text(
                     text = "会话",
                     color = CodexTheme.colors.textPrimary,
-                    fontSize = 18.sp,
+                    fontSize = 19.sp,
                     fontWeight = FontWeight.SemiBold
                 )
                 ConnectionStatusLine(
@@ -509,35 +516,33 @@ private fun DrawerContent(
             onChange = { query = it }
         )
         Spacer(Modifier.height(4.dp))
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (activeThreads.isEmpty()) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            item {
+                SectionHeader(text = "项目", startPadding = 10.dp)
+            }
+            if (projectThreads.isEmpty()) {
                 item {
                     Text(
-                        text = "没有匹配的会话",
+                        text = "暂无项目会话",
                         color = CodexTheme.colors.textSecondary,
-                        fontSize = 14.sp
+                        fontSize = 11.sp
                     )
                 }
             } else {
-                val orderedGroups = groupedThreads.keys.sortedWith(
-                    compareBy<String>(
-                        { it != currentGroupLabel },
-                        { it != "普通会话" },
-                        { it }
-                    )
-                )
-                orderedGroups.forEach { groupLabel ->
-                    val threads = groupedThreads[groupLabel].orEmpty()
-                    val isExpanded = groupLabel == currentGroupLabel || expandedGroups.contains(groupLabel)
+                orderedProjectGroups.forEach { groupLabel ->
+                    val threads = groupedProjectThreads[groupLabel].orEmpty()
+                    val isExpanded = groupLabel == currentProjectGroupLabel || expandedProjectGroups.contains(groupLabel)
                     item {
                         GroupHeader(
-                            label = if (groupLabel == "普通会话") "普通会话" else groupLabel,
+                            label = groupLabel,
+                            icon = Icons.Filled.Folder,
+                            compact = true,
                             expanded = isExpanded,
-                            onToggle = if (groupLabel == currentGroupLabel) null else ({
-                                expandedGroups = if (isExpanded) {
-                                    expandedGroups - groupLabel
+                            onToggle = if (groupLabel == currentProjectGroupLabel) null else ({
+                                expandedProjectGroups = if (isExpanded) {
+                                    expandedProjectGroups - groupLabel
                                 } else {
-                                    expandedGroups + groupLabel
+                                    expandedProjectGroups + groupLabel
                                 }
                             })
                         )
@@ -548,14 +553,52 @@ private fun DrawerContent(
                                 summary = thread,
                                 selected = thread.id == state.selectedThreadId,
                                 showGenerating = state.selectedThreadId == thread.id && state.isGenerating,
+                                indentLevel = 1,
                                 onClick = { onSelectThread(thread.id) }
                             )
                         }
                     }
                 }
             }
+            item {
+                Spacer(Modifier.height(1.dp))
+                SectionHeader(text = "会话", startPadding = 10.dp)
+            }
+            if (chatThreads.isEmpty()) {
+                item {
+                    Text(
+                        text = "暂无普通会话",
+                        color = CodexTheme.colors.textSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+            } else {
+                items(chatThreads) { thread ->
+                    ThreadRow(
+                        summary = thread,
+                        selected = thread.id == state.selectedThreadId,
+                        showGenerating = state.selectedThreadId == thread.id && state.isGenerating,
+                        indentLevel = 0,
+                        onClick = { onSelectThread(thread.id) }
+                    )
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun SectionHeader(
+    text: String,
+    startPadding: androidx.compose.ui.unit.Dp
+) {
+    Text(
+        text = text,
+        modifier = Modifier.padding(start = startPadding),
+        color = CodexTheme.colors.textSecondary,
+        fontSize = 17.sp,
+        fontWeight = FontWeight.SemiBold
+    )
 }
 
 @Composable
@@ -610,6 +653,7 @@ private fun DrawerHeaderAction(
 @Composable
 private fun GroupHeader(
     label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     compact: Boolean = false,
     expanded: Boolean? = null,
     onToggle: (() -> Unit)? = null
@@ -617,16 +661,26 @@ private fun GroupHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = if (compact) 1.dp else 2.dp)
+            .padding(vertical = if (compact) 0.dp else 1.dp)
+            .padding(start = if (compact) 10.dp else 10.dp)
             .clickable(enabled = onToggle != null) { onToggle?.invoke() },
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = CodexTheme.colors.textTertiary,
+                modifier = Modifier.size(if (compact) 10.dp else 12.dp)
+            )
+            Spacer(Modifier.width(5.dp))
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
                 color = CodexTheme.colors.textSecondary,
-                fontSize = if (compact) 10.sp else 11.sp,
-                fontWeight = if (compact) FontWeight.Normal else FontWeight.Medium
+                fontSize = if (compact) 11.sp else 13.sp,
+                fontWeight = FontWeight.Medium
             )
         }
         if (expanded != null) {
@@ -679,27 +733,42 @@ private fun ThreadRow(
     summary: ThreadSummary,
     selected: Boolean,
     showGenerating: Boolean,
+    indentLevel: Int,
     onClick: () -> Unit
 ) {
+    val startPadding = 10.dp + (indentLevel * 8).dp
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(13.dp))
+            .clip(RoundedCornerShape(11.dp))
             .background(if (selected) CodexTheme.colors.surfaceSubtle else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 9.dp, vertical = 7.dp),
+            .padding(start = startPadding, end = 10.dp, top = 2.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (selected) {
+            Box(
+                modifier = Modifier
+                    .width(2.dp)
+                    .height(18.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(CodexTheme.colors.textTertiary)
+            )
+            Spacer(Modifier.width(5.dp))
+        }
         StatusDot(summary.status)
-        Spacer(Modifier.width(7.dp))
+        Spacer(Modifier.width(6.dp))
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = summary.title,
                     modifier = Modifier.weight(1f),
                     color = CodexTheme.colors.textPrimary,
-                    fontSize = 12.sp,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    style = TextStyle(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        platformStyle = PlatformTextStyle(includeFontPadding = false)
+                    ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -709,13 +778,28 @@ private fun ThreadRow(
                     modifier = Modifier.padding(start = 4.dp)
                 )
             }
-            Text(
-                text = summary.preview,
-                color = CodexTheme.colors.textSecondary,
-                fontSize = 10.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Spacer(Modifier.height(0.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = summary.preview.ifBlank { summary.title },
+                    modifier = Modifier.weight(1f),
+                    color = CodexTheme.colors.textSecondary,
+                    fontSize = 7.sp,
+                    lineHeight = 7.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (summary.updatedAt > 0L) {
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        text = formatThreadUpdatedAt(summary.updatedAt),
+                        color = CodexTheme.colors.textTertiary,
+                        fontSize = 5.5.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
         }
     }
 }
@@ -759,10 +843,31 @@ private fun StatusDot(status: ThreadStatus) {
     }
     Box(
         modifier = Modifier
-            .size(8.dp)
+            .size(7.dp)
             .clip(CircleShape)
             .background(color)
     )
+}
+
+internal fun threadListSortOrder(): Comparator<ThreadSummary> {
+    return compareByDescending<ThreadSummary> { it.updatedAt }
+        .thenByDescending { it.id }
+}
+
+internal fun formatThreadUpdatedAt(updatedAt: Long, nowMillis: Long = System.currentTimeMillis()): String {
+    val deltaMinutes = ((nowMillis - updatedAt).coerceAtLeast(0L) / 60_000L).toInt()
+    return when {
+        deltaMinutes <= 0 -> "刚刚"
+        deltaMinutes < 60 -> "${deltaMinutes}分前"
+        deltaMinutes < 24 * 60 -> {
+            val hours = deltaMinutes / 60
+            "${hours}小时前"
+        }
+        else -> {
+            java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")
+                .format(java.time.Instant.ofEpochMilli(updatedAt).atZone(java.time.ZoneId.systemDefault()))
+        }
+    }
 }
 
 @Composable
@@ -1027,14 +1132,14 @@ internal fun ThreadScreen(
         AnimatedVisibility(
             visible = showJumpToBottom,
             modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 8.dp, bottom = composerPadding + 72.dp),
+                .align(Alignment.BottomEnd)
+                .padding(end = 6.dp, bottom = composerPadding + 18.dp),
             enter = fadeIn(tween(120)),
             exit = fadeOut(tween(120))
         ) {
             Box(
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
                     .background(CodexTheme.colors.surface)
                     .border(1.dp, CodexTheme.colors.border, CircleShape)
@@ -1411,35 +1516,53 @@ private fun CommandExecutionCard(
     compactMode: Boolean
 ) {
     val hasOutput = outputValue.isNotBlank()
+    val hasDetails = metaLines.isNotEmpty() || hasOutput
+    var detailsExpanded by rememberSaveable(messageId + ":command:$blockIndex") { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(if (compactMode) 10.dp else 12.dp))
             .background(CodexTheme.colors.surfaceSubtle)
             .border(1.dp, CodexTheme.colors.border, RoundedCornerShape(if (compactMode) 10.dp else 12.dp))
-            .padding(horizontal = if (compactMode) 9.dp else 10.dp, vertical = if (compactMode) 8.dp else 9.dp),
-        verticalArrangement = Arrangement.spacedBy(if (compactMode) 6.dp else 7.dp)
+            .padding(horizontal = if (compactMode) 8.dp else 9.dp, vertical = if (compactMode) 5.dp else 6.dp),
+        verticalArrangement = Arrangement.spacedBy(if (compactMode) 3.dp else 4.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = if (hasDetails) Modifier.clickable(onClick = { detailsExpanded = !detailsExpanded }) else Modifier
+        ) {
             Text(
                 text = summary,
                 color = CodexTheme.colors.textPrimary,
-                fontSize = if (compactMode) 11.sp else 12.sp,
+                fontSize = if (compactMode) 10.sp else 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            if (hasDetails) {
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = if (detailsExpanded) "收起" else "展开",
+                    color = CodexTheme.colors.textTertiary,
+                    fontSize = 9.sp
+                )
+            }
         }
-        if (metaLines.isNotEmpty()) {
-            Text(
-                text = metaLines.joinToString("  ·  "),
-                color = CodexTheme.colors.textTertiary,
-                fontSize = if (compactMode) 9.sp else 10.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+        if (detailsExpanded) {
+            metaLines.forEach { metaLine ->
+                MarkdownText(
+                    text = metaLine,
+                    expanded = true,
+                    onToggle = {},
+                    textColor = CodexTheme.colors.textTertiary,
+                    fontSize = if (compactMode) 9.sp else 10.sp,
+                    lineHeight = if (compactMode) 12.sp else 13.sp,
+                    maxCollapsedLines = Int.MAX_VALUE,
+                    wrapContent = false
+                )
+            }
         }
-        if (hasOutput) {
+        if (detailsExpanded && hasOutput) {
             CommandOutputBlock(
                 messageId = messageId,
                 blockIndex = blockIndex,
@@ -2253,12 +2376,11 @@ private fun MarkdownLineItem(
 ) {
     when (line.kind) {
         MarkdownLineKind.EMPTY -> Spacer(Modifier.height(4.dp))
-        MarkdownLineKind.HEADING -> Text(
+        MarkdownLineKind.HEADING -> MarkdownInlineText(
             text = line.text,
-            color = textColor,
+            textColor = textColor,
             fontSize = (fontSize.value + 2f).sp,
             lineHeight = (lineHeight.value + 2f).sp,
-            fontWeight = FontWeight.SemiBold,
             modifier = Modifier
                 .then(if (wrapContent) Modifier else Modifier.fillMaxWidth())
                 .padding(top = 2.dp, bottom = 1.dp)
@@ -2274,9 +2396,9 @@ private fun MarkdownLineItem(
                 lineHeight = lineHeight,
                 modifier = Modifier.width(12.dp)
             )
-            Text(
+            MarkdownInlineText(
                 text = line.text,
-                color = textColor,
+                textColor = textColor,
                 fontSize = fontSize,
                 lineHeight = lineHeight,
                 modifier = if (wrapContent) Modifier else Modifier.weight(1f)
@@ -2294,9 +2416,9 @@ private fun MarkdownLineItem(
                     .background(textColor.copy(alpha = 0.35f))
             )
             Spacer(Modifier.width(8.dp))
-            Text(
+            MarkdownInlineText(
                 text = line.text,
-                color = textColor,
+                textColor = textColor,
                 fontSize = fontSize,
                 lineHeight = lineHeight,
                 modifier = if (wrapContent) Modifier else Modifier.weight(1f)
@@ -2310,9 +2432,9 @@ private fun MarkdownLineItem(
             fontFamily = FontFamily.Monospace,
             modifier = if (wrapContent) Modifier else Modifier.fillMaxWidth()
         )
-        MarkdownLineKind.PARAGRAPH -> Text(
-            text = renderInlineMarkdown(line.text),
-            color = textColor,
+        MarkdownLineKind.PARAGRAPH -> MarkdownInlineText(
+            text = line.text,
+            textColor = textColor,
             fontSize = fontSize,
             lineHeight = lineHeight,
             modifier = Modifier
@@ -2331,7 +2453,8 @@ private fun renderInlineMarkdown(text: String): AnnotatedString {
             val codeStart = source.indexOf('`', index)
             val boldStart = source.indexOf("**", index)
             val italicStart = source.indexOf('*', index)
-            val next = listOf(codeStart, boldStart, italicStart).filter { it >= 0 }.minOrNull() ?: source.length
+            val linkStart = source.indexOf("[", index)
+            val next = listOf(codeStart, boldStart, italicStart, linkStart).filter { it >= 0 }.minOrNull() ?: source.length
             if (next > index) {
                 append(source.substring(index, next))
             }
@@ -2378,11 +2501,55 @@ private fun renderInlineMarkdown(text: String): AnnotatedString {
                         break
                     }
                 }
+                next == linkStart && linkStart >= 0 -> {
+                    val closeBracket = source.indexOf(']', linkStart + 1)
+                    val openParen = if (closeBracket > linkStart) source.indexOf('(', closeBracket + 1) else -1
+                    val closeParen = if (openParen > closeBracket) source.indexOf(')', openParen + 1) else -1
+                    if (closeBracket > linkStart + 1 && openParen == closeBracket + 1 && closeParen > openParen + 1) {
+                        val label = source.substring(linkStart + 1, closeBracket)
+                        val url = source.substring(openParen + 1, closeParen)
+                        withLink(
+                            LinkAnnotation.Url(
+                                url,
+                                TextLinkStyles(
+                                    style = SpanStyle(
+                                        color = Color(0xFF2563EB),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                )
+                            )
+                        ) {
+                            append(label)
+                        }
+                        index = closeParen + 1
+                    } else {
+                        append(source.substring(linkStart))
+                        break
+                    }
+                }
                 else -> break
             }
         }
     }
     return builder
+}
+
+@Composable
+private fun MarkdownInlineText(
+    text: String,
+    textColor: Color,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    lineHeight: androidx.compose.ui.unit.TextUnit,
+    modifier: Modifier = Modifier
+) {
+    val annotatedText = remember(text) { renderInlineMarkdown(text) }
+    Text(
+        text = annotatedText,
+        color = textColor,
+        fontSize = fontSize,
+        lineHeight = lineHeight,
+        modifier = modifier,
+    )
 }
 
 @Composable

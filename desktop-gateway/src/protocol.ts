@@ -94,6 +94,7 @@ export interface GatewayThreadPayload {
   id: string;
   title: string;
   preview: string;
+  subtitle?: string;
   status: "running" | "idle" | "needs_approval" | "failed";
   updatedAt?: number;
   groupKind?: "project" | "chat";
@@ -108,7 +109,7 @@ export interface GatewayMessagePayload {
 }
 
 export interface GatewayBlockPayload {
-  kind: "text" | "code" | "status" | "reasoning";
+  kind: "text" | "code" | "status" | "reasoning" | "commandSummary" | "commandMeta";
   value: string;
   language?: string;
 }

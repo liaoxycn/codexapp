@@ -11,10 +11,11 @@ import type {
   ThreadResumeResult,
 } from "./appServerTypes.js";
 import { AppServerClient } from "./appServerClient.js";
-import { getThreadStatusType, isThreadActivelyGenerating } from "./threadState.js";
+import { getThreadStatusType, isThreadActivelyGenerating, resolveDisplayedThreadStatus, resolveLifecycleStatus, resolveThreadSummaryStatus } from "./threadState.js";
 import type {
   ClientSnapshot,
   GatewayChipPayload,
+  GatewayBlockPayload,
   GatewayMessagePayload,
   GatewayThreadPayload,
 } from "./protocol.js";
@@ -33,6 +34,7 @@ interface PendingApproval {
 interface ThreadRuntimeState {
   summary: GatewayThreadPayload;
   thread: AppServerThread | null;
+  lastActivityAtMs: number;
   historyWindow: number;
   currentTurnId: string | null;
   activeAssistantMessageId: string | null;
@@ -323,16 +325,8 @@ export class AppServerBridgeBackend {
   }
 
   private async hydrateThreads(): Promise<void> {
-    const [activeList, archivedList] = await Promise.all([
-      this.appServer.threadList(false),
-      this.appServer.threadList(true),
-    ]);
-    const filteredActive = activeList.filter((thread) => !isExcludedThread(thread));
-    const filteredArchived = archivedList.filter((thread) => !isExcludedThread(thread));
-    const summaries = [
-      ...filteredActive.map((thread) => mapThreadToSummary(thread, false)),
-      ...filteredArchived.map((thread) => mapThreadToSummary(thread, true)),
-    ];
+    const activeList = await this.appServer.threadList(false);
+    const summaries = buildVisibleThreadSummaries(activeList);
 
     if (summaries.length === 0) {
       return;
@@ -354,6 +348,7 @@ export class AppServerBridgeBackend {
         this.threads.set(summary.id, {
           summary,
           thread: null,
+          lastActivityAtMs: summary.updatedAt ?? 0,
           historyWindow: INITIAL_HISTORY_WINDOW,
           currentTurnId: null,
           activeAssistantMessageId: null,
@@ -375,7 +370,15 @@ export class AppServerBridgeBackend {
           },
         });
       } else {
-        existing.summary = { ...summary, status: existing.summary.status };
+        existing.summary = {
+          ...summary,
+          status: resolveDisplayedThreadStatus(resolveLifecycleStatus(summary.status, existing.pendingApproval != null), {
+            isGenerating: existing.snapshot.isGenerating,
+            currentTurnId: existing.currentTurnId,
+            transientOperation: existing.transientOperation,
+            pendingApproval: existing.pendingApproval?.text ?? null,
+          }),
+        };
         existing.snapshot.threads = summaries;
       }
     }
@@ -451,17 +454,18 @@ export class AppServerBridgeBackend {
         }
 
         state.snapshot.isGenerating = false;
-        this.updateSummaryStatus(threadId, mapLifecycleStatus(status, state.pendingApproval != null));
+        this.updateSummaryStatus(threadId, resolveLifecycleStatus(status, state.pendingApproval != null));
         this.emitChanged();
         return;
       }
       case "turn/started": {
-        const { threadId, turn } = notification.params as { threadId: string; turn: { id: string } };
+        const { threadId, turn } = notification.params as { threadId: string; turn: { id: string; startedAt?: number | null } };
         const state = this.threads.get(threadId);
         if (!state) {
           return;
         }
         state.currentTurnId = turn.id;
+        touchThreadActivity(state, turn.startedAt);
         if (state.transientOperation === "compact") {
           return;
         }
@@ -473,12 +477,17 @@ export class AppServerBridgeBackend {
         return;
       }
       case "turn/completed": {
-        const { threadId, turn } = notification.params as { threadId: string; turn: { id: string; status?: string } };
+        const { threadId, turn } = notification.params as { threadId: string; turn: { id: string; status?: string; startedAt?: number | null; completedAt?: number | null } };
         const state = this.threads.get(threadId);
+        if (!state) {
+          return;
+        }
         if (state?.transientOperation === "compact" && turn.status !== "failed") {
+          touchThreadActivity(state, turn.completedAt ?? turn.startedAt);
           await this.finalizeCompactState(threadId);
           return;
         }
+        touchThreadActivity(state, turn.completedAt ?? turn.startedAt);
         await this.finalizeTurnState(threadId, turn.status);
         return;
       }
@@ -541,7 +550,18 @@ export class AppServerBridgeBackend {
         if (state.transientOperation === "compact") {
           return;
         }
-        appendOrMergeCodeMessage(state, itemId, delta, "shell", "命令输出");
+        replaceOrAppendMessage(state, {
+          id: itemId,
+          role: "assistant",
+          blocks: [
+            {
+              kind: "commandSummary",
+              value: "命令执行中",
+            },
+            { kind: "commandMeta", value: "命令输出更新中" },
+            { kind: "code", language: "shell", value: delta },
+          ],
+        });
         this.emitChanged();
         return;
       }
@@ -559,14 +579,10 @@ export class AppServerBridgeBackend {
         if (state.transientOperation === "compact") {
           return;
         }
-        const value = formatFileChanges(changes);
         replaceOrAppendMessage(state, {
           id: itemId,
           role: "assistant",
-          blocks: [
-            { kind: "text", value: "文件改动草稿" },
-            { kind: "code", language: "diff", value },
-          ],
+          blocks: buildFileChangeBlocks(changes, "inProgress"),
         });
         this.emitChanged();
         return;
@@ -577,11 +593,18 @@ export class AppServerBridgeBackend {
           threadId: string;
           turnId: string;
           item: AppServerThreadItem;
+          startedAtMs?: number;
+          completedAtMs?: number;
         };
         const state = this.threads.get(threadId);
         if (!state) {
           return;
         }
+        const timestampMs =
+          notification.method === "item/started"
+            ? (notification.params as { startedAtMs?: number }).startedAtMs
+            : (notification.params as { completedAtMs?: number }).completedAtMs;
+        touchThreadActivity(state, timestampMs);
         if (state.transientOperation === "compact") {
           state.currentTurnId = turnId;
           if (item.type === "contextCompaction" && notification.method === "item/completed") {
@@ -697,11 +720,22 @@ export class AppServerBridgeBackend {
       ? mergeSnapshotMessages(allThreadMessages, existing.snapshot.messages)
       : allThreadMessages;
     const historyWindow = existing?.historyWindow ?? INITIAL_HISTORY_WINDOW;
+    const resolvedSummaryStatus = resolveThreadSummaryStatus(thread);
+    const lastActivityAtMs = Math.max(existing?.lastActivityAtMs ?? 0, getThreadLastActivityAtMs(thread));
     const runtimeState: ThreadRuntimeState = {
       summary: existing
-        ? { ...mapThreadToSummary(thread), status: existing.summary.status }
+        ? {
+            ...mapThreadToSummary(thread, false, lastActivityAtMs),
+            status: resolveDisplayedThreadStatus(resolvedSummaryStatus, {
+              isGenerating: existing.snapshot.isGenerating,
+              currentTurnId: existing.currentTurnId,
+              transientOperation: existing.transientOperation,
+              pendingApproval: existing.pendingApproval?.text ?? null,
+            }),
+          }
         : mapThreadToSummary(thread),
       thread,
+      lastActivityAtMs,
       historyWindow: existing?.historyWindow ?? INITIAL_HISTORY_WINDOW,
       currentTurnId: existing?.currentTurnId ?? thread.turns.at(-1)?.id ?? null,
       activeAssistantMessageId: existing?.activeAssistantMessageId ?? null,
@@ -808,7 +842,15 @@ export class AppServerBridgeBackend {
     const items = [...this.threads.values()]
       .filter((entry) => entry.thread != null || entry.snapshot.threads.length > 0)
       .map((entry) => entry.thread
-        ? { ...mapThreadToSummary(entry.thread, entry.summary.archived), status: entry.summary.status }
+        ? {
+            ...mapThreadToSummary(entry.thread, entry.summary.archived, entry.lastActivityAtMs),
+            status: resolveDisplayedThreadStatus(resolveThreadSummaryStatus(entry.thread), {
+              isGenerating: entry.snapshot.isGenerating,
+              currentTurnId: entry.currentTurnId,
+              transientOperation: entry.transientOperation,
+              pendingApproval: entry.pendingApproval?.text ?? null,
+            }),
+          }
         : entry.summary)
       .filter((value): value is GatewayThreadPayload => value != null);
     return dedupeSummaries(items);
@@ -994,10 +1036,7 @@ function mergeThreadItem(state: ThreadRuntimeState, item: AppServerThreadItem, p
     replaceOrAppendMessage(state, {
       id: item.id,
       role: "assistant",
-      blocks: [
-        { kind: "text", value: `命令: ${asString(item.command)}` },
-        { kind: "code", language: "shell", value: asString(item.aggregatedOutput, asString(item.status)) },
-      ],
+      blocks: buildCommandExecutionBlocks(item as Extract<AppServerThreadItem, { type: "commandExecution" }>),
     });
     return;
   }
@@ -1006,10 +1045,10 @@ function mergeThreadItem(state: ThreadRuntimeState, item: AppServerThreadItem, p
     replaceOrAppendMessage(state, {
       id: item.id,
       role: "assistant",
-      blocks: [
-        { kind: "text", value: `文件改动 ${asString(item.status)}` },
-        { kind: "code", language: "diff", value: formatFileChanges(asFileChanges(item.changes)) },
-      ],
+      blocks: buildFileChangeBlocks(
+        asFileChanges((item as Extract<AppServerThreadItem, { type: "fileChange" }>).changes),
+        asString((item as Extract<AppServerThreadItem, { type: "fileChange" }>).status)
+      ),
     });
     return;
   }
@@ -1084,6 +1123,12 @@ function asFileChanges(
   });
 }
 
+function formatFileChanges(changes: Array<{ path?: string; kind?: string; diff?: string | null }>): string {
+  return changes
+    .map((change) => change.diff?.trim() || `${change.kind ?? "update"} ${change.path ?? "unknown"}`)
+    .join("\n");
+}
+
 function mapThreadToSnapshot(
   thread: AppServerThread,
   threads: GatewayThreadPayload[],
@@ -1106,17 +1151,17 @@ function mapThreadToSnapshot(
   };
 }
 
-function mapThreadToSummary(thread: AppServerThread, archived = false): GatewayThreadPayload {
+function mapThreadToSummary(thread: AppServerThread, archived = false, updatedAtOverride?: number): GatewayThreadPayload {
   const grouping = deriveThreadGrouping(thread);
-  const status = isThreadActivelyGenerating(thread)
-    ? "running"
-    : mapLifecycleStatus(thread.status, false);
+  const status = resolveThreadSummaryStatus(thread);
+  const subtitle = buildThreadSubtitle(thread);
   return {
     id: thread.id,
     title: thread.name ?? buildThreadTitle(thread.preview),
     preview: thread.preview,
+    subtitle,
     status,
-    updatedAt: thread.updatedAt,
+    updatedAt: updatedAtOverride ?? toMillisTimestamp(thread.updatedAt),
     groupKind: grouping.kind,
     groupLabel: grouping.label,
     archived,
@@ -1155,21 +1200,16 @@ function mapItemToMessages(item: AppServerThreadItem): GatewayMessagePayload[] {
         {
           id: item.id,
           role: "assistant",
-          blocks: [
-            { kind: "text", value: `命令: ${asString(item.command)}` },
-            { kind: "code", language: "shell", value: asString(item.aggregatedOutput, asString(item.status)) },
-          ],
+          blocks: buildCommandExecutionBlocks(item as Extract<AppServerThreadItem, { type: "commandExecution" }>),
         },
       ];
     case "fileChange":
+      const fileChangeItem = item as Extract<AppServerThreadItem, { type: "fileChange" }>;
       return [
         {
-          id: item.id,
+          id: fileChangeItem.id,
           role: "assistant",
-          blocks: [
-            { kind: "text", value: `文件改动 ${asString(item.status)}` },
-            { kind: "code", language: "diff", value: formatFileChanges(asFileChanges(item.changes)) },
-          ],
+          blocks: buildFileChangeBlocks(fileChangeItem.changes, fileChangeItem.status),
         },
       ];
     case "plan":
@@ -1232,6 +1272,60 @@ function buildThreadTitle(preview: string): string {
   return firstLine.slice(0, 32) || "Codex 会话";
 }
 
+function buildThreadSubtitle(thread: AppServerThread): string {
+  const latestText = extractLatestThreadText(thread);
+  if (latestText.length > 0) {
+    return latestText;
+  }
+  return thread.preview.trim();
+}
+
+function extractLatestThreadText(thread: AppServerThread): string {
+  for (let turnIndex = thread.turns.length - 1; turnIndex >= 0; turnIndex -= 1) {
+    const turn = thread.turns[turnIndex];
+    for (let itemIndex = turn.items.length - 1; itemIndex >= 0; itemIndex -= 1) {
+      const item = turn.items[itemIndex];
+      const text = extractThreadItemText(item);
+      if (text.length > 0) {
+        return text;
+      }
+    }
+  }
+  return "";
+}
+
+function extractThreadItemText(item: AppServerThreadItem): string {
+  switch (item.type) {
+    case "userMessage":
+      return asTextInputEntries(item.content)
+        .map((entry) => entry.text.trim())
+        .find((value) => value.length > 0) ?? "";
+    case "agentMessage":
+      return asString(item.text).trim();
+    default:
+      return "";
+  }
+}
+
+function formatCommandResult(item: {
+  [key: string]: unknown;
+  status?: string;
+  exitCode?: number | null;
+  durationMs?: number | null;
+}): string {
+  const parts: string[] = [];
+  if (typeof item.exitCode === "number") {
+    parts.push(`退出码 ${item.exitCode}`);
+  }
+  if (typeof item.durationMs === "number") {
+    parts.push(`${Math.max(0, Math.round(item.durationMs / 1000))}s`);
+  }
+  if (parts.length > 0) {
+    return parts.join(" · ");
+  }
+  return item.status ?? "unknown";
+}
+
 function deriveThreadGrouping(thread: AppServerThread): { kind: "project" | "chat"; label: string } {
   const cwd = thread.cwd.replaceAll("\\", "/");
   const segments = cwd.split("/").filter(Boolean);
@@ -1268,32 +1362,6 @@ function buildChips(
   return chips.slice(0, 3);
 }
 
-function mapLifecycleStatus(
-  status: AppServerThreadStatus,
-  hasPendingApproval: boolean
-): GatewayThreadPayload["status"] {
-  if (hasPendingApproval) {
-    return "needs_approval";
-  }
-  const type = getThreadStatusType(status);
-  if (type === "active" || type === "in_progress" || type === "running") {
-    return "running";
-  }
-  switch (type) {
-    case "waitingOnApproval":
-      return "needs_approval";
-    case "waitingOnUserInput":
-      return "running";
-    case "systemError":
-      return "failed";
-    case "idle":
-    case "notLoaded":
-      return "idle";
-    default:
-      return "idle";
-  }
-}
-
 function systemStatus(text: string): GatewayMessagePayload {
   return {
     id: randomUUID(),
@@ -1318,10 +1386,94 @@ function buildApprovalResponse(kind: PendingApproval["kind"], allow: boolean): u
   };
 }
 
-function formatFileChanges(changes: Array<{ path?: string; kind?: string; diff?: string | null }>): string {
-  return changes
-    .map((change) => change.diff?.trim() || `${change.kind ?? "update"} ${change.path ?? "unknown"}`)
-    .join("\n");
+function buildFileChangeBlocks(
+  changes: Array<{ path?: string; kind?: string | { type?: string }; diff?: string | null }>,
+  status: string
+): GatewayBlockPayload[] {
+  const summary = summarizeFileChanges(changes, status);
+  const details = formatFileChangeDetails(changes);
+  return [
+    { kind: "commandSummary", value: summary },
+    ...details.map((value) => ({ kind: "commandMeta" as const, value })),
+  ];
+}
+
+function buildCommandExecutionBlocks(item: Extract<AppServerThreadItem, { type: "commandExecution" }>): GatewayBlockPayload[] {
+  return [
+    {
+      kind: "commandSummary",
+      value: Array.isArray(item.commandActions) && item.commandActions.length > 0
+        ? `已运行 ${item.commandActions.length} 条命令`
+        : asString(item.status) === "inProgress"
+          ? "命令执行中"
+          : `命令 ${asString(item.status)}`,
+    },
+    { kind: "commandMeta", value: `命令: ${asString(item.command)}` },
+    { kind: "commandMeta", value: `结果: ${formatCommandResult(item)}` },
+    { kind: "code" as const, language: "shell", value: asString(item.aggregatedOutput, asString(item.status)) },
+  ];
+}
+
+function summarizeFileChanges(
+  changes: Array<{ path?: string; kind?: string | { type?: string }; diff?: string | null }>,
+  status: string
+): string {
+  if (!Array.isArray(changes) || changes.length === 0) {
+    return status === "inProgress" ? "文件改动中" : `文件改动 ${status}`;
+  }
+  const counts = { add: 0, delete: 0, update: 0 };
+  for (const change of changes) {
+    counts[normalizeChangeKind(change.kind)] += 1;
+  }
+  const parts: string[] = [];
+  if (counts.add > 0) {
+    parts.push(`已创建 ${counts.add} 个文件`);
+  }
+  if (counts.delete > 0) {
+    parts.push(`已删除 ${counts.delete} 个文件`);
+  }
+  if (counts.update > 0) {
+    parts.push(`已编辑 ${counts.update} 个文件`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : `已编辑 ${changes.length} 个文件`;
+}
+
+function formatFileChangeDetails(
+  changes: Array<{ path?: string; kind?: string | { type?: string }; diff?: string | null }>
+): string[] {
+  return changes.map((change) => {
+    const label = describeChangeKind(change.kind);
+    const path = change.path?.trim() || "unknown";
+    return `- ${label} \`${path}\``;
+  });
+}
+
+function normalizeChangeKind(kind: unknown): "add" | "delete" | "update" {
+  if (typeof kind === "string") {
+    const normalized = kind.toLowerCase();
+    if (normalized === "add" || normalized === "delete" || normalized === "update") {
+      return normalized;
+    }
+  }
+  if (typeof kind === "object" && kind != null) {
+    const candidate = kind as Record<string, unknown>;
+    const normalized = typeof candidate.type === "string" ? candidate.type.toLowerCase() : "";
+    if (normalized === "add" || normalized === "delete" || normalized === "update") {
+      return normalized;
+    }
+  }
+  return "update";
+}
+
+function describeChangeKind(kind: unknown): string {
+  switch (normalizeChangeKind(kind)) {
+    case "add":
+      return "创建";
+    case "delete":
+      return "删除";
+    default:
+      return "编辑";
+  }
 }
 
 function flattenHookPrompt(fragments: Array<{ type?: string; text?: string }> | undefined): string {
@@ -1617,6 +1769,43 @@ function dedupeSummaries(items: GatewayThreadPayload[]): GatewayThreadPayload[] 
     map.set(item.id, item);
   }
   return [...map.values()];
+}
+
+function touchThreadActivity(state: ThreadRuntimeState, timestampMs?: number | null): void {
+  if (typeof timestampMs !== "number" || !Number.isFinite(timestampMs) || timestampMs <= 0) {
+    return;
+  }
+  state.lastActivityAtMs = Math.max(state.lastActivityAtMs, timestampMs);
+  state.summary = {
+    ...state.summary,
+    updatedAt: state.lastActivityAtMs,
+  };
+  state.snapshot.threads = state.snapshot.threads.map((thread) =>
+    thread.id === state.summary.id ? { ...thread, updatedAt: state.lastActivityAtMs } : thread
+  );
+}
+
+function toMillisTimestamp(seconds: number): number {
+  return seconds > 0 ? seconds * 1000 : 0;
+}
+
+function getThreadLastActivityAtMs(thread: AppServerThread): number {
+  let latest = 0;
+  for (const turn of thread.turns) {
+    if (typeof turn.startedAt === "number" && turn.startedAt > 0) {
+      latest = Math.max(latest, toMillisTimestamp(turn.startedAt));
+    }
+    if (typeof turn.completedAt === "number" && turn.completedAt > 0) {
+      latest = Math.max(latest, toMillisTimestamp(turn.completedAt));
+    }
+  }
+  return latest > 0 ? latest : toMillisTimestamp(thread.updatedAt);
+}
+
+export function buildVisibleThreadSummaries(threads: AppServerThread[]): GatewayThreadPayload[] {
+  return threads
+    .filter((thread) => !isExcludedThread(thread))
+    .map((thread) => mapThreadToSummary(thread, false, getThreadLastActivityAtMs(thread)));
 }
 
 function isThreadNotMaterializedError(error: unknown): boolean {

@@ -45,6 +45,9 @@ export interface AppServerTurn {
   status: AppServerTurnStatus;
   itemsView?: "notLoaded" | "summary" | "full";
   items: AppServerThreadItem[];
+  startedAt?: number | null;
+  completedAt?: number | null;
+  durationMs?: number | null;
 }
 
 export type AppServerThreadStatus =
@@ -76,9 +79,12 @@ export type AppServerThreadItem =
       type: "commandExecution";
       id: string;
       command: string;
-      aggregatedOutput?: string | null;
-      status: string;
-    }
+    commandActions?: Array<{ type: string; command?: string }> | null;
+    aggregatedOutput?: string | null;
+    exitCode?: number | null;
+    durationMs?: number | null;
+    status: string;
+  }
   | {
       type: "fileChange";
       id: string;

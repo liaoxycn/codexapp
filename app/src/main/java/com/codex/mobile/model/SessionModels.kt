@@ -5,8 +5,16 @@ data class ThreadSummary(
     val title: String,
     val preview: String,
     val status: ThreadStatus,
-    val updatedAt: Long = 0L
+    val updatedAt: Long = 0L,
+    val groupKind: ThreadGroupKind = ThreadGroupKind.CHAT,
+    val groupLabel: String = "普通会话",
+    val archived: Boolean = false
 )
+
+enum class ThreadGroupKind {
+    PROJECT,
+    CHAT
+}
 
 data class ThreadMessage(
     val id: String,
@@ -19,6 +27,8 @@ sealed interface MessageBlock {
     data class Code(val language: String, val value: String) : MessageBlock
     data class Status(val value: String) : MessageBlock
     data class Reasoning(val value: String) : MessageBlock
+    data class CommandSummary(val value: String) : MessageBlock
+    data class CommandMeta(val value: String) : MessageBlock
 }
 
 enum class MessageRole {
@@ -63,6 +73,7 @@ data class SessionRemoteState(
     val isThreadSwitching: Boolean = false,
     val messages: List<ThreadMessage> = emptyList(),
     val hasMoreHistory: Boolean = false,
+    val isLoadingOlder: Boolean = false,
     val isGenerating: Boolean = false,
     val isManualRefreshing: Boolean = false,
     val chips: List<ComposerChip> = emptyList(),
@@ -83,6 +94,7 @@ data class HomeUiState(
     val isThreadSwitching: Boolean,
     val messages: List<ThreadMessage>,
     val hasMoreHistory: Boolean,
+    val isLoadingOlder: Boolean,
     val composerText: String,
     val isGenerating: Boolean,
     val isManualRefreshing: Boolean,

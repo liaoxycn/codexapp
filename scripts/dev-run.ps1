@@ -158,7 +158,7 @@ function Main {
     New-Item -ItemType Directory -Path $artifactsDir -Force | Out-Null
 
     try {
-        Write-Log "1/5 stop old processes"
+        Write-Log "1/6 stop old processes"
         Stop-ProcessByName -Names @("node", "tsx", "desktop-gateway", "emulator")
         Start-Sleep -Milliseconds 800
 
@@ -168,10 +168,10 @@ function Main {
         $adbExe = Get-PlatformToolsAdb
         $emulatorExe = Get-AvdBin
 
-        Write-Log "2/5 start emulator and wait"
+        Write-Log "2/6 start emulator and wait"
         Ensure-EmulatorRunning -AvdName $AvdName -AdbExe $adbExe -EmulatorExe $emulatorExe
 
-        Write-Log "3/5 start gateway dev"
+        Write-Log "3/6 start gateway dev"
         $gatewayRoot = Resolve-Path $GatewayDir
         $gatewayPathArg = $GatewayPath.Replace('"', '\"')
         $cmdLine = 'set "CODEX_MOBILE_GATEWAY_HOST=' + $GatewayBindHost.Trim() + '" && set "CODEX_MOBILE_GATEWAY_PORT=' + $GatewayPort + '" && set "CODEX_MOBILE_GATEWAY_PATH=' + $gatewayPathArg.Trim() + '" && npm run dev 1>> "' + $gatewayLog + '" 2>> "' + $gatewayErr + '"'
@@ -185,10 +185,15 @@ function Main {
             throw "gateway port check failed: $GatewayHost`:$GatewayPort"
         }
 
-        Write-Log "4/5 install debug apk"
+        Write-Log "4/6 build debug apk"
+        Invoke-Checked -FilePath (Join-Path $root "gradlew.bat") -Arguments @(":app:preDebugBuild") -WorkingDirectory $root -DisplayName "assembleDebug"
+        Invoke-Checked -FilePath (Join-Path $root "gradlew.bat") -Arguments @(":app:compileDebugKotlin") -WorkingDirectory $root -DisplayName "assembleDebug"
+        Invoke-Checked -FilePath (Join-Path $root "gradlew.bat") -Arguments @(":app:assembleDebug") -WorkingDirectory $root -DisplayName "assembleDebug"
+
+        Write-Log "5/6 install debug apk"
         Invoke-Checked -FilePath (Join-Path $root "gradlew.bat") -Arguments @(":app:installDebug") -WorkingDirectory $root -DisplayName "installDebug"
 
-        Write-Log "5/5 open app"
+        Write-Log "6/6 open app"
         if (-not $SkipOpenApp) {
             Invoke-Checked -FilePath $adbExe -Arguments @("shell", "am", "start", "-n", "$AppId/$Activity") -WorkingDirectory $root -DisplayName "adb start activity"
         }
