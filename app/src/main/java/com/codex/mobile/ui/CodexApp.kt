@@ -117,6 +117,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -213,8 +214,13 @@ fun CodexApp(
             topBar = {
                 Box(modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)) {
                     val selectedThread = state.threads.firstOrNull { it.id == state.selectedThreadId }
+                    val selectedThreadStatus = when {
+                        state.selectedThreadId.isBlank() -> ThreadStatus.IDLE
+                        else -> selectedThread?.status ?: ThreadStatus.IDLE
+                    }
                     TopBar(
                         title = selectedThread?.title ?: "Codex",
+                        status = selectedThreadStatus,
                         onOpenDrawer = { scope.launch { drawerState.open() } },
                         onCreateThread = viewModel::createThread,
                         onOpenConnection = { showGatewayDialog = true }
@@ -363,6 +369,7 @@ private fun GatewayDialog(
 @Composable
 private fun TopBar(
     title: String,
+    status: ThreadStatus,
     onOpenDrawer: () -> Unit,
     onCreateThread: () -> Unit,
     onOpenConnection: () -> Unit
@@ -379,10 +386,13 @@ private fun TopBar(
             contentDescription = "打开抽屉",
             onClick = onOpenDrawer
         )
-        Column(
+        Row(
             modifier = Modifier.weight(1f),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            ThreadStatusIcon(status)
+            Spacer(Modifier.width(6.dp))
             Text(
                 text = title,
                 color = CodexTheme.colors.textPrimary,
@@ -404,6 +414,11 @@ private fun TopBar(
         )
     }
     Divider(color = CodexTheme.colors.border)
+}
+
+@Composable
+private fun ThreadStatusIcon(status: ThreadStatus) {
+    StatusDot(status, size = 9.dp)
 }
 
 @Composable
@@ -552,7 +567,6 @@ private fun DrawerContent(
                             ThreadRow(
                                 summary = thread,
                                 selected = thread.id == state.selectedThreadId,
-                                showGenerating = state.selectedThreadId == thread.id && state.isGenerating,
                                 indentLevel = 1,
                                 onClick = { onSelectThread(thread.id) }
                             )
@@ -577,7 +591,6 @@ private fun DrawerContent(
                     ThreadRow(
                         summary = thread,
                         selected = thread.id == state.selectedThreadId,
-                        showGenerating = state.selectedThreadId == thread.id && state.isGenerating,
                         indentLevel = 0,
                         onClick = { onSelectThread(thread.id) }
                     )
@@ -732,7 +745,6 @@ private fun DrawerSearchBar(
 private fun ThreadRow(
     summary: ThreadSummary,
     selected: Boolean,
-    showGenerating: Boolean,
     indentLevel: Int,
     onClick: () -> Unit
 ) {
@@ -743,18 +755,22 @@ private fun ThreadRow(
             .clip(RoundedCornerShape(11.dp))
             .background(if (selected) CodexTheme.colors.surfaceSubtle else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(start = startPadding, end = 10.dp, top = 2.dp, bottom = 2.dp),
+            .padding(start = startPadding, end = 10.dp, top = 3.dp, bottom = 3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (selected) {
-            Box(
-                modifier = Modifier
-                    .width(2.dp)
-                    .height(18.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(CodexTheme.colors.textTertiary)
-            )
-            Spacer(Modifier.width(5.dp))
+        Box(
+            modifier = Modifier.width(7.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .width(2.dp)
+                        .height(18.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(CodexTheme.colors.textTertiary)
+                )
+            }
         }
         StatusDot(summary.status)
         Spacer(Modifier.width(6.dp))
@@ -766,6 +782,7 @@ private fun ThreadRow(
                     color = CodexTheme.colors.textPrimary,
                     style = TextStyle(
                         fontSize = 14.sp,
+                        lineHeight = 17.sp,
                         fontWeight = FontWeight.Medium,
                         platformStyle = PlatformTextStyle(includeFontPadding = false)
                     ),
@@ -774,18 +791,17 @@ private fun ThreadRow(
                 )
                 ThreadStatusText(
                     status = summary.status,
-                    isGenerating = showGenerating,
                     modifier = Modifier.padding(start = 4.dp)
                 )
             }
-            Spacer(Modifier.height(0.dp))
+            Spacer(Modifier.height(1.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = summary.preview.ifBlank { summary.title },
                     modifier = Modifier.weight(1f),
                     color = CodexTheme.colors.textSecondary,
-                    fontSize = 7.sp,
-                    lineHeight = 7.sp,
+                    fontSize = 8.sp,
+                    lineHeight = 10.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -794,7 +810,8 @@ private fun ThreadRow(
                     Text(
                         text = formatThreadUpdatedAt(summary.updatedAt),
                         color = CodexTheme.colors.textTertiary,
-                        fontSize = 5.5.sp,
+                        fontSize = 6.sp,
+                        lineHeight = 7.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -807,17 +824,16 @@ private fun ThreadRow(
 @Composable
 private fun ThreadStatusText(
     status: ThreadStatus,
-    isGenerating: Boolean,
     modifier: Modifier = Modifier
 ) {
     val text = when {
-        isGenerating || status == ThreadStatus.RUNNING -> "运行中"
+        status == ThreadStatus.RUNNING -> "运行中"
         status == ThreadStatus.NEEDS_APPROVAL -> "待审批"
         status == ThreadStatus.FAILED -> "失败"
         else -> "空闲"
     }
     val color = when {
-        isGenerating || status == ThreadStatus.RUNNING -> Color(0xFF2563EB)
+        status == ThreadStatus.RUNNING -> Color(0xFF2563EB)
         status == ThreadStatus.NEEDS_APPROVAL -> Color(0xFFF59E0B)
         status == ThreadStatus.FAILED -> Color(0xFFDC2626)
         else -> CodexTheme.colors.textTertiary
@@ -826,7 +842,8 @@ private fun ThreadStatusText(
         text = text,
         modifier = modifier,
         color = color,
-        fontSize = 6.sp,
+        fontSize = 6.5.sp,
+        lineHeight = 8.sp,
         fontWeight = FontWeight.Normal,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
@@ -834,19 +851,23 @@ private fun ThreadStatusText(
 }
 
 @Composable
-private fun StatusDot(status: ThreadStatus) {
-    val color = when (status) {
+private fun StatusDot(status: ThreadStatus, size: Dp = 7.dp) {
+    val color = threadStatusColor(status)
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(color)
+    )
+}
+
+private fun threadStatusColor(status: ThreadStatus): Color {
+    return when (status) {
         ThreadStatus.RUNNING -> Color(0xFF2563EB)
         ThreadStatus.IDLE -> Color(0xFF9CA3AF)
         ThreadStatus.NEEDS_APPROVAL -> Color(0xFFF59E0B)
         ThreadStatus.FAILED -> Color(0xFFDC2626)
     }
-    Box(
-        modifier = Modifier
-            .size(7.dp)
-            .clip(CircleShape)
-            .background(color)
-    )
 }
 
 internal fun threadListSortOrder(): Comparator<ThreadSummary> {

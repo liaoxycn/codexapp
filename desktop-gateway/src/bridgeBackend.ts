@@ -11,7 +11,7 @@ import type {
   ThreadResumeResult,
 } from "./appServerTypes.js";
 import { AppServerClient } from "./appServerClient.js";
-import { getThreadStatusType, isThreadActivelyGenerating, resolveDisplayedThreadStatus, resolveLifecycleStatus, resolveThreadSummaryStatus } from "./threadState.js";
+import { getThreadStatusType, isThreadActivelyGenerating, resolveDisplayedThreadStatus, resolveLifecycleStatus, resolveThreadSummaryStatus, shouldRetainThreadRuntimeOverlay } from "./threadState.js";
 import type {
   ClientSnapshot,
   GatewayChipPayload,
@@ -34,6 +34,7 @@ interface PendingApproval {
 interface ThreadRuntimeState {
   summary: GatewayThreadPayload;
   thread: AppServerThread | null;
+  isSubscribed: boolean;
   lastActivityAtMs: number;
   historyWindow: number;
   currentTurnId: string | null;
@@ -105,7 +106,8 @@ export class AppServerBridgeBackend {
   async selectThread(threadId: string): Promise<ClientSnapshot> {
     const resolved = this.resolveThreadId(threadId);
     this.currentThreadId = resolved;
-    await this.refreshThread(resolved);
+    await this.unsubscribeOtherThreads(resolved);
+    await this.resumeThread(resolved);
     this.syncSelectedThread(resolved);
     this.emitChanged();
     return this.getSnapshot(resolved);
@@ -176,7 +178,8 @@ export class AppServerBridgeBackend {
     const resolved = this.resolveThreadId(selectedThreadId);
     if (resolved) {
       this.currentThreadId = resolved;
-      await this.refreshThread(resolved);
+      await this.unsubscribeOtherThreads(resolved);
+      await this.resumeThread(resolved);
       this.syncSelectedThread(resolved);
     }
     this.emitChanged();
@@ -326,9 +329,20 @@ export class AppServerBridgeBackend {
 
   private async hydrateThreads(): Promise<void> {
     const activeList = await this.appServer.threadList(false);
-    const summaries = buildVisibleThreadSummaries(activeList);
+    const visibleThreads = activeList.filter((thread) => !isExcludedThread(thread));
+    const visibleThreadIds = new Set(visibleThreads.map((thread) => thread.id));
+    for (const threadId of [...this.threads.keys()]) {
+      if (!visibleThreadIds.has(threadId)) {
+        this.threads.delete(threadId);
+      }
+    }
+
+    const detailedThreads = await this.readThreadDetailsForSummaries(visibleThreads);
+    const summaries = buildVisibleThreadSummaries(detailedThreads);
 
     if (summaries.length === 0) {
+      this.currentThreadId = "";
+      this.emitChanged();
       return;
     }
 
@@ -337,10 +351,10 @@ export class AppServerBridgeBackend {
         ? this.currentThreadId
         : summaries[0].id;
 
-    const resumed = await this.appServer.threadResume(candidateId);
-    const detailedThread = await this.appServer.threadRead(candidateId);
     this.currentThreadId = candidateId;
-    this.upsertThread(detailedThread, summaries, resumed);
+    for (const thread of detailedThreads) {
+      this.upsertThread(thread, summaries, null);
+    }
 
     for (const summary of summaries) {
       const existing = this.threads.get(summary.id);
@@ -357,6 +371,7 @@ export class AppServerBridgeBackend {
           pendingApproval: null,
           stopRequested: false,
           isFinalizing: false,
+          isSubscribed: false,
           model: null,
           instructionSources: [],
           approvalPolicy: null,
@@ -387,22 +402,28 @@ export class AppServerBridgeBackend {
     this.emitChanged();
   }
 
-  private async ensureResumed(threadId: string): Promise<ThreadRuntimeState> {
-    try {
-      const resumed = await this.appServer.threadResume(threadId);
-      this.upsertThread(resumed.thread, null, resumed);
-      this.syncSelectedThread(threadId);
-      return this.threads.get(threadId)!;
-    } catch (error) {
-      if (!isNoRolloutFoundError(error)) {
-        throw error;
+  private async readThreadDetailsForSummaries(threads: AppServerThread[]): Promise<AppServerThread[]> {
+    const details: AppServerThread[] = [];
+    for (const thread of threads) {
+      try {
+        details.push(await this.appServer.threadRead(thread.id));
+      } catch (error) {
+        if (!isThreadNotMaterializedError(error)) {
+          console.warn(`[gateway] thread/read failed for ${thread.id}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        details.push(thread);
       }
-      const existing = this.threads.get(threadId);
-      if (existing?.thread != null) {
-        return existing;
-      }
-      throw error;
     }
+    return details;
+  }
+
+  private async ensureResumed(threadId: string): Promise<ThreadRuntimeState> {
+    await this.resumeThread(threadId);
+    const state = this.threads.get(threadId);
+    if (state) {
+      return state;
+    }
+    throw new Error(`thread not found after resume: ${threadId}`);
   }
 
   private async refreshThread(threadId: string): Promise<void> {
@@ -415,7 +436,55 @@ export class AppServerBridgeBackend {
       }
       thread = await this.appServer.threadRead(threadId, false);
     }
+    const existing = this.threads.get(threadId);
     this.upsertThread(thread, null, null, true);
+    const state = this.threads.get(threadId);
+    if (state && existing?.isSubscribed) {
+      state.isSubscribed = true;
+    }
+  }
+
+  private async resumeThread(threadId: string): Promise<void> {
+    const existing = this.threads.get(threadId);
+    if (existing?.isSubscribed) {
+      await this.refreshThread(threadId);
+      return;
+    }
+    try {
+      const resumed = await this.appServer.threadResume(threadId);
+      this.upsertThread(resumed.thread, null, resumed);
+      const state = this.threads.get(threadId);
+      if (state) {
+        state.isSubscribed = true;
+      }
+    } catch (error) {
+      if (!isNoRolloutFoundError(error)) {
+        throw error;
+      }
+      const current = this.threads.get(threadId);
+      if (current?.thread != null) {
+        current.isSubscribed = true;
+        return;
+      }
+      throw error;
+    }
+  }
+
+  private async unsubscribeOtherThreads(activeThreadId: string): Promise<void> {
+    const staleThreadIds = [...this.threads.values()]
+      .filter((entry) => entry.thread != null && entry.thread.id !== activeThreadId && entry.isSubscribed)
+      .map((entry) => entry.thread!.id);
+    for (const threadId of staleThreadIds) {
+      try {
+        await this.appServer.threadUnsubscribe(threadId);
+      } catch {
+        // Ignore unsubscribe failures; the next resume rebinds the stream.
+      }
+      const state = this.threads.get(threadId);
+      if (state) {
+        state.isSubscribed = false;
+      }
+    }
   }
 
   private async handleNotification(notification: JsonRpcNotification): Promise<void> {
@@ -632,6 +701,10 @@ export class AppServerBridgeBackend {
       case "thread/started":
         await this.hydrateThreads();
         return;
+      case "thread/archived":
+      case "thread/unarchived":
+        await this.hydrateThreads();
+        return;
       case "thread/compacted": {
         const { threadId } = notification.params as { threadId: string; turnId?: string };
         const state = this.threads.get(threadId);
@@ -722,28 +795,30 @@ export class AppServerBridgeBackend {
     const historyWindow = existing?.historyWindow ?? INITIAL_HISTORY_WINDOW;
     const resolvedSummaryStatus = resolveThreadSummaryStatus(thread);
     const lastActivityAtMs = Math.max(existing?.lastActivityAtMs ?? 0, getThreadLastActivityAtMs(thread));
+    const retainRuntimeOverlay = shouldRetainThreadRuntimeOverlay(thread, existing);
     const runtimeState: ThreadRuntimeState = {
       summary: existing
         ? {
             ...mapThreadToSummary(thread, false, lastActivityAtMs),
             status: resolveDisplayedThreadStatus(resolvedSummaryStatus, {
-              isGenerating: existing.snapshot.isGenerating,
-              currentTurnId: existing.currentTurnId,
-              transientOperation: existing.transientOperation,
-              pendingApproval: existing.pendingApproval?.text ?? null,
+              isGenerating: retainRuntimeOverlay && existing.snapshot.isGenerating,
+              currentTurnId: retainRuntimeOverlay ? existing.currentTurnId : null,
+              transientOperation: retainRuntimeOverlay ? existing.transientOperation : null,
+              pendingApproval: retainRuntimeOverlay ? existing.pendingApproval?.text ?? null : null,
             }),
           }
         : mapThreadToSummary(thread),
       thread,
+      isSubscribed: resume != null || existing?.isSubscribed === true,
       lastActivityAtMs,
       historyWindow: existing?.historyWindow ?? INITIAL_HISTORY_WINDOW,
-      currentTurnId: existing?.currentTurnId ?? thread.turns.at(-1)?.id ?? null,
-      activeAssistantMessageId: existing?.activeAssistantMessageId ?? null,
-      liveAssistantItemId: existing?.liveAssistantItemId ?? null,
-      transientOperation: existing?.transientOperation ?? null,
-      pendingApproval: existing?.pendingApproval ?? null,
-      stopRequested: existing?.stopRequested ?? false,
-      isFinalizing: existing?.isFinalizing ?? false,
+      currentTurnId: retainRuntimeOverlay ? existing?.currentTurnId ?? null : null,
+      activeAssistantMessageId: retainRuntimeOverlay ? existing?.activeAssistantMessageId ?? null : null,
+      liveAssistantItemId: retainRuntimeOverlay ? existing?.liveAssistantItemId ?? null : null,
+      transientOperation: retainRuntimeOverlay ? existing?.transientOperation ?? null : null,
+      pendingApproval: retainRuntimeOverlay ? existing?.pendingApproval ?? null : null,
+      stopRequested: retainRuntimeOverlay ? existing?.stopRequested ?? false : false,
+      isFinalizing: retainRuntimeOverlay ? existing?.isFinalizing ?? false : false,
       model: resume?.model ?? existing?.model ?? null,
       instructionSources: resume?.instructionSources ?? existing?.instructionSources ?? [],
       approvalPolicy: resume?.approvalPolicy ?? existing?.approvalPolicy ?? null,

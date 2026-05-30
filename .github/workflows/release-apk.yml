@@ -1,4 +1,4 @@
-name: Build Release APK
+name: Build Release
 
 on:
   workflow_dispatch:
@@ -76,8 +76,60 @@ jobs:
           name: CodexMobile
           path: app/build/outputs/apk/release/CodexMobile.apk
 
+  build-gateway:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: desktop-gateway/package-lock.json
+
+      - name: Install dependencies
+        working-directory: desktop-gateway
+        run: npm ci
+
+      - name: Build Windows gateway executable
+        working-directory: desktop-gateway
+        run: npm run build:exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-gateway-windows
+          path: desktop-gateway/dist/desktop-gateway.exe
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - build-apk
+      - build-gateway
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/CodexMobile.apk
+          body: |
+            ## 本次更新
+            - 修复移动端会话列表状态同步，状态完全以 app-server/gateway 返回数据为准。
+            - gateway 定时刷新会话列表，覆盖 CodexDesktop 发送、归档、取消归档等跨端变更。
+            - 标题栏新增当前会话状态图标，并与列表状态保持一致。
+            - 优化会话列表行距和选中状态对齐。
+
+            ## Release 产物
+            - `CodexMobile.apk`
+            - `desktop-gateway.exe`
+          files: |
+            release-assets/CodexMobile/CodexMobile.apk
+            release-assets/desktop-gateway-windows/desktop-gateway.exe

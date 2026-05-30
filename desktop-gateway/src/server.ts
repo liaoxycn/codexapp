@@ -28,6 +28,7 @@ interface ClientContext {
   unsubscribe: () => void;
   snapshotTimer: NodeJS.Timeout | null;
   liveRefreshTimer: NodeJS.Timeout | null;
+  listRefreshTimer: NodeJS.Timeout | null;
 }
 
 type Backend = {
@@ -46,6 +47,8 @@ type Backend = {
   stopTurn(threadId: string): ClientSnapshot | Promise<ClientSnapshot>;
   approveCurrent(threadId: string, allow: boolean): ClientSnapshot | Promise<ClientSnapshot>;
 };
+
+const LIST_REFRESH_INTERVAL_MS = 2500;
 
 export class GatewayServer {
   private readonly mockBackend: Backend;
@@ -89,6 +92,7 @@ export class GatewayServer {
         authenticated: false,
         snapshotTimer: null,
         liveRefreshTimer: null,
+        listRefreshTimer: null,
         unsubscribe: this.backend().subscribe(() => {
           if (context.authenticated && socket.readyState === socket.OPEN) {
             this.scheduleSnapshot(context);
@@ -116,6 +120,10 @@ export class GatewayServer {
         if (context.liveRefreshTimer) {
           clearTimeout(context.liveRefreshTimer);
           context.liveRefreshTimer = null;
+        }
+        if (context.listRefreshTimer) {
+          clearTimeout(context.listRefreshTimer);
+          context.listRefreshTimer = null;
         }
         context.unsubscribe();
         this.clients.delete(context);
@@ -264,6 +272,7 @@ export class GatewayServer {
       detail: `已配对 ${message.client ?? "android"} ${message.version ?? ""}`.trim(),
     });
     this.sendSnapshot(context, this.backend().getSnapshot(context.selectedThreadId));
+    this.scheduleListRefresh(context);
   }
 
   private sendStatus(socket: WebSocket, message: GatewayStatusMessage) {
@@ -286,6 +295,7 @@ export class GatewayServer {
     };
     context.socket.send(JSON.stringify(message));
     this.scheduleLiveRefresh(context, snapshot);
+    this.scheduleListRefresh(context);
   }
 
   private scheduleSnapshot(context: ClientContext): void {
@@ -325,7 +335,8 @@ export class GatewayServer {
     const shouldPoll =
       snapshot.isGenerating ||
       snapshot.pendingApproval != null ||
-      selectedThread?.status === "running";
+      selectedThread?.status === "running" ||
+      selectedThread?.status === "needs_approval";
     if (!shouldPoll) {
       if (context.liveRefreshTimer) {
         clearTimeout(context.liveRefreshTimer);
@@ -349,7 +360,7 @@ export class GatewayServer {
 
   private async refreshSelectedThread(context: ClientContext): Promise<void> {
     try {
-      const snapshot = await this.backend().selectThread(context.selectedThreadId);
+      const snapshot = await this.backend().refreshThreads(context.selectedThreadId);
       context.selectedThreadId = snapshot.selectedThreadId;
       this.sendSnapshot(context, snapshot);
     } catch (error) {
@@ -360,6 +371,36 @@ export class GatewayServer {
         status: "error",
         detail,
       });
+    }
+  }
+
+  private scheduleListRefresh(context: ClientContext): void {
+    if (context.listRefreshTimer || !context.authenticated) {
+      return;
+    }
+    context.listRefreshTimer = setTimeout(() => {
+      context.listRefreshTimer = null;
+      if (context.socket.readyState !== context.socket.OPEN || !context.authenticated) {
+        return;
+      }
+      void this.refreshThreadList(context);
+    }, LIST_REFRESH_INTERVAL_MS);
+  }
+
+  private async refreshThreadList(context: ClientContext): Promise<void> {
+    try {
+      const snapshot = await this.backend().refreshThreads(context.selectedThreadId);
+      context.selectedThreadId = snapshot.selectedThreadId;
+      this.sendSnapshot(context, snapshot);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "刷新会话列表失败";
+      console.error("[gateway] list refresh failed:", detail);
+      this.sendStatus(context.socket, {
+        type: "status",
+        status: "error",
+        detail,
+      });
+      this.scheduleListRefresh(context);
     }
   }
 
