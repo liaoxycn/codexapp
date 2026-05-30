@@ -24,6 +24,7 @@ interface GatewayServerOptions {
 interface ClientContext {
   socket: WebSocket;
   selectedThreadId: string;
+  selectionVersion: number;
   authenticated: boolean;
   unsubscribe: () => void;
   snapshotTimer: NodeJS.Timeout | null;
@@ -89,6 +90,7 @@ export class GatewayServer {
       const context: ClientContext = {
         socket,
         selectedThreadId: this.backend().getDefaultThreadId(),
+        selectionVersion: 0,
         authenticated: false,
         snapshotTimer: null,
         liveRefreshTimer: null,
@@ -181,6 +183,7 @@ export class GatewayServer {
 
     switch (message.type) {
       case "create_thread":
+        context.selectionVersion += 1;
         await this.runBackendAction(context, async () => {
           const snapshot = await this.backend().createThread();
           context.selectedThreadId = snapshot.selectedThreadId;
@@ -188,6 +191,7 @@ export class GatewayServer {
         });
         break;
       case "select_thread":
+        context.selectionVersion += 1;
         context.selectedThreadId = this.backend().hasThread(message.threadId)
           ? message.threadId
           : this.backend().getDefaultThreadId();
@@ -201,6 +205,7 @@ export class GatewayServer {
         );
         break;
       case "archive_thread":
+        context.selectionVersion += 1;
         await this.runBackendAction(context, async () => {
           const snapshot = await this.backend().archiveThread(message.threadId);
           context.selectedThreadId = snapshot.selectedThreadId;
@@ -208,6 +213,7 @@ export class GatewayServer {
         });
         break;
       case "unarchive_thread":
+        context.selectionVersion += 1;
         await this.runBackendAction(context, async () => {
           const snapshot = await this.backend().unarchiveThread(message.threadId);
           context.selectedThreadId = snapshot.selectedThreadId;
@@ -215,11 +221,7 @@ export class GatewayServer {
         });
         break;
       case "refresh_threads":
-        await this.runBackendAction(context, async () => {
-          const snapshot = await this.backend().refreshThreads(context.selectedThreadId);
-          context.selectedThreadId = snapshot.selectedThreadId;
-          return snapshot;
-        });
+        await this.refreshSelectedThread(context, "manual");
         break;
       case "load_older_messages":
         await this.runBackendAction(context, async () =>
@@ -354,18 +356,28 @@ export class GatewayServer {
       if (context.socket.readyState !== context.socket.OPEN || !context.authenticated) {
         return;
       }
-      void this.refreshSelectedThread(context);
+      void this.refreshSelectedThread(context, "live");
     }, 1200);
   }
 
-  private async refreshSelectedThread(context: ClientContext): Promise<void> {
+  private async refreshSelectedThread(context: ClientContext, source: "manual" | "live" | "list"): Promise<void> {
+    const requestedThreadId = context.selectedThreadId;
+    const requestedVersion = context.selectionVersion;
     try {
-      const snapshot = await this.backend().refreshThreads(context.selectedThreadId);
+      const snapshot = await this.backend().refreshThreads(requestedThreadId);
+      if (this.isStaleRefresh(context, requestedThreadId, requestedVersion)) {
+        console.log(`[gateway] ignored stale ${source} refresh for ${requestedThreadId}`);
+        return;
+      }
       context.selectedThreadId = snapshot.selectedThreadId;
       this.sendSnapshot(context, snapshot);
     } catch (error) {
-      const detail = error instanceof Error ? error.message : "刷新运行中会话失败";
-      console.error("[gateway] live refresh failed:", detail);
+      if (this.isStaleRefresh(context, requestedThreadId, requestedVersion)) {
+        console.log(`[gateway] ignored stale ${source} refresh error for ${requestedThreadId}`);
+        return;
+      }
+      const detail = error instanceof Error ? error.message : "刷新会话失败";
+      console.error(`[gateway] ${source} refresh failed:`, detail);
       this.sendStatus(context.socket, {
         type: "status",
         status: "error",
@@ -388,20 +400,12 @@ export class GatewayServer {
   }
 
   private async refreshThreadList(context: ClientContext): Promise<void> {
-    try {
-      const snapshot = await this.backend().refreshThreads(context.selectedThreadId);
-      context.selectedThreadId = snapshot.selectedThreadId;
-      this.sendSnapshot(context, snapshot);
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : "刷新会话列表失败";
-      console.error("[gateway] list refresh failed:", detail);
-      this.sendStatus(context.socket, {
-        type: "status",
-        status: "error",
-        detail,
-      });
-      this.scheduleListRefresh(context);
-    }
+    await this.refreshSelectedThread(context, "list");
+    this.scheduleListRefresh(context);
+  }
+
+  private isStaleRefresh(context: ClientContext, requestedThreadId: string, requestedVersion: number): boolean {
+    return context.selectionVersion !== requestedVersion || context.selectedThreadId !== requestedThreadId;
   }
 
   private async pokeDesktop(threadId: string, reason: string): Promise<void> {

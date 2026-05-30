@@ -60,6 +60,7 @@ export class AppServerBridgeBackend {
   private readonly events = new EventEmitter();
   private readonly threads = new Map<string, ThreadRuntimeState>();
   private currentThreadId = "";
+  private selectionVersion = 0;
 
   async start(): Promise<void> {
     await this.appServer.start();
@@ -106,8 +107,15 @@ export class AppServerBridgeBackend {
   async selectThread(threadId: string): Promise<ClientSnapshot> {
     const resolved = this.resolveThreadId(threadId);
     this.currentThreadId = resolved;
+    this.selectionVersion += 1;
     await this.unsubscribeOtherThreads(resolved);
+    if (!this.isCurrentSelection(resolved)) {
+      return this.getSnapshot();
+    }
     await this.resumeThread(resolved);
+    if (!this.isCurrentSelection(resolved)) {
+      return this.getSnapshot();
+    }
     this.syncSelectedThread(resolved);
     this.emitChanged();
     return this.getSnapshot(resolved);
@@ -120,6 +128,7 @@ export class AppServerBridgeBackend {
     const started = await this.appServer.threadStart(cwd);
     const threadId = started.thread.id;
     this.currentThreadId = threadId;
+    this.selectionVersion += 1;
     const mergedSummaries = dedupeSummaries([
       ...this.buildSummaries(threadId),
       mapThreadToSummary(started.thread),
@@ -149,6 +158,7 @@ export class AppServerBridgeBackend {
     await this.hydrateThreads();
     const nextThreadId = [...this.threads.values()].find((entry) => !entry.summary.archived)?.summary.id ?? "";
     this.currentThreadId = nextThreadId;
+    this.selectionVersion += 1;
     if (nextThreadId) {
       await this.refreshThread(nextThreadId);
     }
@@ -163,6 +173,7 @@ export class AppServerBridgeBackend {
     const resolved = this.resolveThreadId(threadId);
     if (this.hasThread(threadId)) {
       this.currentThreadId = threadId;
+      this.selectionVersion += 1;
       await this.refreshThread(threadId);
       this.syncSelectedThread(threadId);
       this.emitChanged();
@@ -174,12 +185,24 @@ export class AppServerBridgeBackend {
   }
 
   async refreshThreads(selectedThreadId?: string): Promise<ClientSnapshot> {
+    const requested = this.resolveThreadId(selectedThreadId);
+    const requestedVersion = this.selectionVersion;
     await this.hydrateThreads();
-    const resolved = this.resolveThreadId(selectedThreadId);
+    if (this.selectionVersion !== requestedVersion && requested !== this.currentThreadId) {
+      this.emitChanged();
+      return this.getSnapshot();
+    }
+    const resolved = this.resolveThreadId(requested);
     if (resolved) {
       this.currentThreadId = resolved;
       await this.unsubscribeOtherThreads(resolved);
+      if (this.selectionVersion !== requestedVersion && resolved !== this.currentThreadId) {
+        return this.getSnapshot();
+      }
       await this.resumeThread(resolved);
+      if (this.selectionVersion !== requestedVersion && resolved !== this.currentThreadId) {
+        return this.getSnapshot();
+      }
       this.syncSelectedThread(resolved);
     }
     this.emitChanged();
@@ -982,6 +1005,10 @@ export class AppServerBridgeBackend {
   private emitChanged(): void {
     this.syncSelectedThread(this.currentThreadId || this.getDefaultThreadId());
     this.events.emit("changed");
+  }
+
+  private isCurrentSelection(threadId: string): boolean {
+    return this.currentThreadId === threadId;
   }
 }
 
