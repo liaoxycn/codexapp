@@ -76,39 +76,10 @@ jobs:
           name: CodexMobile
           path: app/build/outputs/apk/release/CodexMobile.apk
 
-  build-gateway:
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: desktop-gateway/package-lock.json
-
-      - name: Install dependencies
-        working-directory: desktop-gateway
-        run: npm ci
-
-      - name: Build Windows gateway executable
-        working-directory: desktop-gateway
-        run: npm run build:exe
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: desktop-gateway-windows
-          path: desktop-gateway/dist/desktop-gateway.exe
-
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs:
       - build-apk
-      - build-gateway
     runs-on: ubuntu-latest
 
     steps:
@@ -129,7 +100,5 @@ jobs:
 
             ## Release 产物
             - `CodexMobile.apk`
-            - `desktop-gateway.exe`
           files: |
             release-assets/CodexMobile/CodexMobile.apk
-            release-assets/desktop-gateway-windows/desktop-gateway.exe

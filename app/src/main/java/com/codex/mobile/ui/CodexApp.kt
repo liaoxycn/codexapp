@@ -326,28 +326,63 @@ private fun GatewayDialog(
             Text(
                 text = "连接 Desktop Gateway",
                 color = CodexTheme.colors.textPrimary,
-                fontSize = 20.sp,
-                lineHeight = 25.sp,
+                fontSize = 19.sp,
+                lineHeight = 24.sp,
                 fontWeight = FontWeight.SemiBold,
                 style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(CodexTheme.colors.surfaceSubtle)
+                        .padding(horizontal = 12.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(if (isConnected) Color(0xFF059669) else Color(0xFFF59E0B))
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = if (isConnected) "当前已连接，移动端只负责转发与展示" else "填写 Desktop Gateway 地址后连接",
+                        color = CodexTheme.colors.textSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
+                    )
+                }
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("WebSocket 地址") },
-                    placeholder = { Text("ws://10.0.2.2:8765/mobile") },
+                    label = { Text("WebSocket 地址", fontSize = 13.sp) },
+                    placeholder = { Text("ws://10.0.2.2:8765/mobile", fontSize = 14.sp) },
+                    textStyle = TextStyle(
+                        color = CodexTheme.colors.textPrimary,
+                        fontSize = 14.sp,
+                        lineHeight = 18.sp
+                    ),
                     singleLine = true
                 )
                 OutlinedTextField(
                     value = pairToken,
                     onValueChange = { pairToken = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("配对码 / token") },
-                    placeholder = { Text("可选") },
+                    label = { Text("配对码 / token", fontSize = 13.sp) },
+                    placeholder = { Text("可选", fontSize = 14.sp) },
+                    textStyle = TextStyle(
+                        color = CodexTheme.colors.textPrimary,
+                        fontSize = 14.sp,
+                        lineHeight = 18.sp
+                    ),
                     singleLine = true
                 )
                 Text(
@@ -362,20 +397,27 @@ private fun GatewayDialog(
         confirmButton = {
             Button(
                 onClick = { onConnect(url, pairToken) },
-                enabled = url.isNotBlank()
+                enabled = url.isNotBlank(),
+                modifier = Modifier.defaultMinSize(minHeight = 44.dp)
             ) {
-                Text("连接")
+                Text("连接", fontSize = 15.sp, lineHeight = 19.sp)
             }
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (isConnected) {
-                    TextButton(onClick = onDisconnect) {
-                        Text("断开", color = CodexTheme.colors.danger)
+                    TextButton(
+                        onClick = onDisconnect,
+                        modifier = Modifier.defaultMinSize(minHeight = 44.dp)
+                    ) {
+                        Text("断开连接", color = CodexTheme.colors.danger, fontSize = 14.sp)
                     }
                 }
-                TextButton(onClick = onDismiss) {
-                    Text("取消", color = CodexTheme.colors.textPrimary)
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.defaultMinSize(minHeight = 44.dp)
+                ) {
+                    Text("取消", color = CodexTheme.colors.textPrimary, fontSize = 14.sp)
                 }
             }
         }
@@ -823,47 +865,49 @@ private fun ThreadRow(
         StatusDot(summary.status)
         Spacer(Modifier.width(6.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = summary.title,
-                    modifier = Modifier.weight(1f),
-                    color = CodexTheme.colors.textPrimary,
-                    style = TextStyle(
-                        fontSize = 14.sp,
-                        lineHeight = 18.sp,
-                        fontWeight = FontWeight.Medium,
-                        platformStyle = PlatformTextStyle(includeFontPadding = false)
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                ThreadStatusText(
-                    status = summary.status,
-                    modifier = Modifier.padding(start = 4.dp)
-                )
-            }
+            Text(
+                text = summary.title,
+                color = CodexTheme.colors.textPrimary,
+                style = TextStyle(
+                    fontSize = 14.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                    platformStyle = PlatformTextStyle(includeFontPadding = false)
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             Spacer(Modifier.height(2.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = summary.preview.ifBlank { summary.title },
+                color = CodexTheme.colors.textSecondary,
+                fontSize = 9.sp,
+                lineHeight = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Column(
+            modifier = Modifier.width(62.dp),
+            horizontalAlignment = Alignment.End
+        ) {
+            ThreadStatusText(
+                status = summary.status,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(2.dp))
+            if (summary.updatedAt > 0L) {
                 Text(
-                    text = summary.preview.ifBlank { summary.title },
-                    modifier = Modifier.weight(1f),
-                    color = CodexTheme.colors.textSecondary,
-                    fontSize = 9.sp,
-                    lineHeight = 12.sp,
+                    text = formatThreadUpdatedAt(summary.updatedAt),
+                    modifier = Modifier.fillMaxWidth(),
+                    color = CodexTheme.colors.textTertiary,
+                    fontSize = 8.sp,
+                    lineHeight = 10.sp,
+                    textAlign = TextAlign.End,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (summary.updatedAt > 0L) {
-                    Spacer(Modifier.width(5.dp))
-                    Text(
-                        text = formatThreadUpdatedAt(summary.updatedAt),
-                        color = CodexTheme.colors.textTertiary,
-                        fontSize = 8.sp,
-                        lineHeight = 10.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
         }
     }
@@ -888,6 +932,7 @@ private fun ThreadStatusText(
         fontSize = 8.sp,
         lineHeight = 10.sp,
         fontWeight = FontWeight.Medium,
+        textAlign = TextAlign.End,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )
@@ -998,7 +1043,7 @@ internal fun ThreadScreen(
             listState.layoutInfo.totalItemsCount == 0 || !listState.canScrollForward
         }
     }
-    val showJumpToBottom = hasVisibleMessages && !isAtBottom
+    val showJumpToBottom = hasVisibleMessages && !isAtBottom && !state.showComposerDetails
     val userWasAtBottom = rememberSaveable(state.selectedThreadId) { mutableStateOf(true) }
     val pullConnection = remember(state.selectedThreadId, state.isGenerating, state.isManualRefreshing, lastItemIndex, isAtBottom) {
         object : NestedScrollConnection {
@@ -2204,8 +2249,8 @@ private fun Composer(
                     enabled = composerEnabled,
                     textStyle = TextStyle(
                         color = if (composerEnabled) CodexTheme.colors.textPrimary else CodexTheme.colors.textTertiary,
-                        fontSize = if (compactMode) 12.sp else 13.sp,
-                        lineHeight = if (compactMode) 16.sp else 18.sp,
+                        fontSize = if (compactMode) 13.sp else 14.sp,
+                        lineHeight = if (compactMode) 17.sp else 19.sp,
                         platformStyle = PlatformTextStyle(includeFontPadding = false)
                     ),
                     decorationBox = { inner ->
@@ -2223,9 +2268,9 @@ private fun Composer(
                                         state.connectionStatus == ConnectionStatus.CONNECTING -> "正在连接…"
                                         else -> "未连接"
                                     },
-                                    color = CodexTheme.colors.textTertiary,
-                                    fontSize = if (compactMode) 12.sp else 13.sp,
-                                    lineHeight = if (compactMode) 16.sp else 18.sp
+                                    color = if (composerEnabled) CodexTheme.colors.textSecondary else CodexTheme.colors.textTertiary,
+                                    fontSize = if (compactMode) 13.sp else 14.sp,
+                                    lineHeight = if (compactMode) 17.sp else 19.sp
                                 )
                             }
                             inner()
