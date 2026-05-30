@@ -11,6 +11,7 @@ import com.codex.mobile.model.MessageBlock
 import com.codex.mobile.model.MessageRole
 import com.codex.mobile.model.SessionRemoteState
 import com.codex.mobile.model.ThreadMessage
+import com.codex.mobile.model.ThreadGroupKind
 import com.codex.mobile.model.ThreadStatus
 import com.codex.mobile.model.ThreadSummary
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -158,6 +159,7 @@ class DefaultSessionRepository(
                     selectedThreadId = "",
                     messages = emptyList(),
                     hasMoreHistory = false,
+                    isLoadingOlder = false,
                     pendingApproval = null,
                     isGenerating = false
                 )
@@ -184,6 +186,7 @@ class DefaultSessionRepository(
                     isThreadSwitching = true,
                     messages = emptyList(),
                     hasMoreHistory = false,
+                    isLoadingOlder = false,
                     pendingApproval = null,
                     isGenerating = false
                 )
@@ -214,6 +217,7 @@ class DefaultSessionRepository(
 
     override suspend fun loadOlderMessages() {
         if (_state.value.connectionStatus == ConnectionStatus.CONNECTED) {
+            _state.update { it.copy(isLoadingOlder = true) }
             gatewayClient.send(
                 json.encodeToString(
                     GatewayLoadOlderMessagesMessage.serializer(),
@@ -342,9 +346,12 @@ class DefaultSessionRepository(
             ThreadSummary(
                 id = it.id,
                 title = it.title,
-                preview = it.preview,
+                preview = it.subtitle ?: it.preview,
                 status = it.status.toThreadStatus(),
-                updatedAt = it.updatedAt ?: 0L
+                updatedAt = it.updatedAt ?: 0L,
+                groupKind = if (it.groupKind == "project") ThreadGroupKind.PROJECT else ThreadGroupKind.CHAT,
+                groupLabel = it.groupLabel ?: "普通会话",
+                archived = it.archived == true
             )
         }
         val messages = snapshot.messages.map { message ->
@@ -360,6 +367,8 @@ class DefaultSessionRepository(
 
                         "status" -> MessageBlock.Status(block.value)
                         "reasoning" -> MessageBlock.Reasoning(block.value)
+                        "commandSummary" -> MessageBlock.CommandSummary(block.value)
+                        "commandMeta" -> MessageBlock.CommandMeta(block.value)
                         else -> MessageBlock.Text(block.value)
                     }
                 }
@@ -373,6 +382,7 @@ class DefaultSessionRepository(
                 isThreadSwitching = false,
                 messages = messages,
                 hasMoreHistory = snapshot.hasMoreHistory,
+                isLoadingOlder = false,
                 pendingApproval = snapshot.pendingApproval,
                 chips = snapshot.chips.map { chip ->
                     ComposerChip(
@@ -635,8 +645,12 @@ private data class GatewayThreadPayload(
     val id: String,
     val title: String,
     val preview: String,
+    val subtitle: String? = null,
     val status: String,
-    val updatedAt: Long? = null
+    val updatedAt: Long? = null,
+    val groupKind: String? = null,
+    val groupLabel: String? = null,
+    val archived: Boolean? = null
 )
 
 @Serializable
@@ -688,6 +702,7 @@ private fun emptyRemoteState(
     isThreadSwitching = false,
     messages = emptyList(),
     hasMoreHistory = false,
+    isLoadingOlder = false,
     isGenerating = false,
     chips = emptyList(),
     slashCommands = listOf(

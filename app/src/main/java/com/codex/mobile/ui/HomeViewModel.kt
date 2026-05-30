@@ -361,6 +361,7 @@ private fun SessionRemoteState.toHomeState(
     isThreadSwitching = isThreadSwitching,
     messages = messages,
     hasMoreHistory = hasMoreHistory,
+    isLoadingOlder = isLoadingOlder,
     composerText = composer,
     isGenerating = isGenerating,
     showComposerDetails = composerExpanded,

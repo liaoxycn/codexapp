@@ -29,6 +29,10 @@ type InboundMessage =
   | (JsonRpcNotification & JsonRpcBase)
   | (JsonRpcServerRequest & JsonRpcBase);
 
+const THREAD_LIST_PAGE_SIZE = 100;
+const THREAD_LIST_MAX_PAGES = 10;
+const THREAD_LIST_SOURCE_KINDS = ["cli", "vscode", "appServer", "unknown"];
+
 function isResponse(message: InboundMessage): message is JsonRpcResponse {
   return "id" in message && !("method" in message);
 }
@@ -143,11 +147,24 @@ export class AppServerClient {
   }
 
   async threadList(archived = false): Promise<AppServerThread[]> {
-    const result = (await this.request("thread/list", {
-      limit: 20,
-      archived,
-    })) as ThreadListResult;
-    return result.data;
+    const threads: AppServerThread[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < THREAD_LIST_MAX_PAGES; page += 1) {
+      const result = (await this.request("thread/list", {
+        cursor,
+        limit: THREAD_LIST_PAGE_SIZE,
+        sortKey: "updated_at",
+        sortDirection: "desc",
+        sourceKinds: THREAD_LIST_SOURCE_KINDS,
+        archived,
+      })) as ThreadListResult;
+      threads.push(...result.data);
+      cursor = result.nextCursor ?? null;
+      if (!cursor) {
+        break;
+      }
+    }
+    return threads;
   }
 
   async threadRead(threadId: string, includeTurns = true): Promise<AppServerThread> {
@@ -158,9 +175,10 @@ export class AppServerClient {
     return result.thread;
   }
 
-  async threadResume(threadId: string): Promise<ThreadResumeResult> {
+  async threadResume(threadId: string, options: { excludeTurns?: boolean } = {}): Promise<ThreadResumeResult> {
     return (await this.request("thread/resume", {
       threadId,
+      excludeTurns: options.excludeTurns ?? false,
     })) as ThreadResumeResult;
   }
 
@@ -185,6 +203,12 @@ export class AppServerClient {
 
   async threadUnarchive(threadId: string): Promise<void> {
     await this.request("thread/unarchive", {
+      threadId,
+    });
+  }
+
+  async threadUnsubscribe(threadId: string): Promise<void> {
+    await this.request("thread/unsubscribe", {
       threadId,
     });
   }
