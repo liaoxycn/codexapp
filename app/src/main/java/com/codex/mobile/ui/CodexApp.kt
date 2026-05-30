@@ -325,7 +325,10 @@ private fun GatewayDialog(
             Text(
                 text = "连接 Desktop Gateway",
                 color = CodexTheme.colors.textPrimary,
-                fontWeight = FontWeight.SemiBold
+                fontSize = 20.sp,
+                lineHeight = 25.sp,
+                fontWeight = FontWeight.SemiBold,
+                style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
             )
         },
         text = {
@@ -350,7 +353,8 @@ private fun GatewayDialog(
                     text = "移动端只负责连接与展示；账号、Key、MCP、Skill 均由桌面端处理。",
                     color = CodexTheme.colors.textSecondary,
                     fontSize = 12.sp,
-                    lineHeight = 17.sp
+                    lineHeight = 17.sp,
+                    style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
                 )
             }
         },
@@ -366,11 +370,11 @@ private fun GatewayDialog(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (isConnected) {
                     TextButton(onClick = onDisconnect) {
-                        Text("断开")
+                        Text("断开", color = CodexTheme.colors.danger)
                     }
                 }
                 TextButton(onClick = onDismiss) {
-                    Text("取消")
+                    Text("取消", color = CodexTheme.colors.textPrimary)
                 }
             }
         }
@@ -1193,12 +1197,11 @@ internal fun ThreadScreen(
         ) {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(44.dp)
                     .clip(CircleShape)
-                    .background(CodexTheme.colors.surface)
+                    .background(CodexTheme.colors.surface.copy(alpha = 0.96f))
                     .border(1.dp, CodexTheme.colors.border, CircleShape)
                     .testTag("jump_to_bottom_button")
-                    .semantics { contentDescription = "滚到底部" }
             ) {
                 IconButton(
                     onClick = {
@@ -1208,12 +1211,15 @@ internal fun ThreadScreen(
                             }
                         }
                     },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .semantics { contentDescription = "滚到底部" }
                 ) {
                     Icon(
                         imageVector = Icons.Filled.ArrowDownward,
-                        contentDescription = "滚到底部",
-                        tint = CodexTheme.colors.textPrimary
+                        contentDescription = null,
+                        tint = CodexTheme.colors.textPrimary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -1484,13 +1490,16 @@ private fun ActionPill(label: String, filled: Boolean, onClick: () -> Unit) {
                 shape = RoundedCornerShape(999.dp)
             )
             .clickable(onClick = onClick)
+            .defaultMinSize(minHeight = 44.dp)
             .padding(horizontal = 12.dp, vertical = if (filled) 7.dp else 6.dp)
     ) {
         Text(
             text = label,
             color = if (filled) Color.White else CodexTheme.colors.textPrimary,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium
+            fontSize = 12.sp,
+            lineHeight = 15.sp,
+            fontWeight = FontWeight.Medium,
+            style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
         )
     }
 }
@@ -1616,12 +1625,26 @@ private fun CommandExecutionCard(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = if (hasDetails) Modifier.clickable(onClick = { detailsExpanded = !detailsExpanded }) else Modifier
+            modifier = if (hasDetails) {
+                Modifier
+                    .semantics { contentDescription = if (detailsExpanded) "收起命令详情" else "展开命令详情" }
+                    .clickable(onClick = { detailsExpanded = !detailsExpanded })
+            } else {
+                Modifier
+            }
         ) {
+            Icon(
+                imageVector = Icons.Filled.Info,
+                contentDescription = null,
+                tint = CodexTheme.colors.textTertiary,
+                modifier = Modifier.size(if (compactMode) 13.dp else 15.dp)
+            )
+            Spacer(Modifier.width(6.dp))
             Text(
                 text = summary,
                 color = CodexTheme.colors.textPrimary,
-                fontSize = if (compactMode) 10.sp else 11.sp,
+                fontSize = if (compactMode) 11.sp else 12.sp,
+                lineHeight = if (compactMode) 14.sp else 16.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1630,7 +1653,7 @@ private fun CommandExecutionCard(
                 Spacer(Modifier.width(4.dp))
                 Icon(
                     imageVector = if (detailsExpanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = if (detailsExpanded) "收起命令详情" else "展开命令详情",
+                    contentDescription = null,
                     tint = CodexTheme.colors.textTertiary,
                     modifier = Modifier.size(14.dp)
                 )
@@ -2077,7 +2100,7 @@ private fun Composer(
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Add,
+                    imageVector = if (state.showComposerDetails) Icons.Filled.KeyboardArrowDown else Icons.Filled.Add,
                     contentDescription = null,
                     tint = CodexTheme.colors.textPrimary,
                     modifier = Modifier.size(18.dp)
@@ -2165,38 +2188,40 @@ private fun Composer(
                     onClick = onStop,
                     contentDescription = "停止生成",
                     size = 32.dp,
-                    shape = RoundedCornerShape(10.dp)
+                    shape = CircleShape,
+                    fill = CodexTheme.colors.danger
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Stop,
                         contentDescription = null,
-                        tint = CodexTheme.colors.textPrimary,
-                        modifier = Modifier.size(17.dp)
+                        tint = Color.White,
+                        modifier = Modifier.size(15.dp)
                     )
                 }
-            }
-            ComposerIconButton(
-                onClick = {
-                    if (sendEnabled) sendNow()
-                },
-                contentDescription = "发送消息",
-                size = 32.dp,
-                shape = CircleShape,
-                fill = when {
-                    sendEnabled -> Color(0xFF111827)
-                    else -> CodexTheme.colors.surfaceSubtle
-                }
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = null,
-                    tint = if (!sendEnabled) {
-                        CodexTheme.colors.textTertiary
-                    } else {
-                        Color.White
+            } else {
+                ComposerIconButton(
+                    onClick = {
+                        if (sendEnabled) sendNow()
                     },
-                    modifier = Modifier.size(16.dp)
-                )
+                    contentDescription = "发送消息",
+                    size = 32.dp,
+                    shape = CircleShape,
+                    fill = when {
+                        sendEnabled -> Color(0xFF111827)
+                        else -> CodexTheme.colors.surfaceSubtle
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = null,
+                        tint = if (!sendEnabled) {
+                            CodexTheme.colors.textTertiary
+                        } else {
+                            Color.White
+                        },
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         }
     }
@@ -2281,23 +2306,24 @@ private fun SlashCommandPanel(
                 .clip(RoundedCornerShape(12.dp))
                 .background(CodexTheme.colors.surfaceSubtle)
                 .border(1.dp, CodexTheme.colors.border, RoundedCornerShape(12.dp))
-                .padding(horizontal = 9.dp, vertical = 4.dp),
+                .padding(horizontal = 10.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = Icons.Filled.Search,
                 contentDescription = null,
                 tint = CodexTheme.colors.textSecondary,
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier.size(15.dp)
             )
-            Spacer(Modifier.width(5.dp))
+            Spacer(Modifier.width(7.dp))
             BasicTextField(
                 value = query,
                 onValueChange = onQueryChange,
                 singleLine = true,
                 textStyle = TextStyle(
                     color = CodexTheme.colors.textPrimary,
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
+                    lineHeight = 17.sp,
                     platformStyle = PlatformTextStyle(includeFontPadding = false)
                 ),
                 modifier = Modifier.fillMaxWidth(),
@@ -2305,11 +2331,11 @@ private fun SlashCommandPanel(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .defaultMinSize(minHeight = 22.dp),
+                            .defaultMinSize(minHeight = 28.dp),
                         contentAlignment = Alignment.CenterStart
                     ) {
                         if (query.isBlank()) {
-                            Text("搜索命令", color = CodexTheme.colors.textTertiary, fontSize = 12.sp)
+                            Text("搜索命令", color = CodexTheme.colors.textTertiary, fontSize = 13.sp, lineHeight = 17.sp)
                         }
                         innerTextField()
                     }
@@ -2342,13 +2368,15 @@ private fun SlashCommandRow(
             .clip(RoundedCornerShape(10.dp))
             .background(CodexTheme.colors.surfaceSubtle)
             .clickable(enabled = onClick != null) { onClick?.invoke() }
-            .padding(horizontal = 9.dp, vertical = 4.dp),
+            .defaultMinSize(minHeight = 44.dp)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = command,
             color = CodexTheme.colors.textPrimary,
-            fontSize = 10.sp,
+            fontSize = 13.sp,
+            lineHeight = 17.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -2358,7 +2386,8 @@ private fun SlashCommandRow(
             Text(
                 text = supporting,
                 color = CodexTheme.colors.textSecondary,
-                fontSize = 8.sp,
+                fontSize = 11.sp,
+                lineHeight = 15.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -2376,20 +2405,28 @@ private fun MiniAction(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
             .background(CodexTheme.colors.surfaceSubtle)
+            .semantics { contentDescription = label }
             .clickable(enabled = onClick != null) {
                 onClick?.invoke()
             }
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .defaultMinSize(minHeight = 44.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = CodexTheme.colors.textSecondary,
-            modifier = Modifier.size(13.dp)
+            modifier = Modifier.size(15.dp)
         )
-        Spacer(Modifier.width(4.dp))
-        Text(text = label, color = CodexTheme.colors.textPrimary, fontSize = 10.sp)
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = label,
+            color = CodexTheme.colors.textPrimary,
+            fontSize = 12.sp,
+            lineHeight = 15.sp,
+            style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
+        )
     }
 }
 
