@@ -63,12 +63,22 @@ import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.material.rememberDrawerState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.collectAsState
@@ -88,6 +98,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.testTag
@@ -312,7 +323,7 @@ private fun GatewayDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "连接 desktop gateway",
+                text = "连接 Desktop Gateway",
                 color = CodexTheme.colors.textPrimary,
                 fontWeight = FontWeight.SemiBold
             )
@@ -336,7 +347,7 @@ private fun GatewayDialog(
                     singleLine = true
                 )
                 Text(
-                    text = "Android 只连 desktop gateway；账号、key、mcp、skill 都由桌面端处理。",
+                    text = "移动端只负责连接与展示；账号、Key、MCP、Skill 均由桌面端处理。",
                     color = CodexTheme.colors.textSecondary,
                     fontSize = 12.sp,
                     lineHeight = 17.sp
@@ -378,7 +389,7 @@ private fun TopBar(
         modifier = Modifier
             .fillMaxWidth()
             .background(CodexTheme.colors.surface)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 9.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         HeaderIconButton(
@@ -387,8 +398,10 @@ private fun TopBar(
             onClick = onOpenDrawer
         )
         Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
             ThreadStatusIcon(status)
@@ -396,10 +409,12 @@ private fun TopBar(
             Text(
                 text = title,
                 color = CodexTheme.colors.textPrimary,
-                fontSize = 16.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
+                lineHeight = 19.sp,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
             )
         }
         HeaderIconButton(
@@ -418,7 +433,7 @@ private fun TopBar(
 
 @Composable
 private fun ThreadStatusIcon(status: ThreadStatus) {
-    StatusDot(status, size = 9.dp)
+    StatusDot(status, size = 8.dp)
 }
 
 @Composable
@@ -429,8 +444,8 @@ private fun HeaderIconButton(
 ) {
     Box(
         modifier = Modifier
-            .size(36.dp)
-            .clip(RoundedCornerShape(11.dp))
+            .size(34.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(CodexTheme.colors.surfaceSubtle)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
@@ -439,7 +454,7 @@ private fun HeaderIconButton(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = CodexTheme.colors.textPrimary,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(17.dp)
         )
     }
 }
@@ -493,7 +508,7 @@ private fun DrawerContent(
             .clip(RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp))
             .background(CodexTheme.colors.surface)
             .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(horizontal = 11.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -504,15 +519,17 @@ private fun DrawerContent(
                 Text(
                     text = "会话",
                     color = CodexTheme.colors.textPrimary,
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontSize = 20.sp,
+                    lineHeight = 24.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
                 )
                 ConnectionStatusLine(
                     status = state.connectionStatus,
                     detail = state.connectionDetail
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 DrawerHeaderAction(
                     icon = Icons.Filled.Add,
                     contentDescription = "新建会话",
@@ -525,13 +542,13 @@ private fun DrawerContent(
                 )
             }
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(10.dp))
         DrawerSearchBar(
             query = query,
             onChange = { query = it }
         )
-        Spacer(Modifier.height(4.dp))
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+        Spacer(Modifier.height(8.dp))
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             item {
                 SectionHeader(text = "项目", startPadding = 10.dp)
             }
@@ -575,7 +592,7 @@ private fun DrawerContent(
                 }
             }
             item {
-                Spacer(Modifier.height(1.dp))
+                Spacer(Modifier.height(3.dp))
                 SectionHeader(text = "会话", startPadding = 10.dp)
             }
             if (chatThreads.isEmpty()) {
@@ -609,8 +626,10 @@ private fun SectionHeader(
         text = text,
         modifier = Modifier.padding(start = startPadding),
         color = CodexTheme.colors.textSecondary,
-        fontSize = 17.sp,
-        fontWeight = FontWeight.SemiBold
+        fontSize = 15.sp,
+        lineHeight = 19.sp,
+        fontWeight = FontWeight.SemiBold,
+        style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
     )
 }
 
@@ -620,10 +639,10 @@ private fun ConnectionStatusLine(
     detail: String
 ) {
     val statusText = when (status) {
-        ConnectionStatus.CONNECTED -> "已连接 desktop gateway"
-        ConnectionStatus.CONNECTING -> "正在连接 desktop gateway"
+        ConnectionStatus.CONNECTED -> "已连接 Desktop Gateway"
+        ConnectionStatus.CONNECTING -> "正在连接 Desktop Gateway"
         ConnectionStatus.ERROR -> detail.ifBlank { "连接异常" }
-        ConnectionStatus.DISCONNECTED -> "未连接 desktop gateway"
+        ConnectionStatus.DISCONNECTED -> "未连接 Desktop Gateway"
     }
     Text(
         text = statusText,
@@ -633,7 +652,9 @@ private fun ConnectionStatusLine(
             ConnectionStatus.ERROR -> Color(0xFFDC2626)
             ConnectionStatus.DISCONNECTED -> Color(0xFFF59E0B)
         },
-        fontSize = 9.sp,
+        fontSize = 10.sp,
+        lineHeight = 13.sp,
+        fontWeight = FontWeight.Medium,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )
@@ -647,7 +668,7 @@ private fun DrawerHeaderAction(
 ) {
     Box(
         modifier = Modifier
-            .size(32.dp)
+            .size(34.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(CodexTheme.colors.surfaceSubtle)
             .clickable(onClick = onClick)
@@ -658,7 +679,7 @@ private fun DrawerHeaderAction(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = CodexTheme.colors.textPrimary,
-            modifier = Modifier.size(16.dp)
+            modifier = Modifier.size(17.dp)
         )
     }
 }
@@ -674,7 +695,7 @@ private fun GroupHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = if (compact) 0.dp else 1.dp)
+            .padding(vertical = if (compact) 2.dp else 3.dp)
             .padding(start = if (compact) 10.dp else 10.dp)
             .clickable(enabled = onToggle != null) { onToggle?.invoke() },
         verticalAlignment = Alignment.CenterVertically
@@ -684,7 +705,7 @@ private fun GroupHeader(
                 imageVector = icon,
                 contentDescription = null,
                 tint = CodexTheme.colors.textTertiary,
-                modifier = Modifier.size(if (compact) 10.dp else 12.dp)
+                modifier = Modifier.size(if (compact) 12.dp else 14.dp)
             )
             Spacer(Modifier.width(5.dp))
         }
@@ -692,15 +713,20 @@ private fun GroupHeader(
             Text(
                 text = label,
                 color = CodexTheme.colors.textSecondary,
-                fontSize = if (compact) 11.sp else 13.sp,
-                fontWeight = FontWeight.Medium
+                fontSize = if (compact) 12.sp else 13.sp,
+                lineHeight = if (compact) 15.sp else 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
             )
         }
         if (expanded != null) {
-            Text(
-                text = if (expanded) "收起" else "展开",
-                color = CodexTheme.colors.textTertiary,
-                fontSize = 10.sp
+            Icon(
+                imageVector = if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = if (expanded) "收起" else "展开",
+                tint = CodexTheme.colors.textTertiary,
+                modifier = Modifier.size(16.dp)
             )
         }
     }
@@ -717,23 +743,30 @@ private fun DrawerSearchBar(
             .clip(RoundedCornerShape(13.dp))
             .background(CodexTheme.colors.surfaceSubtle)
             .border(1.dp, CodexTheme.colors.border, RoundedCornerShape(13.dp))
-            .padding(horizontal = 9.dp, vertical = 5.dp),
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("⌕", color = CodexTheme.colors.textTertiary, fontSize = 11.sp)
-        Spacer(Modifier.width(5.dp))
+        Icon(
+            imageVector = Icons.Filled.Search,
+            contentDescription = null,
+            tint = CodexTheme.colors.textTertiary,
+            modifier = Modifier.size(15.dp)
+        )
+        Spacer(Modifier.width(7.dp))
         BasicTextField(
             value = query,
             onValueChange = onChange,
             singleLine = true,
             textStyle = TextStyle(
                 color = CodexTheme.colors.textPrimary,
-                fontSize = 11.sp
+                fontSize = 12.sp,
+                lineHeight = 15.sp,
+                platformStyle = PlatformTextStyle(includeFontPadding = false)
             ),
             modifier = Modifier.fillMaxWidth(),
             decorationBox = { innerTextField ->
                 if (query.isBlank()) {
-                    Text("搜索会话", color = CodexTheme.colors.textTertiary, fontSize = 11.sp)
+                    Text("搜索会话", color = CodexTheme.colors.textTertiary, fontSize = 12.sp)
                 }
                 innerTextField()
             }
@@ -755,18 +788,18 @@ private fun ThreadRow(
             .clip(RoundedCornerShape(11.dp))
             .background(if (selected) CodexTheme.colors.surfaceSubtle else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(start = startPadding, end = 10.dp, top = 3.dp, bottom = 3.dp),
+            .padding(start = startPadding, end = 10.dp, top = 5.dp, bottom = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier.width(7.dp),
+            modifier = Modifier.width(8.dp),
             contentAlignment = Alignment.CenterStart
         ) {
             if (selected) {
                 Box(
                     modifier = Modifier
                         .width(2.dp)
-                        .height(18.dp)
+                        .height(22.dp)
                         .clip(RoundedCornerShape(2.dp))
                         .background(CodexTheme.colors.textTertiary)
                 )
@@ -782,7 +815,7 @@ private fun ThreadRow(
                     color = CodexTheme.colors.textPrimary,
                     style = TextStyle(
                         fontSize = 14.sp,
-                        lineHeight = 17.sp,
+                        lineHeight = 18.sp,
                         fontWeight = FontWeight.Medium,
                         platformStyle = PlatformTextStyle(includeFontPadding = false)
                     ),
@@ -794,14 +827,14 @@ private fun ThreadRow(
                     modifier = Modifier.padding(start = 4.dp)
                 )
             }
-            Spacer(Modifier.height(1.dp))
+            Spacer(Modifier.height(2.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = summary.preview.ifBlank { summary.title },
                     modifier = Modifier.weight(1f),
                     color = CodexTheme.colors.textSecondary,
-                    fontSize = 8.sp,
-                    lineHeight = 10.sp,
+                    fontSize = 9.sp,
+                    lineHeight = 12.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -810,8 +843,8 @@ private fun ThreadRow(
                     Text(
                         text = formatThreadUpdatedAt(summary.updatedAt),
                         color = CodexTheme.colors.textTertiary,
-                        fontSize = 6.sp,
-                        lineHeight = 7.sp,
+                        fontSize = 8.sp,
+                        lineHeight = 10.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -842,9 +875,9 @@ private fun ThreadStatusText(
         text = text,
         modifier = modifier,
         color = color,
-        fontSize = 6.5.sp,
-        lineHeight = 8.sp,
-        fontWeight = FontWeight.Normal,
+        fontSize = 8.sp,
+        lineHeight = 10.sp,
+        fontWeight = FontWeight.Medium,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )
@@ -1179,7 +1212,7 @@ internal fun ThreadScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.ArrowDownward,
-                        contentDescription = null,
+                        contentDescription = "滚到底部",
                         tint = CodexTheme.colors.textPrimary
                     )
                 }
@@ -1270,10 +1303,10 @@ private fun ConnectionBanner(
             Spacer(Modifier.width(if (compact) 6.dp else 8.dp))
             Text(
                 text = when (state.connectionStatus) {
-                    ConnectionStatus.CONNECTED -> "已连接 desktop gateway"
-                    ConnectionStatus.CONNECTING -> "正在连接 desktop gateway"
+                    ConnectionStatus.CONNECTED -> "已连接 Desktop Gateway"
+                    ConnectionStatus.CONNECTING -> "正在连接 Desktop Gateway"
                     ConnectionStatus.ERROR -> "连接异常"
-                    ConnectionStatus.DISCONNECTED -> "未连接 desktop gateway"
+                    ConnectionStatus.DISCONNECTED -> "未连接 Desktop Gateway"
                 },
                 color = CodexTheme.colors.textPrimary,
                 fontSize = if (compact) 9.sp else 11.sp,
@@ -1310,32 +1343,45 @@ private fun EmptyThreadCard(
     hasThreads: Boolean
 ) {
     val title = when {
-        !connected -> "连接 desktop gateway 后开始"
+        !connected -> "连接 Desktop Gateway 后开始"
         hasThreads -> "当前会话暂无消息"
         else -> "暂无会话"
     }
     val detail = when {
-        !connected -> "本 app 只显示 desktop 真实会话数据。"
+        !connected -> "本 app 只显示 Desktop Gateway 真实会话数据。"
         hasThreads -> "从下方输入区发送第一条消息。"
         else -> "点右上角新建，或在侧边栏选择已有会话。"
     }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+            .padding(vertical = 20.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(CodexTheme.colors.surfaceSubtle)
+            .border(1.dp, CodexTheme.colors.border, RoundedCornerShape(18.dp))
+            .padding(horizontal = 18.dp, vertical = 18.dp),
+        horizontalAlignment = Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
+        Icon(
+            imageVector = if (connected) Icons.Filled.Info else Icons.Filled.ErrorOutline,
+            contentDescription = null,
+            tint = CodexTheme.colors.textTertiary,
+            modifier = Modifier.size(20.dp)
+        )
         Text(
             text = title,
             color = CodexTheme.colors.textPrimary,
             fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold
+            lineHeight = 19.sp,
+            fontWeight = FontWeight.SemiBold,
+            style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
         )
         Text(
             text = detail,
             color = CodexTheme.colors.textSecondary,
-            fontSize = 12.sp
+            fontSize = 12.sp,
+            lineHeight = 17.sp
         )
     }
 }
@@ -1346,20 +1392,33 @@ private fun ThreadSwitchingCard(pendingTitle: String?) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+            .padding(vertical = 20.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(CodexTheme.colors.surfaceSubtle)
+            .border(1.dp, CodexTheme.colors.border, RoundedCornerShape(18.dp))
+            .padding(horizontal = 18.dp, vertical = 18.dp),
+        horizontalAlignment = Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
+        Icon(
+            imageVector = Icons.Filled.HourglassEmpty,
+            contentDescription = null,
+            tint = CodexTheme.colors.textTertiary,
+            modifier = Modifier.size(20.dp)
+        )
         Text(
             text = "正在切换到 $title",
             color = CodexTheme.colors.textPrimary,
             fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold
+            lineHeight = 19.sp,
+            fontWeight = FontWeight.SemiBold,
+            style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
         )
         Text(
-            text = "等待 desktop 同步真实内容…",
+            text = "等待 Desktop Gateway 同步真实内容…",
             color = CodexTheme.colors.textSecondary,
-            fontSize = 12.sp
+            fontSize = 12.sp,
+            lineHeight = 17.sp
         )
     }
 }
@@ -1380,13 +1439,20 @@ private fun ApprovalCard(
             .padding(if (compactMode) 10.dp else 12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("!", color = Color(0xFFD97706), fontSize = 16.sp)
+            Icon(
+                imageVector = Icons.Filled.Warning,
+                contentDescription = null,
+                tint = Color(0xFFD97706),
+                modifier = Modifier.size(16.dp)
+            )
             Spacer(Modifier.width(6.dp))
             Text(
                 text = "待审批",
                 color = CodexTheme.colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = if (compactMode) 12.sp else 13.sp
+                fontSize = if (compactMode) 12.sp else 13.sp,
+                lineHeight = if (compactMode) 16.sp else 17.sp,
+                style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
             )
         }
         Spacer(Modifier.height(6.dp))
@@ -1562,10 +1628,11 @@ private fun CommandExecutionCard(
             )
             if (hasDetails) {
                 Spacer(Modifier.width(4.dp))
-                Text(
-                    text = if (detailsExpanded) "收起" else "展开",
-                    color = CodexTheme.colors.textTertiary,
-                    fontSize = 9.sp
+                Icon(
+                    imageVector = if (detailsExpanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = if (detailsExpanded) "收起命令详情" else "展开命令详情",
+                    tint = CodexTheme.colors.textTertiary,
+                    modifier = Modifier.size(14.dp)
                 )
             }
         }
@@ -1623,10 +1690,11 @@ private fun ReasoningBlock(
                 fontWeight = FontWeight.Medium
             )
             Spacer(Modifier.width(6.dp))
-            Text(
-                text = if (expanded) "收起" else "展开",
-                color = CodexTheme.colors.textTertiary,
-                fontSize = 10.sp
+            Icon(
+                imageVector = if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = if (expanded) "收起思考详情" else "展开思考详情",
+                tint = CodexTheme.colors.textTertiary,
+                modifier = Modifier.size(14.dp)
             )
         }
         if (expanded) {
@@ -1664,12 +1732,25 @@ private fun ExpandableText(
             )
         }
         if (shouldCollapse) {
-            Text(
-                text = if (expanded) "收起" else "展开",
-                color = CodexTheme.colors.textTertiary,
-                fontSize = 11.sp,
-                modifier = Modifier.clickable(onClick = onToggle)
-            )
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .clickable(onClick = onToggle)
+                    .padding(horizontal = 1.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (expanded) "收起" else "展开",
+                    color = CodexTheme.colors.textTertiary,
+                    fontSize = 11.sp
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = if (expanded) "收起全文" else "展开全文",
+                    tint = CodexTheme.colors.textTertiary,
+                    modifier = Modifier.size(13.dp)
+                )
+            }
         }
     }
 }
@@ -1683,12 +1764,18 @@ private fun SystemMessage(message: ThreadMessage, compactMode: Boolean) {
 @Composable
 private fun InlineStatus(text: String, compactMode: Boolean = false) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("⏸", color = CodexTheme.colors.textSecondary, fontSize = 11.sp)
+        Icon(
+            imageVector = Icons.Filled.Info,
+            contentDescription = null,
+            tint = CodexTheme.colors.textTertiary,
+            modifier = Modifier.size(if (compactMode) 12.dp else 13.dp)
+        )
         Spacer(Modifier.width(5.dp))
         Text(
             text = text,
             color = CodexTheme.colors.textSecondary,
             fontSize = if (compactMode) 10.sp else 11.sp,
+            lineHeight = if (compactMode) 14.sp else 15.sp,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
@@ -1722,23 +1809,46 @@ private fun CodeBlock(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = if (compactMode) 9.dp else 10.dp, vertical = if (compactMode) 5.dp else 6.dp),
+                .padding(horizontal = if (compactMode) 9.dp else 10.dp, vertical = if (compactMode) 6.dp else 7.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = if (isShell) "输出" else language,
-                color = Color(0xFFD1D5DB),
-                fontSize = if (compactMode) 10.sp else 11.sp,
-                fontWeight = FontWeight.Medium
-            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color(0xFF374151))
+                    .padding(horizontal = 7.dp, vertical = 3.dp)
+            ) {
+                Text(
+                    text = if (isShell) "输出" else language.ifBlank { "code" },
+                    color = Color(0xFFE5E7EB),
+                    fontSize = if (compactMode) 9.sp else 10.sp,
+                    lineHeight = if (compactMode) 11.sp else 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             Spacer(Modifier.weight(1f))
             if (shouldCollapse) {
-                Text(
-                    text = if (expanded) "收起" else "展开",
-                    color = Color(0xFF9CA3AF),
-                    fontSize = 10.sp,
-                    modifier = Modifier.clickable(onClick = { expanded = !expanded })
-                )
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .clickable(onClick = { expanded = !expanded })
+                        .padding(horizontal = 2.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (expanded) "收起" else "展开",
+                        color = Color(0xFF9CA3AF),
+                        fontSize = 10.sp
+                    )
+                    Icon(
+                        imageVector = if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = if (expanded) "收起代码块" else "展开代码块",
+                        tint = Color(0xFF9CA3AF),
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
             }
         }
         Divider(color = Color(0xFF374151))
@@ -1877,7 +1987,7 @@ private fun Composer(
             .background(CodexTheme.colors.surface)
             .imePadding()
             .windowInsetsPadding(WindowInsets.navigationBars)
-            .padding(horizontal = 10.dp, vertical = 2.dp)
+            .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
         AnimatedVisibility(visible = state.showComposerDetails) {
             Column(
@@ -1889,13 +1999,13 @@ private fun Composer(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    MiniAction("清空", "■") {
+                    MiniAction("清空", Icons.Filled.Delete) {
                         onActivePanelChange("none")
                         slashQuery = ""
                         suppressInlineSlashPanel = false
                         onClearComposer()
                     }
-                    MiniAction("/命令", "⌕") {
+                    MiniAction("/命令", Icons.Filled.Search) {
                         val opening = activePanel != "slash"
                         suppressInlineSlashPanel = false
                         onActivePanelChange(if (opening) "slash" else "none")
@@ -1957,15 +2067,21 @@ private fun Composer(
                 .clip(RoundedCornerShape(22.dp))
                 .background(CodexTheme.colors.surface)
                 .border(1.dp, CodexTheme.colors.border, RoundedCornerShape(22.dp))
-                .padding(horizontal = 6.dp, vertical = 3.dp),
+                .padding(horizontal = 6.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             ComposerIconButton(
                 onClick = onToggleDetails,
+                contentDescription = if (state.showComposerDetails) "收起输入工具" else "展开输入工具",
                 size = 32.dp,
                 shape = RoundedCornerShape(10.dp)
             ) {
-                Text("+", color = CodexTheme.colors.textPrimary, fontSize = 15.sp, textAlign = TextAlign.Center)
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = null,
+                    tint = CodexTheme.colors.textPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
             }
             Box(
                 modifier = Modifier
@@ -2015,8 +2131,8 @@ private fun Composer(
                     enabled = composerEnabled,
                     textStyle = TextStyle(
                         color = if (composerEnabled) CodexTheme.colors.textPrimary else CodexTheme.colors.textTertiary,
-                        fontSize = if (compactMode) 11.sp else 12.sp,
-                        lineHeight = if (compactMode) 14.sp else 15.sp,
+                        fontSize = if (compactMode) 12.sp else 13.sp,
+                        lineHeight = if (compactMode) 16.sp else 18.sp,
                         platformStyle = PlatformTextStyle(includeFontPadding = false)
                     ),
                     decorationBox = { inner ->
@@ -2035,7 +2151,8 @@ private fun Composer(
                                         else -> "未连接"
                                     },
                                     color = CodexTheme.colors.textTertiary,
-                                    fontSize = if (compactMode) 11.sp else 13.sp
+                                    fontSize = if (compactMode) 12.sp else 13.sp,
+                                    lineHeight = if (compactMode) 16.sp else 18.sp
                                 )
                             }
                             inner()
@@ -2046,16 +2163,23 @@ private fun Composer(
             if (state.isGenerating) {
                 ComposerIconButton(
                     onClick = onStop,
+                    contentDescription = "停止生成",
                     size = 32.dp,
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("■", color = CodexTheme.colors.textPrimary, fontSize = 12.sp, textAlign = TextAlign.Center)
+                    Icon(
+                        imageVector = Icons.Filled.Stop,
+                        contentDescription = null,
+                        tint = CodexTheme.colors.textPrimary,
+                        modifier = Modifier.size(17.dp)
+                    )
                 }
             }
             ComposerIconButton(
                 onClick = {
                     if (sendEnabled) sendNow()
                 },
+                contentDescription = "发送消息",
                 size = 32.dp,
                 shape = CircleShape,
                 fill = when {
@@ -2063,15 +2187,15 @@ private fun Composer(
                     else -> CodexTheme.colors.surfaceSubtle
                 }
             ) {
-                Text(
-                    "➤",
-                    color = if (!sendEnabled) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Send,
+                    contentDescription = null,
+                    tint = if (!sendEnabled) {
                         CodexTheme.colors.textTertiary
                     } else {
                         Color.White
                     },
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }
@@ -2160,7 +2284,12 @@ private fun SlashCommandPanel(
                 .padding(horizontal = 9.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("⌕", color = CodexTheme.colors.textSecondary, fontSize = 11.sp)
+            Icon(
+                imageVector = Icons.Filled.Search,
+                contentDescription = null,
+                tint = CodexTheme.colors.textSecondary,
+                modifier = Modifier.size(14.dp)
+            )
             Spacer(Modifier.width(5.dp))
             BasicTextField(
                 value = query,
@@ -2240,7 +2369,7 @@ private fun SlashCommandRow(
 @Composable
 private fun MiniAction(
     label: String,
-    icon: String,
+    icon: ImageVector,
     onClick: (() -> Unit)? = null
 ) {
     Row(
@@ -2253,7 +2382,12 @@ private fun MiniAction(
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(icon, color = CodexTheme.colors.textSecondary, fontSize = 9.sp)
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = CodexTheme.colors.textSecondary,
+            modifier = Modifier.size(13.dp)
+        )
         Spacer(Modifier.width(4.dp))
         Text(text = label, color = CodexTheme.colors.textPrimary, fontSize = 10.sp)
     }
@@ -2342,12 +2476,25 @@ private fun MarkdownText(
             )
         }
         if (shouldCollapse) {
-            Text(
-                text = if (expanded) "收起" else "展开",
-                color = CodexTheme.colors.textTertiary,
-                fontSize = 11.sp,
-                modifier = Modifier.clickable(onClick = onToggle)
-            )
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .clickable(onClick = onToggle)
+                    .padding(horizontal = 1.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (expanded) "收起" else "展开",
+                    color = CodexTheme.colors.textTertiary,
+                    fontSize = 11.sp
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = if (expanded) "收起全文" else "展开全文",
+                    tint = CodexTheme.colors.textTertiary,
+                    modifier = Modifier.size(13.dp)
+                )
+            }
         }
     }
 }
@@ -2426,13 +2573,14 @@ private fun MarkdownLineItem(
             )
         }
         MarkdownLineKind.QUOTE -> Row(
-            modifier = if (wrapContent) Modifier else Modifier.fillMaxWidth(),
+            modifier = (if (wrapContent) Modifier else Modifier.fillMaxWidth())
+                .padding(vertical = 2.dp),
             verticalAlignment = Alignment.Top
         ) {
             Box(
                 modifier = Modifier
                     .width(2.dp)
-                    .fillMaxHeight()
+                    .height(lineHeight.value.dp)
                     .padding(top = 2.dp)
                     .background(textColor.copy(alpha = 0.35f))
             )
@@ -2451,7 +2599,10 @@ private fun MarkdownLineItem(
             fontSize = fontSize,
             lineHeight = lineHeight,
             fontFamily = FontFamily.Monospace,
-            modifier = if (wrapContent) Modifier else Modifier.fillMaxWidth()
+            modifier = (if (wrapContent) Modifier else Modifier.fillMaxWidth())
+                .clip(RoundedCornerShape(6.dp))
+                .background(textColor.copy(alpha = 0.06f))
+                .padding(horizontal = 6.dp, vertical = 3.dp)
         )
         MarkdownLineKind.PARAGRAPH -> MarkdownInlineText(
             text = line.text,
@@ -2576,6 +2727,7 @@ private fun MarkdownInlineText(
 @Composable
 private fun ComposerIconButton(
     onClick: () -> Unit,
+    contentDescription: String,
     size: androidx.compose.ui.unit.Dp,
     shape: androidx.compose.ui.graphics.Shape,
     fill: Color = CodexTheme.colors.surfaceSubtle,
@@ -2586,6 +2738,7 @@ private fun ComposerIconButton(
             .size(size)
             .clip(shape)
             .background(fill)
+            .semantics { this.contentDescription = contentDescription }
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
