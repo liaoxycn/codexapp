@@ -80,9 +80,9 @@ class HomeViewModel(
         }
     }
 
-    fun createThread() {
+    fun createThread(cwd: String? = null) {
         viewModelScope.launch {
-            repository.createThread()
+            repository.createThread(cwd)
         }
     }
 

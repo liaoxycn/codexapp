@@ -26,6 +26,7 @@ export interface GatewaySelectThreadMessage {
 
 export interface GatewayCreateThreadMessage {
   type: "create_thread";
+  cwd?: string;
 }
 
 export interface GatewayRenameThreadMessage {
@@ -95,6 +96,7 @@ export interface GatewayThreadPayload {
   title: string;
   preview: string;
   subtitle?: string;
+  cwd?: string;
   status: "running" | "idle" | "needs_approval" | "failed";
   updatedAt?: number;
   groupKind?: "project" | "chat";

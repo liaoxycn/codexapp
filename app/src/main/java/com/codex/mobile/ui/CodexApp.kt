@@ -68,6 +68,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Info
@@ -220,6 +221,10 @@ fun CodexApp(
                 state = state,
                 onCreateThread = {
                     viewModel.createThread()
+                    scope.launch { drawerState.close() }
+                },
+                onCreateThreadInProject = { cwd ->
+                    viewModel.createThread(cwd)
                     scope.launch { drawerState.close() }
                 },
                 onRefreshThreads = viewModel::refreshThreads,
@@ -528,9 +533,10 @@ private fun HeaderIconButton(
 }
 
 @Composable
-private fun DrawerContent(
+internal fun DrawerContent(
     state: HomeUiState,
     onCreateThread: () -> Unit,
+    onCreateThreadInProject: (String) -> Unit,
     onRefreshThreads: () -> Unit,
     onSelectThread: (String) -> Unit
 ) {
@@ -632,12 +638,16 @@ private fun DrawerContent(
                 orderedProjectGroups.forEach { groupLabel ->
                     val threads = groupedProjectThreads[groupLabel].orEmpty()
                     val isExpanded = groupLabel == currentProjectGroupLabel || expandedProjectGroups.contains(groupLabel)
+                    val projectCwd = threads.firstOrNull { it.cwd.isNotBlank() }?.cwd.orEmpty()
                     item {
                         GroupHeader(
                             label = groupLabel,
                             icon = Icons.Filled.Folder,
                             compact = true,
                             expanded = isExpanded,
+                            onCreateThread = if (projectCwd.isNotBlank()) ({
+                                onCreateThreadInProject(projectCwd)
+                            }) else null,
                             onToggle = if (groupLabel == currentProjectGroupLabel) null else ({
                                 expandedProjectGroups = if (isExpanded) {
                                     expandedProjectGroups - groupLabel
@@ -759,6 +769,7 @@ private fun GroupHeader(
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     compact: Boolean = false,
     expanded: Boolean? = null,
+    onCreateThread: (() -> Unit)? = null,
     onToggle: (() -> Unit)? = null
 ) {
     val groupDescription = when {
@@ -771,21 +782,25 @@ private fun GroupHeader(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = if (compact) 2.dp else 3.dp)
-            .padding(start = if (compact) 10.dp else 10.dp)
-            .semantics { contentDescription = groupDescription }
-            .clickable(enabled = onToggle != null) { onToggle?.invoke() },
+            .padding(start = if (compact) 10.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = CodexTheme.colors.textTertiary,
-                modifier = Modifier.size(if (compact) 12.dp else 14.dp)
-            )
-            Spacer(Modifier.width(5.dp))
-        }
-        Column(modifier = Modifier.weight(1f)) {
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .semantics { contentDescription = groupDescription }
+                .clickable(enabled = onToggle != null) { onToggle?.invoke() },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = CodexTheme.colors.textTertiary,
+                    modifier = Modifier.size(if (compact) 12.dp else 14.dp)
+                )
+                Spacer(Modifier.width(5.dp))
+            }
             Text(
                 text = label,
                 color = CodexTheme.colors.textSecondary,
@@ -794,16 +809,35 @@ private fun GroupHeader(
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
                 style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
             )
+            if (expanded != null) {
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = CodexTheme.colors.textTertiary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
-        if (expanded != null) {
-            Icon(
-                imageVector = if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = CodexTheme.colors.textTertiary,
-                modifier = Modifier.size(16.dp)
-            )
+        if (onCreateThread != null) {
+            Spacer(Modifier.width(4.dp))
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .semantics { contentDescription = "在 $label 中开始新会话" }
+                    .clickable(onClick = onCreateThread),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = null,
+                    tint = CodexTheme.colors.textTertiary,
+                    modifier = Modifier.size(15.dp)
+                )
+            }
         }
     }
 }

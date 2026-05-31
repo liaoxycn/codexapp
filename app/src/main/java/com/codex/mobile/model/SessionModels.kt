@@ -8,6 +8,7 @@ data class ThreadSummary(
     val updatedAt: Long = 0L,
     val groupKind: ThreadGroupKind = ThreadGroupKind.CHAT,
     val groupLabel: String = "普通会话",
+    val cwd: String = "",
     val archived: Boolean = false
 )
 

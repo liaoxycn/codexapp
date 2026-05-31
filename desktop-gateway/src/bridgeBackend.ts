@@ -20,7 +20,6 @@ import type {
   GatewayThreadPayload,
 } from "./protocol.js";
 
-const SELF_TEST_EXCLUDE_TITLE = "调研 Codex 安卓壳方案";
 const INITIAL_HISTORY_WINDOW = 24;
 const HISTORY_WINDOW_STEP = 24;
 
@@ -121,11 +120,12 @@ export class AppServerBridgeBackend {
     return this.getSnapshot(resolved);
   }
 
-  async createThread(): Promise<ClientSnapshot> {
-    const cwd = this.threads.get(this.currentThreadId)?.thread?.cwd
+  async createThread(cwd?: string): Promise<ClientSnapshot> {
+    const selectedCwd = this.threads.get(this.currentThreadId)?.thread?.cwd
       ?? this.threads.get(this.currentThreadId)?.snapshot.cwd
       ?? process.cwd();
-    const started = await this.appServer.threadStart(cwd);
+    const targetCwd = cwd?.trim() || selectedCwd;
+    const started = await this.appServer.threadStart(targetCwd);
     const threadId = started.thread.id;
     this.currentThreadId = threadId;
     this.selectionVersion += 1;
@@ -352,16 +352,29 @@ export class AppServerBridgeBackend {
 
   private async hydrateThreads(): Promise<void> {
     const activeList = await this.appServer.threadList(false);
-    const visibleThreads = activeList.filter((thread) => !isExcludedThread(thread));
-    const visibleThreadIds = new Set(visibleThreads.map((thread) => thread.id));
+    const activeThreadIds = new Set(activeList.map((thread) => thread.id));
     for (const threadId of [...this.threads.keys()]) {
-      if (!visibleThreadIds.has(threadId)) {
+      if (activeThreadIds.has(threadId)) {
+        continue;
+      }
+      const existing = this.threads.get(threadId);
+      const preservePendingCurrent =
+        threadId === this.currentThreadId
+        && !activeThreadIds.has(threadId)
+        && (existing?.thread != null || existing?.isSubscribed === true);
+      if (!preservePendingCurrent) {
         this.threads.delete(threadId);
       }
     }
 
-    const detailedThreads = await this.readThreadDetailsForSummaries(visibleThreads);
-    const summaries = buildVisibleThreadSummaries(detailedThreads);
+    const detailedThreads = await this.readThreadDetailsForSummaries(activeList);
+    const retainedSummaries = [...this.threads.values()]
+      .filter((entry) => !activeThreadIds.has(entry.summary.id))
+      .map((entry) => entry.summary);
+    const summaries = dedupeSummaries([
+      ...retainedSummaries,
+      ...buildVisibleThreadSummaries(detailedThreads),
+    ]);
 
     if (summaries.length === 0) {
       this.currentThreadId = "";
@@ -524,6 +537,16 @@ export class AppServerBridgeBackend {
         const nextType = getThreadStatusType(status);
         if (nextType === "active") {
           const compactInFlight = state.transientOperation === "compact";
+          const hasLiveTurn =
+            state.currentTurnId != null
+            || state.snapshot.isGenerating
+            || (state.thread != null && isThreadActivelyGenerating(state.thread));
+          if (!compactInFlight && !hasLiveTurn) {
+            state.snapshot.isGenerating = false;
+            this.updateSummaryStatus(threadId, state.pendingApproval ? "needs_approval" : "idle");
+            this.emitChanged();
+            return;
+          }
           state.snapshot.isGenerating = !compactInFlight;
           this.updateSummaryStatus(
             threadId,
@@ -1262,6 +1285,7 @@ function mapThreadToSummary(thread: AppServerThread, archived = false, updatedAt
     title: thread.name ?? buildThreadTitle(thread.preview),
     preview: thread.preview,
     subtitle,
+    cwd: thread.cwd,
     status,
     updatedAt: updatedAtOverride ?? toMillisTimestamp(thread.updatedAt),
     groupKind: grouping.kind,
@@ -1431,23 +1455,13 @@ function formatCommandResult(item: {
 function deriveThreadGrouping(thread: AppServerThread): { kind: "project" | "chat"; label: string } {
   const cwd = thread.cwd.replaceAll("\\", "/");
   const segments = cwd.split("/").filter(Boolean);
-  const leaf = segments.at(-1) ?? "会话";
-  const penultimate = segments.at(-2) ?? "";
-  const title = thread.name ?? buildThreadTitle(thread.preview);
+  const leaf = segments.at(-1) ?? "";
 
-  if (segments.includes("Codex") || /new-chat|chat/i.test(leaf) || /回复|hello|ok/i.test(title)) {
+  if (leaf.length === 0) {
     return { kind: "chat", label: "普通会话" };
   }
 
-  if (penultimate.toLowerCase() === "home") {
-    return { kind: "project", label: leaf };
-  }
-
-  if (leaf.length > 0) {
-    return { kind: "project", label: leaf };
-  }
-
-  return { kind: "chat", label: "普通会话" };
+  return { kind: "project", label: leaf };
 }
 
 function buildChips(
@@ -1905,9 +1919,7 @@ function getThreadLastActivityAtMs(thread: AppServerThread): number {
 }
 
 export function buildVisibleThreadSummaries(threads: AppServerThread[]): GatewayThreadPayload[] {
-  return threads
-    .filter((thread) => !isExcludedThread(thread))
-    .map((thread) => mapThreadToSummary(thread, false, getThreadLastActivityAtMs(thread)));
+  return threads.map((thread) => mapThreadToSummary(thread, false, getThreadLastActivityAtMs(thread)));
 }
 
 function isThreadNotMaterializedError(error: unknown): boolean {
@@ -1916,11 +1928,6 @@ function isThreadNotMaterializedError(error: unknown): boolean {
 
 function isNoRolloutFoundError(error: unknown): boolean {
   return error instanceof Error && error.message.includes("no rollout found for thread id");
-}
-
-function isExcludedThread(thread: AppServerThread): boolean {
-  const title = thread.name ?? buildThreadTitle(thread.preview);
-  return title.includes(SELF_TEST_EXCLUDE_TITLE) || thread.preview.includes(SELF_TEST_EXCLUDE_TITLE);
 }
 
 function emptySnapshot(): ClientSnapshot {

@@ -158,6 +158,20 @@ test("old unmaterialized app-server activity stays idle", () => {
   );
 });
 
+test("new empty active thread stays idle", () => {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  assert.equal(
+    resolveThreadSummaryStatus(
+      thread({
+        status: { type: "active", activeFlags: [] },
+        updatedAt: nowSeconds,
+        turns: [],
+      })
+    ),
+    "idle"
+  );
+});
+
 test("runtime generating state keeps thread listed as running", () => {
   assert.equal(
     resolveDisplayedThreadStatus("idle", {
