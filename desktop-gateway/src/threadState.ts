@@ -77,6 +77,9 @@ export function isThreadActivelyGenerating(thread: AppServerThread): boolean {
 }
 
 function hasRecentUnmaterializedActivity(thread: AppServerThread, nowMs = Date.now()): boolean {
+  if (thread.turns.length === 0) {
+    return false;
+  }
   const updatedAtMs = thread.updatedAt > 0 ? thread.updatedAt * 1000 : 0;
   if (updatedAtMs <= 0 || nowMs - updatedAtMs > 120_000) {
     return false;
@@ -110,7 +113,10 @@ export function resolveThreadSummaryStatus(
   }
   if (type === "active" || type === "in_progress" || type === "inprogress" || type === "running") {
     const lastTurn = thread.turns.at(-1);
-    if (!lastTurn || !isTerminalTurnStatus(lastTurn.status)) {
+    if (!lastTurn) {
+      return type === "active" ? "idle" : "running";
+    }
+    if (!isTerminalTurnStatus(lastTurn.status)) {
       return "running";
     }
     if (isTerminalTurnStatus(lastTurn.status)) {

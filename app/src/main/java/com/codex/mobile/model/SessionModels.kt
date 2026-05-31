@@ -8,6 +8,7 @@ data class ThreadSummary(
     val updatedAt: Long = 0L,
     val groupKind: ThreadGroupKind = ThreadGroupKind.CHAT,
     val groupLabel: String = "普通会话",
+    val cwd: String = "",
     val archived: Boolean = false
 )
 
@@ -29,6 +30,9 @@ sealed interface MessageBlock {
     data class Reasoning(val value: String) : MessageBlock
     data class CommandSummary(val value: String) : MessageBlock
     data class CommandMeta(val value: String) : MessageBlock
+    data class FileChangeSummary(val value: String) : MessageBlock
+    data class FileChangeMeta(val value: String, val path: String = "") : MessageBlock
+    data class FileChangeDiff(val value: String) : MessageBlock
 }
 
 enum class MessageRole {

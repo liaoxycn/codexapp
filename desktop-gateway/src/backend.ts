@@ -66,8 +66,9 @@ export class InMemoryDesktopBackend {
     };
   }
 
-  createThread(): ClientSnapshot {
+  createThread(cwd?: string): ClientSnapshot {
     const id = randomUUID();
+    const workspacePath = cwd?.trim() || this.workspacePath;
     this.threads.set(id, {
       summary: {
         id,
@@ -75,17 +76,18 @@ export class InMemoryDesktopBackend {
         preview: "等待输入",
         status: "idle",
         groupKind: "project",
-        groupLabel: shrinkWorkspacePath(this.workspacePath),
+        groupLabel: shrinkWorkspacePath(workspacePath),
+        cwd: workspacePath,
         archived: false
       },
       messages: [],
       chips: [
         { label: "openai", icon: "context" },
-        { label: shrinkWorkspacePath(this.workspacePath), icon: "file" }
+        { label: shrinkWorkspacePath(workspacePath), icon: "file" }
       ],
       pendingApproval: null,
       slashCommands: ["/compact  压缩上下文", "/goal  设置目标", "! ls  运行 shell 命令"],
-      cwd: this.workspacePath,
+      cwd: workspacePath,
       permissionSummary: "workspace-write",
       isGenerating: false
     });
@@ -267,7 +269,10 @@ function createSeedThreads(workspacePath: string): ThreadRecord[] {
         id: "thread-android-shell",
         title: "Android 壳开发",
         preview: "desktop gateway + app-server bridge",
-        status: "running"
+        status: "running",
+        cwd: workspacePath,
+        groupKind: "project",
+        groupLabel: shrinkWorkspacePath(workspacePath)
       },
       messages: [
         {
@@ -306,7 +311,10 @@ function createSeedThreads(workspacePath: string): ThreadRecord[] {
         id: "thread-composer",
         title: "输入区状态机",
         preview: "steer / approval / retry",
-        status: "needs_approval"
+        status: "needs_approval",
+        cwd: workspacePath,
+        groupKind: "project",
+        groupLabel: shrinkWorkspacePath(workspacePath)
       },
       messages: [
         {
@@ -341,6 +349,9 @@ function createSeedThreads(workspacePath: string): ThreadRecord[] {
         title: "线程历史分页",
         preview: "thread/turns/list experimental",
         status: "idle",
+        cwd: workspacePath,
+        groupKind: "project",
+        groupLabel: shrinkWorkspacePath(workspacePath),
         archived: true
       },
       messages: [

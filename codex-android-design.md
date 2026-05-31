@@ -397,7 +397,7 @@ gateway -> Android：
 - `snapshot` 当前已来自真实 `thread/list + thread/read`，发送前会先 `thread/resume`。
 - `send_prompt` 当前已调用真实 `turn/start`。
 - `stop_turn` 当前已调用真实 `turn/interrupt`。
-- gateway 已排除自测线程 `调研 Codex 安卓壳方案`，避免污染当前工作会话。
+- gateway 不再按固定标题排除线程；自测需选择非当前项目会话，避免污染当前工作会话。
 - gateway 已加入后端操作错误兜底：失败时向 Android 回 `status=error`，不直接崩进程。
 - gateway 已加入约 120ms 的快照节流，避免高频通知直接刷爆 Android。
 - `turn/started` 现在会先下发 `思考中` 占位，生成期不再表现为空白。

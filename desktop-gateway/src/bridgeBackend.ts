@@ -20,7 +20,6 @@ import type {
   GatewayThreadPayload,
 } from "./protocol.js";
 
-const SELF_TEST_EXCLUDE_TITLE = "调研 Codex 安卓壳方案";
 const INITIAL_HISTORY_WINDOW = 24;
 const HISTORY_WINDOW_STEP = 24;
 
@@ -121,11 +120,12 @@ export class AppServerBridgeBackend {
     return this.getSnapshot(resolved);
   }
 
-  async createThread(): Promise<ClientSnapshot> {
-    const cwd = this.threads.get(this.currentThreadId)?.thread?.cwd
+  async createThread(cwd?: string): Promise<ClientSnapshot> {
+    const selectedCwd = this.threads.get(this.currentThreadId)?.thread?.cwd
       ?? this.threads.get(this.currentThreadId)?.snapshot.cwd
       ?? process.cwd();
-    const started = await this.appServer.threadStart(cwd);
+    const targetCwd = cwd?.trim() || selectedCwd;
+    const started = await this.appServer.threadStart(targetCwd);
     const threadId = started.thread.id;
     this.currentThreadId = threadId;
     this.selectionVersion += 1;
@@ -352,16 +352,29 @@ export class AppServerBridgeBackend {
 
   private async hydrateThreads(): Promise<void> {
     const activeList = await this.appServer.threadList(false);
-    const visibleThreads = activeList.filter((thread) => !isExcludedThread(thread));
-    const visibleThreadIds = new Set(visibleThreads.map((thread) => thread.id));
+    const activeThreadIds = new Set(activeList.map((thread) => thread.id));
     for (const threadId of [...this.threads.keys()]) {
-      if (!visibleThreadIds.has(threadId)) {
+      if (activeThreadIds.has(threadId)) {
+        continue;
+      }
+      const existing = this.threads.get(threadId);
+      const preservePendingCurrent =
+        threadId === this.currentThreadId
+        && !activeThreadIds.has(threadId)
+        && (existing?.thread != null || existing?.isSubscribed === true);
+      if (!preservePendingCurrent) {
         this.threads.delete(threadId);
       }
     }
 
-    const detailedThreads = await this.readThreadDetailsForSummaries(visibleThreads);
-    const summaries = buildVisibleThreadSummaries(detailedThreads);
+    const detailedThreads = await this.readThreadDetailsForSummaries(activeList);
+    const retainedSummaries = [...this.threads.values()]
+      .filter((entry) => !activeThreadIds.has(entry.summary.id))
+      .map((entry) => entry.summary);
+    const summaries = dedupeSummaries([
+      ...retainedSummaries,
+      ...buildVisibleThreadSummaries(detailedThreads),
+    ]);
 
     if (summaries.length === 0) {
       this.currentThreadId = "";
@@ -524,6 +537,16 @@ export class AppServerBridgeBackend {
         const nextType = getThreadStatusType(status);
         if (nextType === "active") {
           const compactInFlight = state.transientOperation === "compact";
+          const hasLiveTurn =
+            state.currentTurnId != null
+            || state.snapshot.isGenerating
+            || (state.thread != null && isThreadActivelyGenerating(state.thread));
+          if (!compactInFlight && !hasLiveTurn) {
+            state.snapshot.isGenerating = false;
+            this.updateSummaryStatus(threadId, state.pendingApproval ? "needs_approval" : "idle");
+            this.emitChanged();
+            return;
+          }
           state.snapshot.isGenerating = !compactInFlight;
           this.updateSummaryStatus(
             threadId,
@@ -674,7 +697,7 @@ export class AppServerBridgeBackend {
         replaceOrAppendMessage(state, {
           id: itemId,
           role: "assistant",
-          blocks: buildFileChangeBlocks(changes, "inProgress"),
+          blocks: buildFileChangeBlocks(changes, "inProgress", state.snapshot.cwd),
         });
         this.emitChanged();
         return;
@@ -1149,13 +1172,14 @@ function mergeThreadItem(state: ThreadRuntimeState, item: AppServerThreadItem, p
       role: "assistant",
       blocks: buildFileChangeBlocks(
         asFileChanges((item as Extract<AppServerThreadItem, { type: "fileChange" }>).changes),
-        asString((item as Extract<AppServerThreadItem, { type: "fileChange" }>).status)
+        asString((item as Extract<AppServerThreadItem, { type: "fileChange" }>).status),
+        state.snapshot.cwd
       ),
     });
     return;
   }
 
-  const messages = mapItemToMessages(item);
+  const messages = mapItemToMessages(item, state.snapshot.cwd);
   if (messages.length === 0) {
     return;
   }
@@ -1262,6 +1286,7 @@ function mapThreadToSummary(thread: AppServerThread, archived = false, updatedAt
     title: thread.name ?? buildThreadTitle(thread.preview),
     preview: thread.preview,
     subtitle,
+    cwd: thread.cwd,
     status,
     updatedAt: updatedAtOverride ?? toMillisTimestamp(thread.updatedAt),
     groupKind: grouping.kind,
@@ -1270,7 +1295,7 @@ function mapThreadToSummary(thread: AppServerThread, archived = false, updatedAt
   };
 }
 
-function mapItemToMessages(item: AppServerThreadItem): GatewayMessagePayload[] {
+function mapItemToMessages(item: AppServerThreadItem, cwd = ""): GatewayMessagePayload[] {
   switch (item.type) {
     case "userMessage":
       return [
@@ -1311,7 +1336,7 @@ function mapItemToMessages(item: AppServerThreadItem): GatewayMessagePayload[] {
         {
           id: fileChangeItem.id,
           role: "assistant",
-          blocks: buildFileChangeBlocks(fileChangeItem.changes, fileChangeItem.status),
+          blocks: buildFileChangeBlocks(fileChangeItem.changes, fileChangeItem.status, cwd),
         },
       ];
     case "plan":
@@ -1431,23 +1456,13 @@ function formatCommandResult(item: {
 function deriveThreadGrouping(thread: AppServerThread): { kind: "project" | "chat"; label: string } {
   const cwd = thread.cwd.replaceAll("\\", "/");
   const segments = cwd.split("/").filter(Boolean);
-  const leaf = segments.at(-1) ?? "会话";
-  const penultimate = segments.at(-2) ?? "";
-  const title = thread.name ?? buildThreadTitle(thread.preview);
+  const leaf = segments.at(-1) ?? "";
 
-  if (segments.includes("Codex") || /new-chat|chat/i.test(leaf) || /回复|hello|ok/i.test(title)) {
+  if (leaf.length === 0) {
     return { kind: "chat", label: "普通会话" };
   }
 
-  if (penultimate.toLowerCase() === "home") {
-    return { kind: "project", label: leaf };
-  }
-
-  if (leaf.length > 0) {
-    return { kind: "project", label: leaf };
-  }
-
-  return { kind: "chat", label: "普通会话" };
+  return { kind: "project", label: leaf };
 }
 
 function buildChips(
@@ -1488,16 +1503,21 @@ function buildApprovalResponse(kind: PendingApproval["kind"], allow: boolean): u
   };
 }
 
-function buildFileChangeBlocks(
+export function buildFileChangeBlocks(
   changes: Array<{ path?: string; kind?: string | { type?: string }; diff?: string | null }>,
-  status: string
+  status: string,
+  cwd = ""
 ): GatewayBlockPayload[] {
   const summary = summarizeFileChanges(changes, status);
-  const details = formatFileChangeDetails(changes);
-  return [
-    { kind: "commandSummary", value: summary },
-    ...details.map((value) => ({ kind: "commandMeta" as const, value })),
-  ];
+  const details = formatFileChangeDetails(changes, cwd);
+  const blocks: GatewayBlockPayload[] = [{ kind: "fileChangeSummary", value: summary }];
+  for (const detail of details) {
+    blocks.push({ kind: "fileChangeMeta", value: detail.label, path: detail.path });
+    if (detail.diff.length > 0) {
+      blocks.push({ kind: "fileChangeDiff", language: "diff", value: detail.diff });
+    }
+  }
+  return blocks;
 }
 
 function buildCommandExecutionBlocks(item: Extract<AppServerThreadItem, { type: "commandExecution" }>): GatewayBlockPayload[] {
@@ -1541,13 +1561,37 @@ function summarizeFileChanges(
 }
 
 function formatFileChangeDetails(
-  changes: Array<{ path?: string; kind?: string | { type?: string }; diff?: string | null }>
-): string[] {
+  changes: Array<{ path?: string; kind?: string | { type?: string }; diff?: string | null }>,
+  cwd: string
+): Array<{ label: string; path: string; diff: string }> {
   return changes.map((change) => {
-    const label = describeChangeKind(change.kind);
-    const path = change.path?.trim() || "unknown";
-    return `- ${label} \`${path}\``;
+    const action = describeChangeKind(change.kind);
+    const rawPath = change.path?.trim() || "unknown";
+    const path = formatProjectRelativePath(rawPath, cwd);
+    const diff = change.diff?.trim() ?? "";
+    return {
+      label: `${action} ${formatFileName(path)}`,
+      path,
+      diff,
+    };
   });
+}
+
+function formatFileName(path: string): string {
+  const normalized = path.replaceAll("\\", "/");
+  return normalized.split("/").filter(Boolean).at(-1) ?? path;
+}
+
+function formatProjectRelativePath(path: string, cwd: string): string {
+  const normalizedPath = path.replaceAll("\\", "/");
+  const normalizedCwd = cwd.trim().replaceAll("\\", "/").replace(/\/+$/, "");
+  if (normalizedCwd.length > 0 && normalizedPath.toLowerCase().startsWith(`${normalizedCwd.toLowerCase()}/`)) {
+    return normalizedPath.slice(normalizedCwd.length + 1);
+  }
+  if (/^[A-Za-z]:\//.test(normalizedPath) || normalizedPath.startsWith("/")) {
+    return formatFileName(normalizedPath);
+  }
+  return normalizedPath;
 }
 
 function normalizeChangeKind(kind: unknown): "add" | "delete" | "update" {
@@ -1570,11 +1614,11 @@ function normalizeChangeKind(kind: unknown): "add" | "delete" | "update" {
 function describeChangeKind(kind: unknown): string {
   switch (normalizeChangeKind(kind)) {
     case "add":
-      return "创建";
+      return "已创建";
     case "delete":
-      return "删除";
+      return "已删除";
     default:
-      return "编辑";
+      return "已编辑";
   }
 }
 
@@ -1715,7 +1759,7 @@ function rebaseSnapshotMessagesFromThread(state: ThreadRuntimeState): void {
 }
 
 function collectThreadMessages(thread: AppServerThread): GatewayMessagePayload[] {
-  return thread.turns.flatMap((turn) => turn.items).flatMap(mapItemToMessages);
+  return thread.turns.flatMap((turn) => turn.items).flatMap((item) => mapItemToMessages(item, thread.cwd));
 }
 
 function mergeSnapshotMessages(
@@ -1905,9 +1949,7 @@ function getThreadLastActivityAtMs(thread: AppServerThread): number {
 }
 
 export function buildVisibleThreadSummaries(threads: AppServerThread[]): GatewayThreadPayload[] {
-  return threads
-    .filter((thread) => !isExcludedThread(thread))
-    .map((thread) => mapThreadToSummary(thread, false, getThreadLastActivityAtMs(thread)));
+  return threads.map((thread) => mapThreadToSummary(thread, false, getThreadLastActivityAtMs(thread)));
 }
 
 function isThreadNotMaterializedError(error: unknown): boolean {
@@ -1916,11 +1958,6 @@ function isThreadNotMaterializedError(error: unknown): boolean {
 
 function isNoRolloutFoundError(error: unknown): boolean {
   return error instanceof Error && error.message.includes("no rollout found for thread id");
-}
-
-function isExcludedThread(thread: AppServerThread): boolean {
-  const title = thread.name ?? buildThreadTitle(thread.preview);
-  return title.includes(SELF_TEST_EXCLUDE_TITLE) || thread.preview.includes(SELF_TEST_EXCLUDE_TITLE);
 }
 
 function emptySnapshot(): ClientSnapshot {

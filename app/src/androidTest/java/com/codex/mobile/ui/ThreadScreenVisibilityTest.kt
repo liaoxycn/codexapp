@@ -4,7 +4,10 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import com.codex.mobile.model.ComposerChip
 import com.codex.mobile.model.ComposerChipIcon
 import com.codex.mobile.model.ConnectionStatus
@@ -13,8 +16,11 @@ import com.codex.mobile.model.HomeUiState
 import com.codex.mobile.model.MessageBlock
 import com.codex.mobile.model.MessageRole
 import com.codex.mobile.model.ThreadMessage
+import com.codex.mobile.model.ThreadGroupKind
 import com.codex.mobile.model.ThreadStatus
 import com.codex.mobile.model.ThreadSummary
+import com.codex.mobile.ui.theme.CodexTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -128,6 +134,70 @@ class ThreadScreenVisibilityTest {
         rule.waitUntil(timeoutMillis = 3_000) { loadCalls > 0 }
     }
 
+    @Test
+    fun fileChangeCardShowsFilesAndExpandsDiff() {
+        val diff = "diff --git a/app/src/main/App.kt b/app/src/main/App.kt\n-old\n+new"
+        rule.setContent {
+            MaterialTheme {
+                ThreadScreen(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(
+                        messages = listOf(
+                            ThreadMessage(
+                                id = "file-change-1",
+                                role = MessageRole.ASSISTANT,
+                                blocks = listOf(
+                                    MessageBlock.FileChangeSummary("已编辑 1 个文件"),
+                                    MessageBlock.FileChangeMeta("已编辑 App.kt", "app/src/main/App.kt"),
+                                    MessageBlock.FileChangeDiff(diff)
+                                )
+                            )
+                        )
+                    ),
+                    compactMode = false,
+                    onOpenConnection = {},
+                    onRefreshCurrent = {},
+                    onLoadOlderMessages = {},
+                    onApprovePending = {},
+                    onRejectPending = {}
+                )
+            }
+        }
+
+        rule.waitForIdle()
+        rule.onNodeWithTag("thread_message_list").performScrollToIndex(0)
+        rule.waitForIdle()
+        rule.onNodeWithText("已编辑 App.kt").assertExists()
+        rule.onNodeWithContentDescription("展开 已编辑 App.kt diff").performClick()
+        rule.onNodeWithText("app/src/main/App.kt").assertExists()
+        rule.onNodeWithText(diff).assertExists()
+    }
+
+    @Test
+    fun projectDrawerActionCreatesThreadWithProjectCwd() {
+        var createdCwd: String? = null
+        rule.setContent {
+            CodexTheme {
+                DrawerContent(
+                    state = sampleDrawerState(),
+                    onCreateThread = {},
+                    onCreateThreadInProject = { createdCwd = it },
+                    onRefreshThreads = {},
+                    onSelectThread = {}
+                )
+            }
+        }
+
+        rule.onNodeWithContentDescription("在 Project A 中开始新会话")
+            .assertExists()
+            .performClick()
+
+        assertEquals("D:/Projects/Project A", createdCwd)
+    }
+
     private fun sampleState(
         hasMoreHistory: Boolean,
         isLoadingOlder: Boolean,
@@ -166,5 +236,46 @@ class ThreadScreenVisibilityTest {
         connectionDetail = "",
         gatewayConfig = GatewayConfig(),
         isDemoMode = true
+    )
+
+    private fun sampleDrawerState() = HomeUiState(
+        threads = listOf(
+            ThreadSummary(
+                id = "project-a-1",
+                title = "Project task",
+                preview = "preview",
+                status = ThreadStatus.IDLE,
+                updatedAt = 2_000L,
+                groupKind = ThreadGroupKind.PROJECT,
+                groupLabel = "Project A",
+                cwd = "D:/Projects/Project A"
+            ),
+            ThreadSummary(
+                id = "chat-1",
+                title = "General chat",
+                preview = "preview",
+                status = ThreadStatus.IDLE,
+                updatedAt = 1_000L
+            )
+        ),
+        selectedThreadId = "project-a-1",
+        pendingThreadTitle = null,
+        isThreadSwitching = false,
+        messages = emptyList(),
+        hasMoreHistory = false,
+        isLoadingOlder = false,
+        composerText = "",
+        isGenerating = false,
+        isManualRefreshing = false,
+        showComposerDetails = false,
+        chips = emptyList(),
+        slashCommands = emptyList(),
+        pendingApproval = null,
+        cwd = "D:/Projects/Project A",
+        permissionSummary = "",
+        connectionStatus = ConnectionStatus.CONNECTED,
+        connectionDetail = "",
+        gatewayConfig = GatewayConfig(),
+        isDemoMode = false
     )
 }

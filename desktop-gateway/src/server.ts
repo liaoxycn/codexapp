@@ -37,7 +37,7 @@ type Backend = {
   hasThread(threadId: string): boolean;
   getDefaultThreadId(): string;
   getSnapshot(selectedThreadId?: string): ClientSnapshot;
-  createThread(): ClientSnapshot | Promise<ClientSnapshot>;
+  createThread(cwd?: string): ClientSnapshot | Promise<ClientSnapshot>;
   selectThread(threadId: string): ClientSnapshot | Promise<ClientSnapshot>;
   renameThread(threadId: string, name: string): ClientSnapshot | Promise<ClientSnapshot>;
   archiveThread(threadId: string): ClientSnapshot | Promise<ClientSnapshot>;
@@ -185,7 +185,7 @@ export class GatewayServer {
       case "create_thread":
         context.selectionVersion += 1;
         await this.runBackendAction(context, async () => {
-          const snapshot = await this.backend().createThread();
+          const snapshot = await this.backend().createThread(message.cwd);
           context.selectedThreadId = snapshot.selectedThreadId;
           return snapshot;
         });
@@ -230,9 +230,15 @@ export class GatewayServer {
         break;
       case "send_prompt":
         await this.runBackendAction(context, async () => {
-          const snapshot = await this.backend().sendPrompt(message.threadId?.trim() || context.selectedThreadId, message.text);
-          console.log(`[gateway] send_prompt backend ok thread=${snapshot.selectedThreadId || context.selectedThreadId}`);
-          void this.pokeDesktop(snapshot.selectedThreadId || context.selectedThreadId, "send_prompt");
+          const requestedThreadId = message.threadId?.trim() || context.selectedThreadId;
+          if (requestedThreadId && requestedThreadId !== context.selectedThreadId) {
+            context.selectionVersion += 1;
+            context.selectedThreadId = requestedThreadId;
+          }
+          const snapshot = await this.backend().sendPrompt(requestedThreadId, message.text);
+          context.selectedThreadId = snapshot.selectedThreadId || requestedThreadId;
+          console.log(`[gateway] send_prompt backend ok thread=${context.selectedThreadId}`);
+          void this.pokeDesktop(context.selectedThreadId, "send_prompt");
           return snapshot;
         });
         break;

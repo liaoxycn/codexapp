@@ -33,7 +33,7 @@ interface SessionRepository {
 
     suspend fun connect(config: GatewayConfig)
     suspend fun disconnect()
-    suspend fun createThread()
+    suspend fun createThread(cwd: String? = null)
     suspend fun selectThread(id: String)
     suspend fun refreshThreads()
     suspend fun loadOlderMessages()
@@ -150,7 +150,7 @@ class DefaultSessionRepository(
         }
     }
 
-    override suspend fun createThread() {
+    override suspend fun createThread(cwd: String?) {
         if (_state.value.connectionStatus == ConnectionStatus.CONNECTED) {
             _state.update { remote ->
                 remote.copy(
@@ -167,7 +167,7 @@ class DefaultSessionRepository(
             gatewayClient.send(
                 json.encodeToString(
                     GatewayCreateThreadMessage.serializer(),
-                    GatewayCreateThreadMessage()
+                    GatewayCreateThreadMessage(cwd = cwd?.takeIf { it.isNotBlank() })
                 )
             )
             return
@@ -351,6 +351,7 @@ class DefaultSessionRepository(
                 updatedAt = it.updatedAt ?: 0L,
                 groupKind = if (it.groupKind == "project") ThreadGroupKind.PROJECT else ThreadGroupKind.CHAT,
                 groupLabel = it.groupLabel ?: "普通会话",
+                cwd = it.cwd.orEmpty(),
                 archived = it.archived == true
             )
         }
@@ -369,6 +370,9 @@ class DefaultSessionRepository(
                         "reasoning" -> MessageBlock.Reasoning(block.value)
                         "commandSummary" -> MessageBlock.CommandSummary(block.value)
                         "commandMeta" -> MessageBlock.CommandMeta(block.value)
+                        "fileChangeSummary" -> MessageBlock.FileChangeSummary(block.value)
+                        "fileChangeMeta" -> MessageBlock.FileChangeMeta(block.value, block.path.orEmpty())
+                        "fileChangeDiff" -> MessageBlock.FileChangeDiff(block.value)
                         else -> MessageBlock.Text(block.value)
                     }
                 }
@@ -583,7 +587,8 @@ private data class GatewaySelectThreadMessage(
 
 @Serializable
 private data class GatewayCreateThreadMessage(
-    val type: String = "create_thread"
+    val type: String = "create_thread",
+    val cwd: String? = null
 )
 
 @Serializable
@@ -646,6 +651,7 @@ private data class GatewayThreadPayload(
     val title: String,
     val preview: String,
     val subtitle: String? = null,
+    val cwd: String? = null,
     val status: String,
     val updatedAt: Long? = null,
     val groupKind: String? = null,
@@ -664,7 +670,8 @@ private data class GatewayMessagePayload(
 private data class GatewayBlockPayload(
     val kind: String,
     val value: String,
-    val language: String? = null
+    val language: String? = null,
+    val path: String? = null
 )
 
 @Serializable

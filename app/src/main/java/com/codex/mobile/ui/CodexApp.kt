@@ -68,6 +68,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Info
@@ -156,10 +157,21 @@ fun CodexApp(
     val state by viewModel.state.collectAsState()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     var showGatewayDialog by rememberSaveable { mutableStateOf(false) }
     var compactMode by rememberSaveable { mutableStateOf(false) }
     var composerPanel by rememberSaveable { mutableStateOf("none") }
     var lastBackPressAt by rememberSaveable { mutableStateOf(0L) }
+
+    fun dismissComposerChrome() {
+        composerPanel = "none"
+        if (state.showComposerDetails) {
+            viewModel.closeComposerDetails()
+        }
+        focusManager.clearFocus(force = true)
+        keyboardController?.hide()
+    }
 
     BackHandler(enabled = true) {
         if (showGatewayDialog) {
@@ -211,6 +223,10 @@ fun CodexApp(
                     viewModel.createThread()
                     scope.launch { drawerState.close() }
                 },
+                onCreateThreadInProject = { cwd ->
+                    viewModel.createThread(cwd)
+                    scope.launch { drawerState.close() }
+                },
                 onRefreshThreads = viewModel::refreshThreads,
                 onSelectThread = {
                     viewModel.selectThread(it)
@@ -233,7 +249,10 @@ fun CodexApp(
                     TopBar(
                         title = selectedThread?.title ?: "Codex",
                         status = selectedThreadStatus,
-                        onOpenDrawer = { scope.launch { drawerState.open() } },
+                        onOpenDrawer = {
+                            dismissComposerChrome()
+                            scope.launch { drawerState.open() }
+                        },
                         onCreateThread = viewModel::createThread,
                         onOpenConnection = { showGatewayDialog = true }
                     )
@@ -456,9 +475,9 @@ private fun TopBar(
             Text(
                 text = title,
                 color = CodexTheme.colors.textPrimary,
-                fontSize = 15.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
-                lineHeight = 19.sp,
+                lineHeight = 20.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
@@ -497,8 +516,8 @@ private fun HeaderIconButton(
 ) {
     Box(
         modifier = Modifier
-            .size(38.dp)
-            .clip(RoundedCornerShape(13.dp))
+            .size(42.dp)
+            .clip(RoundedCornerShape(14.dp))
             .background(CodexTheme.colors.surfaceSubtle)
             .semantics { this.contentDescription = contentDescription }
             .clickable(onClick = onClick),
@@ -508,15 +527,16 @@ private fun HeaderIconButton(
             imageVector = icon,
             contentDescription = null,
             tint = CodexTheme.colors.textPrimary,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(19.dp)
         )
     }
 }
 
 @Composable
-private fun DrawerContent(
+internal fun DrawerContent(
     state: HomeUiState,
     onCreateThread: () -> Unit,
+    onCreateThreadInProject: (String) -> Unit,
     onRefreshThreads: () -> Unit,
     onSelectThread: (String) -> Unit
 ) {
@@ -618,12 +638,17 @@ private fun DrawerContent(
                 orderedProjectGroups.forEach { groupLabel ->
                     val threads = groupedProjectThreads[groupLabel].orEmpty()
                     val isExpanded = groupLabel == currentProjectGroupLabel || expandedProjectGroups.contains(groupLabel)
+                    val projectCwd = threads.firstOrNull { it.cwd.isNotBlank() }?.cwd.orEmpty()
                     item {
                         GroupHeader(
                             label = groupLabel,
+                            secondaryText = projectCwd,
                             icon = Icons.Filled.Folder,
                             compact = true,
                             expanded = isExpanded,
+                            onCreateThread = if (projectCwd.isNotBlank()) ({
+                                onCreateThreadInProject(projectCwd)
+                            }) else null,
                             onToggle = if (groupLabel == currentProjectGroupLabel) null else ({
                                 expandedProjectGroups = if (isExpanded) {
                                     expandedProjectGroups - groupLabel
@@ -722,19 +747,19 @@ private fun DrawerHeaderAction(
 ) {
     Box(
         modifier = Modifier
-            .size(38.dp)
-            .clip(RoundedCornerShape(13.dp))
+            .size(42.dp)
+            .clip(RoundedCornerShape(14.dp))
             .background(CodexTheme.colors.surfaceSubtle)
             .semantics { this.contentDescription = contentDescription }
             .clickable(onClick = onClick)
-            .padding(5.dp),
+            .padding(6.dp),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = CodexTheme.colors.textPrimary,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(19.dp)
         )
     }
 }
@@ -742,47 +767,102 @@ private fun DrawerHeaderAction(
 @Composable
 private fun GroupHeader(
     label: String,
+    secondaryText: String = "",
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     compact: Boolean = false,
     expanded: Boolean? = null,
+    onCreateThread: (() -> Unit)? = null,
     onToggle: (() -> Unit)? = null
 ) {
+    val groupDescription = when {
+        expanded == true && onToggle == null -> "当前项目：$label，已展开"
+        expanded == true -> "收起项目：$label"
+        expanded == false -> "展开项目：$label"
+        else -> "项目：$label"
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = if (compact) 2.dp else 3.dp)
-            .padding(start = if (compact) 10.dp else 10.dp)
-            .clickable(enabled = onToggle != null) { onToggle?.invoke() },
+            .padding(start = if (compact) 10.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = CodexTheme.colors.textTertiary,
-                modifier = Modifier.size(if (compact) 12.dp else 14.dp)
-            )
-            Spacer(Modifier.width(5.dp))
-        }
-        Column(modifier = Modifier.weight(1f)) {
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .semantics { contentDescription = groupDescription }
+                .clickable(enabled = onToggle != null) { onToggle?.invoke() },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = CodexTheme.colors.textTertiary,
+                    modifier = Modifier.size(if (compact) 12.dp else 14.dp)
+                )
+                Spacer(Modifier.width(5.dp))
+            }
             Text(
                 text = label,
                 color = CodexTheme.colors.textSecondary,
-                fontSize = if (compact) 12.sp else 13.sp,
-                lineHeight = if (compact) 15.sp else 16.sp,
+                fontSize = if (secondaryText.isNotBlank()) 14.sp else if (compact) 12.sp else 13.sp,
+                lineHeight = if (secondaryText.isNotBlank()) 17.sp else if (compact) 15.sp else 16.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = if (secondaryText.isNotBlank()) Modifier.widthIn(max = 96.dp) else Modifier.weight(1f),
                 style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
             )
+            if (secondaryText.isNotBlank()) {
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "|",
+                    color = CodexTheme.colors.textTertiary,
+                    fontSize = 9.sp,
+                    lineHeight = 11.sp,
+                    maxLines = 1,
+                    style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = secondaryText,
+                    color = CodexTheme.colors.textTertiary,
+                    fontSize = 9.sp,
+                    lineHeight = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Start,
+                    modifier = Modifier.weight(1f),
+                    style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
+                )
+            }
+            if (expanded != null) {
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = CodexTheme.colors.textTertiary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
-        if (expanded != null) {
-            Icon(
-                imageVector = if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = if (expanded) "收起" else "展开",
-                tint = CodexTheme.colors.textTertiary,
-                modifier = Modifier.size(16.dp)
-            )
+        if (onCreateThread != null) {
+            Spacer(Modifier.width(4.dp))
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .semantics { contentDescription = "在 $label 中开始新会话" }
+                    .clickable(onClick = onCreateThread),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = null,
+                    tint = CodexTheme.colors.textTertiary,
+                    modifier = Modifier.size(15.dp)
+                )
+            }
         }
     }
 }
@@ -839,11 +919,14 @@ private fun ThreadRow(
     onClick: () -> Unit
 ) {
     val startPadding = 10.dp + (indentLevel * 8).dp
+    val updatedLabel = if (summary.updatedAt > 0L) formatThreadUpdatedAt(summary.updatedAt) else "无更新时间"
+    val rowDescription = "会话：${summary.title}，状态：${threadStatusLabel(summary.status)}，更新：$updatedLabel"
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(11.dp))
             .background(if (selected) CodexTheme.colors.surfaceSubtle else Color.Transparent)
+            .semantics { contentDescription = rowDescription }
             .clickable(onClick = onClick)
             .padding(start = startPadding, end = 10.dp, top = 5.dp, bottom = 5.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1633,14 +1716,26 @@ private fun UserMessage(message: ThreadMessage, compactMode: Boolean) {
 private fun AssistantMessage(message: ThreadMessage, compactMode: Boolean, messageIndex: Int) {
     var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
     var reasoningExpanded by rememberSaveable(message.id + ":reasoning") { mutableStateOf(false) }
+    val fileChangeSummary = message.blocks.filterIsInstance<MessageBlock.FileChangeSummary>().firstOrNull()?.value
+    val fileChangeEntries = remember(message.blocks) { buildFileChangeEntries(message.blocks) }
     val commandSummary = message.blocks.filterIsInstance<MessageBlock.CommandSummary>().firstOrNull()?.value
     val commandMetaLines = message.blocks.filterIsInstance<MessageBlock.CommandMeta>().mapNotNull { it.value.trim().takeIf(String::isNotEmpty) }
     val commandOutput = message.blocks.filterIsInstance<MessageBlock.Code>().firstOrNull { it.language.equals("shell", ignoreCase = true) }
+    val hasFileChangeCard = fileChangeSummary != null || fileChangeEntries.isNotEmpty()
     val hasCommandCard = commandSummary != null || commandMetaLines.isNotEmpty() || commandOutput != null
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(if (compactMode) 3.dp else 5.dp)
     ) {
+        if (hasFileChangeCard) {
+            FileChangeCard(
+                messageId = message.id,
+                summary = fileChangeSummary ?: "文件改动",
+                entries = fileChangeEntries,
+                compactMode = compactMode
+            )
+        }
+
         if (hasCommandCard) {
             CommandExecutionCard(
                 messageId = message.id,
@@ -1682,8 +1777,187 @@ private fun AssistantMessage(message: ThreadMessage, compactMode: Boolean, messa
                     onToggle = { reasoningExpanded = !reasoningExpanded },
                     compactMode = compactMode
                 )
-                is MessageBlock.CommandSummary, is MessageBlock.CommandMeta -> Unit
+                is MessageBlock.CommandSummary,
+                is MessageBlock.CommandMeta,
+                is MessageBlock.FileChangeSummary,
+                is MessageBlock.FileChangeMeta,
+                is MessageBlock.FileChangeDiff -> Unit
             }
+        }
+    }
+}
+
+private data class FileChangeEntry(
+    val label: String,
+    val path: String,
+    val diff: String?
+)
+
+private fun buildFileChangeEntries(blocks: List<MessageBlock>): List<FileChangeEntry> {
+    val entries = mutableListOf<FileChangeEntry>()
+    blocks.forEach { block ->
+        when (block) {
+            is MessageBlock.FileChangeMeta -> {
+                val label = block.value.trim()
+                if (label.isNotEmpty()) {
+                    entries += FileChangeEntry(label = label, path = block.path.trim(), diff = null)
+                }
+            }
+            is MessageBlock.FileChangeDiff -> {
+                val diff = block.value.trim()
+                if (diff.isNotEmpty()) {
+                    val lastIndex = entries.indexOfLast { it.diff == null }
+                    if (lastIndex >= 0) {
+                        entries[lastIndex] = entries[lastIndex].copy(diff = diff)
+                    } else {
+                        entries += FileChangeEntry(label = "文件 diff", path = "", diff = diff)
+                    }
+                }
+            }
+            else -> Unit
+        }
+    }
+    return entries
+}
+
+@Composable
+private fun FileChangeCard(
+    messageId: String,
+    summary: String,
+    entries: List<FileChangeEntry>,
+    compactMode: Boolean
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(if (compactMode) 10.dp else 12.dp))
+            .background(CodexTheme.colors.surfaceSubtle)
+            .border(1.dp, CodexTheme.colors.border, RoundedCornerShape(if (compactMode) 10.dp else 12.dp))
+            .padding(horizontal = if (compactMode) 7.dp else 8.dp, vertical = if (compactMode) 2.dp else 3.dp),
+        verticalArrangement = Arrangement.spacedBy(1.dp)
+    ) {
+        if (entries.isEmpty()) {
+            Text(
+                text = summary,
+                color = CodexTheme.colors.textSecondary,
+                fontSize = if (compactMode) 10.sp else 11.sp,
+                lineHeight = if (compactMode) 13.sp else 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        } else {
+            entries.forEachIndexed { index, entry ->
+                FileChangeRow(
+                    messageId = messageId,
+                    index = index,
+                    entry = entry,
+                    compactMode = compactMode
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FileChangeRow(
+    messageId: String,
+    index: Int,
+    entry: FileChangeEntry,
+    compactMode: Boolean
+) {
+    val hasDiff = !entry.diff.isNullOrBlank()
+    var expanded by rememberSaveable(messageId + ":fileChange:$index") { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(if (compactMode) 2.dp else 3.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .then(
+                    if (hasDiff) {
+                        Modifier
+                            .clickable(onClick = { expanded = !expanded })
+                            .semantics { contentDescription = if (expanded) "收起 ${entry.label} diff" else "展开 ${entry.label} diff" }
+                    } else {
+                        Modifier
+                    }
+                )
+                .padding(horizontal = 2.dp, vertical = if (compactMode) 2.dp else 3.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = entry.label,
+                color = CodexTheme.colors.textSecondary,
+                fontSize = if (compactMode) 10.sp else 11.sp,
+                lineHeight = if (compactMode) 13.sp else 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            if (hasDiff) {
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = CodexTheme.colors.textTertiary,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
+        if (expanded && hasDiff) {
+            if (entry.path.isNotBlank()) {
+                Text(
+                    text = entry.path,
+                    color = CodexTheme.colors.textTertiary,
+                    fontSize = if (compactMode) 9.sp else 10.sp,
+                    lineHeight = if (compactMode) 12.sp else 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 2.dp, end = 2.dp)
+                )
+            }
+            FileDiffBlock(
+                value = entry.diff.orEmpty(),
+                compactMode = compactMode
+            )
+        }
+    }
+}
+
+@Composable
+private fun FileDiffBlock(
+    value: String,
+    compactMode: Boolean
+) {
+    val styledDiff = remember(value) { buildDiffAnnotatedString(value) }
+    Text(
+        text = styledDiff,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(if (compactMode) 8.dp else 10.dp))
+            .background(CodexTheme.colors.codeBackground)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = if (compactMode) 8.dp else 9.dp, vertical = if (compactMode) 5.dp else 6.dp),
+        fontSize = if (compactMode) 10.sp else 11.sp,
+        lineHeight = if (compactMode) 15.sp else 16.sp,
+        fontFamily = FontFamily.Monospace,
+        overflow = TextOverflow.Clip
+    )
+}
+
+private fun buildDiffAnnotatedString(diff: String): AnnotatedString = buildAnnotatedString {
+    val lines = diff.lines()
+    lines.forEachIndexed { index, line ->
+        val color = when {
+            line.startsWith("@@") -> Color(0xFF93C5FD)
+            line.startsWith("+++") || line.startsWith("---") || line.startsWith("diff --git") -> Color(0xFF9CA3AF)
+            line.startsWith("+") -> Color(0xFF86EFAC)
+            line.startsWith("-") -> Color(0xFFFCA5A5)
+            else -> Color(0xFFE5E7EB)
+        }
+        withStyle(SpanStyle(color = color)) {
+            append(line)
+        }
+        if (index < lines.lastIndex) {
+            append("\n")
         }
     }
 }
@@ -2298,7 +2572,8 @@ private fun Composer(
                     onClick = {
                         if (sendEnabled) sendNow()
                     },
-                    contentDescription = "发送消息",
+                    contentDescription = if (sendEnabled) "发送消息" else "输入内容后发送",
+                    enabled = sendEnabled,
                     size = 32.dp,
                     shape = CircleShape,
                     fill = when {
@@ -2331,6 +2606,9 @@ private fun ThreadMessage.revisionKey(): String {
             is MessageBlock.Reasoning -> block.value.length
             is MessageBlock.CommandSummary -> block.value.length
             is MessageBlock.CommandMeta -> block.value.length
+            is MessageBlock.FileChangeSummary -> block.value.length
+            is MessageBlock.FileChangeMeta -> block.value.length
+            is MessageBlock.FileChangeDiff -> block.value.length
         }
     }
     return "$id:${blocks.size}:$contentSize"
@@ -2862,6 +3140,7 @@ private fun MarkdownInlineText(
 private fun ComposerIconButton(
     onClick: () -> Unit,
     contentDescription: String,
+    enabled: Boolean = true,
     size: androidx.compose.ui.unit.Dp,
     shape: androidx.compose.ui.graphics.Shape,
     fill: Color = CodexTheme.colors.surfaceSubtle,
@@ -2873,7 +3152,7 @@ private fun ComposerIconButton(
             .clip(shape)
             .background(fill)
             .semantics { this.contentDescription = contentDescription }
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         content()

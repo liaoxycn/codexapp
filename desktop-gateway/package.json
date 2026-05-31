@@ -9,6 +9,9 @@
     "build": "tsc -p tsconfig.json",
     "build:exe": "node scripts/build-exe.mjs"
   },
+  "engines": {
+    "node": ">=24"
+  },
   "dependencies": {
     "ws": "^8.18.3"
   },

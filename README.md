@@ -15,6 +15,8 @@
 - `app/`：Android APK 工程
 - `desktop-gateway/`：桌面转发层，负责连接 Android 和本机 `codex app-server`
 
+项目目录说明见 [docs/PROJECT_WIKI.md](docs/PROJECT_WIKI.md)。
+
 默认连接链路：
 
 `Android App -> desktop-gateway -> codex app-server`
@@ -26,7 +28,7 @@
 先确保电脑已安装：
 
 - `Git`
-- `Node.js 20+`
+- `Node.js 24+`
 - `npm`
 - `codex` CLI，并且命令行里可以直接执行 `codex app-server`
 
