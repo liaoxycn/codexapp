@@ -8,7 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.Surface
 import androidx.compose.ui.Modifier
-import com.codex.mobile.ui.CodexApp
+import com.codex.mobile.ui.app.CodexApp
 import com.codex.mobile.ui.theme.CodexTheme
 
 class MainActivity : ComponentActivity() {

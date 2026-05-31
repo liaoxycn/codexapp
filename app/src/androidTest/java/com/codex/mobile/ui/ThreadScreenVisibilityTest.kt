@@ -19,7 +19,9 @@ import com.codex.mobile.model.ThreadMessage
 import com.codex.mobile.model.ThreadGroupKind
 import com.codex.mobile.model.ThreadStatus
 import com.codex.mobile.model.ThreadSummary
+import com.codex.mobile.ui.drawer.DrawerContent
 import com.codex.mobile.ui.theme.CodexTheme
+import com.codex.mobile.ui.thread.ThreadScreen
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule

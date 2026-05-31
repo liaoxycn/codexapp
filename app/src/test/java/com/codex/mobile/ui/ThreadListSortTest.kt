@@ -3,6 +3,8 @@ package com.codex.mobile.ui
 import com.codex.mobile.model.ThreadGroupKind
 import com.codex.mobile.model.ThreadStatus
 import com.codex.mobile.model.ThreadSummary
+import com.codex.mobile.ui.drawer.formatThreadUpdatedAt
+import com.codex.mobile.ui.drawer.threadListSortOrder
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

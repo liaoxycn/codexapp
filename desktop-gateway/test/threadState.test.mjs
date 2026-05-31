@@ -9,7 +9,7 @@ import {
   resolveThreadSummaryStatus,
   shouldRetainLiveThreadRuntime,
   shouldRetainThreadRuntimeOverlay,
-} from "../src/threadState.ts";
+} from "../dist/threadState.js";
 
 function thread(overrides = {}) {
   return {
@@ -217,6 +217,7 @@ test("finished active thread resolves to idle summary", () => {
 });
 
 test("string based backend states map correctly", () => {
+  assert.equal(resolveLifecycleStatus("active", false), "running");
   assert.equal(resolveLifecycleStatus("inProgress", false), "running");
   assert.equal(resolveLifecycleStatus("waitingOnApproval", false), "needs_approval");
   assert.equal(resolveLifecycleStatus("waitingOnUserInput", false), "idle");

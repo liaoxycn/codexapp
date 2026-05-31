@@ -1,0 +1,22 @@
+package com.codex.mobile.model
+
+data class SessionRemoteState(
+    val threads: List<ThreadSummary> = emptyList(),
+    val selectedThreadId: String = "",
+    val pendingThreadTitle: String? = null,
+    val isThreadSwitching: Boolean = false,
+    val messages: List<ThreadMessage> = emptyList(),
+    val hasMoreHistory: Boolean = false,
+    val isLoadingOlder: Boolean = false,
+    val isGenerating: Boolean = false,
+    val isManualRefreshing: Boolean = false,
+    val chips: List<ComposerChip> = emptyList(),
+    val slashCommands: List<String> = emptyList(),
+    val pendingApproval: String? = null,
+    val cwd: String = "",
+    val permissionSummary: String = "",
+    val connectionStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED,
+    val connectionDetail: String = "未连接 gateway",
+    val gatewayConfig: GatewayConfig = GatewayConfig(),
+    val isDemoMode: Boolean = true
+)
