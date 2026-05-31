@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.codex.mobile.model.ComposerChip
 import com.codex.mobile.model.ComposerChipIcon
@@ -131,6 +132,48 @@ class ThreadScreenVisibilityTest {
 
         rule.onNodeWithTag("thread_message_list").performScrollToIndex(0)
         rule.waitUntil(timeoutMillis = 3_000) { loadCalls > 0 }
+    }
+
+    @Test
+    fun fileChangeCardShowsFilesAndExpandsDiff() {
+        val diff = "diff --git a/app/src/main/App.kt b/app/src/main/App.kt\n-old\n+new"
+        rule.setContent {
+            MaterialTheme {
+                ThreadScreen(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(
+                        messages = listOf(
+                            ThreadMessage(
+                                id = "file-change-1",
+                                role = MessageRole.ASSISTANT,
+                                blocks = listOf(
+                                    MessageBlock.FileChangeSummary("已编辑 1 个文件"),
+                                    MessageBlock.FileChangeMeta("已编辑 App.kt", "app/src/main/App.kt"),
+                                    MessageBlock.FileChangeDiff(diff)
+                                )
+                            )
+                        )
+                    ),
+                    compactMode = false,
+                    onOpenConnection = {},
+                    onRefreshCurrent = {},
+                    onLoadOlderMessages = {},
+                    onApprovePending = {},
+                    onRejectPending = {}
+                )
+            }
+        }
+
+        rule.waitForIdle()
+        rule.onNodeWithTag("thread_message_list").performScrollToIndex(0)
+        rule.waitForIdle()
+        rule.onNodeWithText("已编辑 App.kt").assertExists()
+        rule.onNodeWithContentDescription("展开 已编辑 App.kt diff").performClick()
+        rule.onNodeWithText("app/src/main/App.kt").assertExists()
+        rule.onNodeWithText(diff).assertExists()
     }
 
     @Test

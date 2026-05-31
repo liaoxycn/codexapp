@@ -697,7 +697,7 @@ export class AppServerBridgeBackend {
         replaceOrAppendMessage(state, {
           id: itemId,
           role: "assistant",
-          blocks: buildFileChangeBlocks(changes, "inProgress"),
+          blocks: buildFileChangeBlocks(changes, "inProgress", state.snapshot.cwd),
         });
         this.emitChanged();
         return;
@@ -1172,13 +1172,14 @@ function mergeThreadItem(state: ThreadRuntimeState, item: AppServerThreadItem, p
       role: "assistant",
       blocks: buildFileChangeBlocks(
         asFileChanges((item as Extract<AppServerThreadItem, { type: "fileChange" }>).changes),
-        asString((item as Extract<AppServerThreadItem, { type: "fileChange" }>).status)
+        asString((item as Extract<AppServerThreadItem, { type: "fileChange" }>).status),
+        state.snapshot.cwd
       ),
     });
     return;
   }
 
-  const messages = mapItemToMessages(item);
+  const messages = mapItemToMessages(item, state.snapshot.cwd);
   if (messages.length === 0) {
     return;
   }
@@ -1294,7 +1295,7 @@ function mapThreadToSummary(thread: AppServerThread, archived = false, updatedAt
   };
 }
 
-function mapItemToMessages(item: AppServerThreadItem): GatewayMessagePayload[] {
+function mapItemToMessages(item: AppServerThreadItem, cwd = ""): GatewayMessagePayload[] {
   switch (item.type) {
     case "userMessage":
       return [
@@ -1335,7 +1336,7 @@ function mapItemToMessages(item: AppServerThreadItem): GatewayMessagePayload[] {
         {
           id: fileChangeItem.id,
           role: "assistant",
-          blocks: buildFileChangeBlocks(fileChangeItem.changes, fileChangeItem.status),
+          blocks: buildFileChangeBlocks(fileChangeItem.changes, fileChangeItem.status, cwd),
         },
       ];
     case "plan":
@@ -1502,16 +1503,21 @@ function buildApprovalResponse(kind: PendingApproval["kind"], allow: boolean): u
   };
 }
 
-function buildFileChangeBlocks(
+export function buildFileChangeBlocks(
   changes: Array<{ path?: string; kind?: string | { type?: string }; diff?: string | null }>,
-  status: string
+  status: string,
+  cwd = ""
 ): GatewayBlockPayload[] {
   const summary = summarizeFileChanges(changes, status);
-  const details = formatFileChangeDetails(changes);
-  return [
-    { kind: "commandSummary", value: summary },
-    ...details.map((value) => ({ kind: "commandMeta" as const, value })),
-  ];
+  const details = formatFileChangeDetails(changes, cwd);
+  const blocks: GatewayBlockPayload[] = [{ kind: "fileChangeSummary", value: summary }];
+  for (const detail of details) {
+    blocks.push({ kind: "fileChangeMeta", value: detail.label, path: detail.path });
+    if (detail.diff.length > 0) {
+      blocks.push({ kind: "fileChangeDiff", language: "diff", value: detail.diff });
+    }
+  }
+  return blocks;
 }
 
 function buildCommandExecutionBlocks(item: Extract<AppServerThreadItem, { type: "commandExecution" }>): GatewayBlockPayload[] {
@@ -1555,13 +1561,37 @@ function summarizeFileChanges(
 }
 
 function formatFileChangeDetails(
-  changes: Array<{ path?: string; kind?: string | { type?: string }; diff?: string | null }>
-): string[] {
+  changes: Array<{ path?: string; kind?: string | { type?: string }; diff?: string | null }>,
+  cwd: string
+): Array<{ label: string; path: string; diff: string }> {
   return changes.map((change) => {
-    const label = describeChangeKind(change.kind);
-    const path = change.path?.trim() || "unknown";
-    return `- ${label} \`${path}\``;
+    const action = describeChangeKind(change.kind);
+    const rawPath = change.path?.trim() || "unknown";
+    const path = formatProjectRelativePath(rawPath, cwd);
+    const diff = change.diff?.trim() ?? "";
+    return {
+      label: `${action} ${formatFileName(path)}`,
+      path,
+      diff,
+    };
   });
+}
+
+function formatFileName(path: string): string {
+  const normalized = path.replaceAll("\\", "/");
+  return normalized.split("/").filter(Boolean).at(-1) ?? path;
+}
+
+function formatProjectRelativePath(path: string, cwd: string): string {
+  const normalizedPath = path.replaceAll("\\", "/");
+  const normalizedCwd = cwd.trim().replaceAll("\\", "/").replace(/\/+$/, "");
+  if (normalizedCwd.length > 0 && normalizedPath.toLowerCase().startsWith(`${normalizedCwd.toLowerCase()}/`)) {
+    return normalizedPath.slice(normalizedCwd.length + 1);
+  }
+  if (/^[A-Za-z]:\//.test(normalizedPath) || normalizedPath.startsWith("/")) {
+    return formatFileName(normalizedPath);
+  }
+  return normalizedPath;
 }
 
 function normalizeChangeKind(kind: unknown): "add" | "delete" | "update" {
@@ -1584,11 +1614,11 @@ function normalizeChangeKind(kind: unknown): "add" | "delete" | "update" {
 function describeChangeKind(kind: unknown): string {
   switch (normalizeChangeKind(kind)) {
     case "add":
-      return "创建";
+      return "已创建";
     case "delete":
-      return "删除";
+      return "已删除";
     default:
-      return "编辑";
+      return "已编辑";
   }
 }
 
@@ -1729,7 +1759,7 @@ function rebaseSnapshotMessagesFromThread(state: ThreadRuntimeState): void {
 }
 
 function collectThreadMessages(thread: AppServerThread): GatewayMessagePayload[] {
-  return thread.turns.flatMap((turn) => turn.items).flatMap(mapItemToMessages);
+  return thread.turns.flatMap((turn) => turn.items).flatMap((item) => mapItemToMessages(item, thread.cwd));
 }
 
 function mergeSnapshotMessages(

@@ -111,9 +111,19 @@ export interface GatewayMessagePayload {
 }
 
 export interface GatewayBlockPayload {
-  kind: "text" | "code" | "status" | "reasoning" | "commandSummary" | "commandMeta";
+  kind:
+    | "text"
+    | "code"
+    | "status"
+    | "reasoning"
+    | "commandSummary"
+    | "commandMeta"
+    | "fileChangeSummary"
+    | "fileChangeMeta"
+    | "fileChangeDiff";
   value: string;
   language?: string;
+  path?: string;
 }
 
 export interface GatewayChipPayload {

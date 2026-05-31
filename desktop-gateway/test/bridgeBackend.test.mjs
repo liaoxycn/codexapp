@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { InMemoryDesktopBackend } from "../dist/backend.js";
-import { AppServerBridgeBackend, buildVisibleThreadSummaries } from "../dist/bridgeBackend.js";
+import { AppServerBridgeBackend, buildFileChangeBlocks, buildVisibleThreadSummaries } from "../dist/bridgeBackend.js";
 
 function thread(id, overrides = {}) {
   return {
@@ -42,6 +42,26 @@ test("visible thread summaries convert thread and turn timestamps to millisecond
   ]);
 
   assert.equal(summaries[0].updatedAt, 220000);
+});
+
+test("file change blocks include file rows and expandable diffs", () => {
+  const blocks = buildFileChangeBlocks([
+    {
+      path: "D:/Projects/codexapp/app/src/main/App.kt",
+      kind: "update",
+      diff: "diff --git a/app/src/main/App.kt b/app/src/main/App.kt\n--- a/app/src/main/App.kt\n+++ b/app/src/main/App.kt\n-old\n+new",
+    },
+  ], "complete", "D:/Projects/codexapp");
+
+  assert.deepEqual(
+    blocks.map((block) => block.kind),
+    ["fileChangeSummary", "fileChangeMeta", "fileChangeDiff"]
+  );
+  assert.equal(blocks[0].value, "已编辑 1 个文件");
+  assert.equal(blocks[1].value, "已编辑 App.kt");
+  assert.equal(blocks[1].path, "app/src/main/App.kt");
+  assert.equal(blocks[2].language, "diff");
+  assert.match(blocks[2].value, /\+new/);
 });
 
 test("visible thread summaries keep short OK project threads under their cwd project", () => {

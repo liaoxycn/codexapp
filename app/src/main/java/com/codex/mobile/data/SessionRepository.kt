@@ -370,6 +370,9 @@ class DefaultSessionRepository(
                         "reasoning" -> MessageBlock.Reasoning(block.value)
                         "commandSummary" -> MessageBlock.CommandSummary(block.value)
                         "commandMeta" -> MessageBlock.CommandMeta(block.value)
+                        "fileChangeSummary" -> MessageBlock.FileChangeSummary(block.value)
+                        "fileChangeMeta" -> MessageBlock.FileChangeMeta(block.value, block.path.orEmpty())
+                        "fileChangeDiff" -> MessageBlock.FileChangeDiff(block.value)
                         else -> MessageBlock.Text(block.value)
                     }
                 }
@@ -667,7 +670,8 @@ private data class GatewayMessagePayload(
 private data class GatewayBlockPayload(
     val kind: String,
     val value: String,
-    val language: String? = null
+    val language: String? = null,
+    val path: String? = null
 )
 
 @Serializable
