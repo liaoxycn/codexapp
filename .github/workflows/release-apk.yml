@@ -9,6 +9,9 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -16,6 +19,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -93,10 +101,12 @@ jobs:
         with:
           body: |
             ## 本次更新
-            - 优化移动端壳 UI 控件：标题栏连接入口改为设置图标，并扩大顶部、抽屉按钮触控区域。
-            - 标题栏新增当前会话状态无障碍描述，状态文案复用统一映射。
-            - 未连接或连接异常时在会话页顶部固定显示连接提示，避免被消息列表遮挡。
-            - 改进搜索、下拉刷新、折叠详情、代码块和快捷操作的无障碍语义。
+            - 打磨移动端壳 UI：优化标题栏、抽屉、输入区、斜杠菜单和连接设置弹窗的排版、触控区域与视觉层级。
+            - 打开抽屉前自动收起输入工具、清除焦点并隐藏软键盘，避免键盘压缩会话列表。
+            - 优化会话列表状态点、选中态、行语义和项目分组语义，读屏可明确会话标题、状态、更新时间和项目展开对象。
+            - 修复输入工具/斜杠菜单展开时“滚到底部”悬浮按钮干扰的问题。
+            - 禁用态发送按钮不再执行无效点击，并提示“输入内容后发送”。
+            - Release workflow 切换到 Node.js 24，确保 GitHub Actions 可正常打包 APK。
 
             ## Release 产物
             - `CodexMobile.apk`

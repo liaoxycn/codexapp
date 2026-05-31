@@ -26,7 +26,7 @@
 先确保电脑已安装：
 
 - `Git`
-- `Node.js 20+`
+- `Node.js 24+`
 - `npm`
 - `codex` CLI，并且命令行里可以直接执行 `codex app-server`
 
