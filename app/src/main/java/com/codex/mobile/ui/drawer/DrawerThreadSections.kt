@@ -25,9 +25,7 @@ internal fun buildDrawerThreadSections(
 ): DrawerThreadSections {
     val normalizedQuery = query.trim()
     val matchingThreads = threads.filter { thread ->
-        normalizedQuery.isBlank() ||
-            thread.title.contains(normalizedQuery, ignoreCase = true) ||
-            thread.preview.contains(normalizedQuery, ignoreCase = true)
+        thread.matchesDrawerQuery(normalizedQuery)
     }
     val activeThreads = matchingThreads.filterNot(ThreadSummary::archived)
     val archivedThreads = matchingThreads.filter(ThreadSummary::archived).sortedWith(threadListSortOrder())
@@ -73,4 +71,10 @@ internal fun newlyDiscoveredProjectGroups(
     orderedGroups: List<String>
 ): Set<String> {
     return orderedGroups.filterNot(knownGroups::contains).toSet()
+}
+
+private fun ThreadSummary.matchesDrawerQuery(query: String): Boolean {
+    return query.isBlank() ||
+        listOf(title, preview, groupLabel, cwd, gitBranch, gitSha)
+            .any { it.contains(query, ignoreCase = true) }
 }

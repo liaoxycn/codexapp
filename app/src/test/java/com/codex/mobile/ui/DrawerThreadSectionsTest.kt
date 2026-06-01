@@ -30,6 +30,74 @@ class DrawerThreadSectionsTest {
     }
 
     @Test
+    fun filtersThreadsByProjectPathAndGitMetadata() {
+        val sections = buildDrawerThreadSections(
+            threads = listOf(
+                summary("chat", title = "Alpha"),
+                summary(
+                    "project-cwd",
+                    title = "Beta",
+                    groupKind = ThreadGroupKind.PROJECT,
+                    groupLabel = "Home App",
+                    cwd = "D:/Projects/home/codexapp"
+                ),
+                summary(
+                    "project-git",
+                    title = "Gamma",
+                    groupKind = ThreadGroupKind.PROJECT,
+                    groupLabel = "Mobile",
+                    gitBranch = "feature/mobile-shell",
+                    gitSha = "abc1234"
+                )
+            ),
+            selectedThreadId = "",
+            query = "mobile-shell",
+            expandedProjectGroups = emptySet()
+        )
+
+        assertEquals(listOf("Mobile"), sections.projectGroups.map { it.label })
+        assertEquals(listOf("project-git"), sections.projectGroups.single().threads.map { it.id })
+        assertTrue(sections.chatThreads.isEmpty())
+    }
+
+    @Test
+    fun filtersThreadsByProjectGroupAndCwd() {
+        val groupSections = buildDrawerThreadSections(
+            threads = listOf(
+                summary("chat", title = "Alpha"),
+                summary(
+                    "project-label",
+                    title = "Beta",
+                    groupKind = ThreadGroupKind.PROJECT,
+                    groupLabel = "Codex Desktop",
+                    cwd = "D:/Projects/home/codexapp"
+                )
+            ),
+            selectedThreadId = "",
+            query = "desktop",
+            expandedProjectGroups = emptySet()
+        )
+        val cwdSections = buildDrawerThreadSections(
+            threads = listOf(
+                summary("chat", title = "Alpha"),
+                summary(
+                    "project-cwd",
+                    title = "Beta",
+                    groupKind = ThreadGroupKind.PROJECT,
+                    groupLabel = "Mobile",
+                    cwd = "D:/Projects/home/codexapp"
+                )
+            ),
+            selectedThreadId = "",
+            query = "codexapp",
+            expandedProjectGroups = emptySet()
+        )
+
+        assertEquals(listOf("project-label"), groupSections.projectGroups.single().threads.map { it.id })
+        assertEquals(listOf("project-cwd"), cwdSections.projectGroups.single().threads.map { it.id })
+    }
+
+    @Test
     fun ordersProjectGroupsByLatestUpdatedAt() {
         val sections = buildDrawerThreadSections(
             threads = listOf(
@@ -97,7 +165,9 @@ class DrawerThreadSectionsTest {
         groupKind: ThreadGroupKind = ThreadGroupKind.CHAT,
         groupLabel: String = "普通会话",
         cwd: String = "",
-        archived: Boolean = false
+        archived: Boolean = false,
+        gitBranch: String = "",
+        gitSha: String = ""
     ) = ThreadSummary(
         id = id,
         title = title,
@@ -107,6 +177,8 @@ class DrawerThreadSectionsTest {
         groupKind = groupKind,
         groupLabel = groupLabel,
         cwd = cwd,
-        archived = archived
+        archived = archived,
+        gitBranch = gitBranch,
+        gitSha = gitSha
     )
 }
