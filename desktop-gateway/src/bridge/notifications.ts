@@ -8,6 +8,7 @@ import {
   handleItemLifecycle,
   handleMcpToolCallProgress,
   handlePlanDelta,
+  handleReasoningSummaryPartAdded,
   handleReasoningSummaryDelta,
   handleReasoningTextDelta,
 } from "./itemNotifications.js";
@@ -55,6 +56,9 @@ export async function handleBridgeNotification(
       return;
     case "item/reasoning/summaryTextDelta":
       handleReasoningSummaryDelta(notification, deps);
+      return;
+    case "item/reasoning/summaryPartAdded":
+      handleReasoningSummaryPartAdded(notification, deps);
       return;
     case "item/reasoning/textDelta":
       handleReasoningTextDelta(notification, deps);

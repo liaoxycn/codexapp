@@ -60,6 +60,31 @@ export function handleReasoningSummaryDelta(
   deps.emitChanged();
 }
 
+export function handleReasoningSummaryPartAdded(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const { threadId, itemId, summaryIndex } = notification.params as {
+    threadId: string;
+    turnId: string;
+    itemId: string;
+    summaryIndex?: number;
+  };
+  const state = deps.threads.get(threadId);
+  if (!state || state.transientOperation === "compact") {
+    return;
+  }
+
+  appendOrMergeMessage(
+    state,
+    itemId,
+    "assistant",
+    { kind: "reasoning", value: `思考摘要 ${summaryIndex == null ? "" : summaryIndex + 1}`.trim() },
+    false
+  );
+  deps.emitChanged();
+}
+
 export function handleReasoningTextDelta(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
