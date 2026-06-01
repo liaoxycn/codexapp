@@ -17,6 +17,26 @@ function thread(id, overrides = {}) {
   };
 }
 
+function startedThreadResponse(id, cwd, overrides = {}) {
+  return {
+    thread: thread(id, {
+      cwd,
+      preview: id,
+      updatedAt: 200,
+      ...overrides,
+    }),
+    model: "gpt-5",
+    modelProvider: "openai",
+    serviceTier: null,
+    cwd,
+    instructionSources: [cwd],
+    approvalPolicy: "never",
+    approvalsReviewer: "user",
+    sandbox: { type: "workspaceWrite", networkAccess: false },
+    reasoningEffort: null,
+  };
+}
+
 test("visible thread summaries do not hide threads by fixed title", () => {
   const summaries = buildVisibleThreadSummaries([
     thread("live-1"),
@@ -206,4 +226,191 @@ test("bridge backend keeps an empty newly created thread idle", async () => {
 
   assert.equal(afterStatusUpdate.isGenerating, false);
   assert.equal(afterStatusUpdate.threads.find((item) => item.id === "empty-project-thread")?.status, "idle");
+});
+
+test("bridge backend starts compact request from prompt command", async () => {
+  const backend = new AppServerBridgeBackend();
+  const compactCalls = [];
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("compact-thread", cwd),
+    threadRead: async (threadId) => thread(threadId, { cwd: "D:/Projects/CompactProject" }),
+    threadCompactStart: async (threadId) => {
+      compactCalls.push(threadId);
+    },
+  };
+
+  await backend.createThread("D:/Projects/CompactProject");
+  const snapshot = await backend.sendPrompt("compact-thread", "/compact");
+
+  assert.deepEqual(compactCalls, ["compact-thread"]);
+  assert.equal(snapshot.isGenerating, false);
+  assert.equal(snapshot.messages.some((message) =>
+    message.blocks.some((block) => block.kind === "status" && block.value === "已请求压缩上下文")
+  ), true);
+});
+
+test("bridge backend turns shell prompt into pending approval", async () => {
+  const backend = new AppServerBridgeBackend();
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("shell-thread", cwd),
+    threadRead: async (threadId) => thread(threadId, { cwd: "D:/Projects/ShellProject" }),
+  };
+
+  await backend.createThread("D:/Projects/ShellProject");
+  const snapshot = await backend.sendPrompt("shell-thread", "!echo hi");
+
+  assert.equal(snapshot.pendingApproval, "允许执行 shell 命令\necho hi");
+  assert.equal(snapshot.threads.find((item) => item.id === "shell-thread")?.status, "needs_approval");
+});
+
+test("bridge backend executes approved shell command through app-server", async () => {
+  const backend = new AppServerBridgeBackend();
+  const shellCalls = [];
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("approved-shell-thread", cwd),
+    threadRead: async (threadId) => thread(threadId, { cwd: "D:/Projects/ApprovedShell" }),
+    threadShellCommand: async (threadId, command) => {
+      shellCalls.push([threadId, command]);
+    },
+  };
+
+  await backend.createThread("D:/Projects/ApprovedShell");
+  await backend.sendPrompt("approved-shell-thread", "!dir");
+  const snapshot = await backend.approveCurrent("approved-shell-thread", true);
+
+  assert.deepEqual(shellCalls, [["approved-shell-thread", "dir"]]);
+  assert.equal(snapshot.pendingApproval, null);
+  assert.equal(snapshot.isGenerating, true);
+  assert.equal(snapshot.messages.some((message) =>
+    message.blocks.some((block) => block.kind === "status" && block.value === "审批已允许")
+  ), true);
+});
+
+test("bridge backend merges assistant delta from notification stream", async () => {
+  const backend = new AppServerBridgeBackend();
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("delta-thread", cwd),
+  };
+
+  await backend.createThread("D:/Projects/DeltaProject");
+  await backend.handleNotification({
+    method: "turn/started",
+    params: { threadId: "delta-thread", turn: { id: "turn-1", startedAt: 200 } },
+  });
+  await backend.handleNotification({
+    method: "item/agentMessage/delta",
+    params: { threadId: "delta-thread", turnId: "turn-1", itemId: "assistant-item-1", delta: "hello" },
+  });
+
+  const snapshot = backend.getSnapshot("delta-thread");
+  assert.equal(snapshot.isGenerating, true);
+  assert.equal(
+    snapshot.messages.some((message) =>
+      message.blocks.some((block) => block.kind === "text" && block.value.includes("hello"))
+    ),
+    true
+  );
+});
+
+test("bridge backend archives current thread and selects the next active thread", async () => {
+  const backend = new AppServerBridgeBackend();
+  const threadsById = {
+    "thread-a": thread("thread-a", { cwd: "D:/Projects/A", updatedAt: 100 }),
+    "thread-b": thread("thread-b", { cwd: "D:/Projects/B", updatedAt: 200 }),
+  };
+  let startIndex = 0;
+  let activeIds = ["thread-a", "thread-b"];
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse(
+      startIndex++ === 0 ? "thread-a" : "thread-b",
+      cwd
+    ),
+    threadArchive: async (threadId) => {
+      activeIds = activeIds.filter((id) => id !== threadId);
+    },
+    threadList: async () => activeIds.map((id) => threadsById[id]),
+    threadRead: async (threadId) => threadsById[threadId],
+  };
+
+  await backend.createThread("D:/Projects/A");
+  await backend.createThread("D:/Projects/B");
+  const snapshot = await backend.archiveThread("thread-b");
+
+  assert.equal(snapshot.selectedThreadId, "thread-a");
+  assert.equal(snapshot.cwd, "D:/Projects/A");
+});
+
+test("bridge backend selects a thread again after unarchive refresh", async () => {
+  const backend = new AppServerBridgeBackend();
+  const threadsById = {
+    "thread-a": thread("thread-a", { cwd: "D:/Projects/A", updatedAt: 100 }),
+    "thread-b": thread("thread-b", { cwd: "D:/Projects/B", updatedAt: 200 }),
+  };
+  let activeIds = ["thread-a"];
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("thread-a", cwd),
+    threadUnarchive: async (threadId) => {
+      if (!activeIds.includes(threadId)) {
+        activeIds = [...activeIds, threadId];
+      }
+    },
+    threadList: async () => activeIds.map((id) => threadsById[id]),
+    threadRead: async (threadId) => threadsById[threadId],
+  };
+
+  await backend.createThread("D:/Projects/A");
+  const snapshot = await backend.unarchiveThread("thread-b");
+
+  assert.equal(snapshot.selectedThreadId, "thread-b");
+  assert.equal(snapshot.cwd, "D:/Projects/B");
+});
+
+test("bridge backend refreshThreads does not override a newer manual selection", async () => {
+  const backend = new AppServerBridgeBackend();
+  const threadsById = {
+    "thread-a": thread("thread-a", { cwd: "D:/Projects/A", updatedAt: 100 }),
+    "thread-b": thread("thread-b", { cwd: "D:/Projects/B", updatedAt: 200 }),
+  };
+  let startIndex = 0;
+  let releaseThreadList = () => {};
+  const threadListBlocked = new Promise((resolve) => {
+    releaseThreadList = resolve;
+  });
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse(
+      startIndex++ === 0 ? "thread-a" : "thread-b",
+      cwd
+    ),
+    threadList: async () => {
+      await threadListBlocked;
+      return [threadsById["thread-a"], threadsById["thread-b"]];
+    },
+    threadRead: async (threadId) => threadsById[threadId],
+    threadUnsubscribe: async () => {},
+  };
+
+  await backend.createThread("D:/Projects/A");
+  await backend.createThread("D:/Projects/B");
+
+  const refreshPromise = backend.refreshThreads("thread-a");
+  await backend.selectThread("thread-b");
+  releaseThreadList();
+
+  const snapshot = await refreshPromise;
+  assert.equal(snapshot.selectedThreadId, "thread-b");
+  assert.equal(snapshot.cwd, "D:/Projects/B");
+});
+
+test("bridge backend loadOlderMessages expands history window", async () => {
+  const backend = new AppServerBridgeBackend();
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("history-thread", cwd),
+  };
+
+  await backend.createThread("D:/Projects/History");
+  const before = backend.threads.get("history-thread").historyWindow;
+
+  await backend.loadOlderMessages("history-thread");
+
+  assert.equal(backend.threads.get("history-thread").historyWindow, before + 24);
 });

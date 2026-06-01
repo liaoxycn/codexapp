@@ -1,0 +1,98 @@
+import type { AppServerThread, ThreadResumeResult } from "../appServerTypes.js";
+import {
+  resolveDisplayedThreadStatus,
+  resolveThreadSummaryStatus,
+  shouldRetainThreadRuntimeOverlay,
+} from "../threadState.js";
+import type { GatewayThreadPayload } from "../protocol.js";
+import { collectThreadMessages, mergeSnapshotMessages } from "./runtimeSnapshotMessages.js";
+import {
+  getThreadLastActivityAtMs,
+  mapThreadToSnapshot,
+  mapThreadToSummary,
+  toResumeMetadata,
+  trimMessagesToWindow,
+} from "./summaries.js";
+import {
+  buildRuntimeSummaries,
+  syncSelectedThreadSnapshots,
+} from "./runtimeSummaryState.js";
+import {
+  INITIAL_HISTORY_WINDOW,
+  type ThreadRuntimeState,
+} from "./types.js";
+
+interface UpsertThreadStateParams {
+  threads: Map<string, ThreadRuntimeState>;
+  thread: AppServerThread;
+  summaries?: GatewayThreadPayload[] | null;
+  resume?: ThreadResumeResult | null;
+  preserveLiveMessages?: boolean;
+}
+
+export function upsertThreadState({
+  threads,
+  thread,
+  summaries,
+  resume = null,
+  preserveLiveMessages = false,
+}: UpsertThreadStateParams): void {
+  const existing = threads.get(thread.id);
+  const mergedSummaries = summaries ?? buildRuntimeSummaries(threads);
+  const allThreadMessages = collectThreadMessages(thread);
+  const baseSnapshot = mapThreadToSnapshot(
+    thread,
+    mergedSummaries,
+    thread.id,
+    resume ?? toResumeMetadata(existing),
+    allThreadMessages
+  );
+  const mergedMessages =
+    preserveLiveMessages && existing
+      ? mergeSnapshotMessages(allThreadMessages, existing.snapshot.messages)
+      : allThreadMessages;
+  const historyWindow = existing?.historyWindow ?? INITIAL_HISTORY_WINDOW;
+  const resolvedSummaryStatus = resolveThreadSummaryStatus(thread);
+  const lastActivityAtMs = Math.max(existing?.lastActivityAtMs ?? 0, getThreadLastActivityAtMs(thread));
+  const retainRuntimeOverlay = shouldRetainThreadRuntimeOverlay(thread, existing);
+
+  const runtimeState: ThreadRuntimeState = {
+    summary: existing
+      ? {
+          ...mapThreadToSummary(thread, false, lastActivityAtMs),
+          status: resolveDisplayedThreadStatus(resolvedSummaryStatus, {
+            isGenerating: retainRuntimeOverlay && existing.snapshot.isGenerating,
+            currentTurnId: retainRuntimeOverlay ? existing.currentTurnId : null,
+            transientOperation: retainRuntimeOverlay ? existing.transientOperation : null,
+            pendingApproval: retainRuntimeOverlay ? existing.pendingApproval?.text ?? null : null,
+          }),
+        }
+      : mapThreadToSummary(thread),
+    thread,
+    isSubscribed: resume != null || existing?.isSubscribed === true,
+    lastActivityAtMs,
+    historyWindow,
+    currentTurnId: retainRuntimeOverlay ? existing?.currentTurnId ?? null : null,
+    activeAssistantMessageId: retainRuntimeOverlay ? existing?.activeAssistantMessageId ?? null : null,
+    liveAssistantItemId: retainRuntimeOverlay ? existing?.liveAssistantItemId ?? null : null,
+    transientOperation: retainRuntimeOverlay ? existing?.transientOperation ?? null : null,
+    pendingApproval: retainRuntimeOverlay ? existing?.pendingApproval ?? null : null,
+    stopRequested: retainRuntimeOverlay ? existing?.stopRequested ?? false : false,
+    isFinalizing: retainRuntimeOverlay ? existing?.isFinalizing ?? false : false,
+    model: resume?.model ?? existing?.model ?? null,
+    instructionSources: resume?.instructionSources ?? existing?.instructionSources ?? [],
+    approvalPolicy: resume?.approvalPolicy ?? existing?.approvalPolicy ?? null,
+    approvalsReviewer: resume?.approvalsReviewer ?? existing?.approvalsReviewer ?? null,
+    sandbox: resume?.sandbox ?? existing?.sandbox ?? null,
+    reasoningEffort: resume?.reasoningEffort ?? existing?.reasoningEffort ?? null,
+    snapshot: {
+      ...baseSnapshot,
+      messages: trimMessagesToWindow(mergedMessages, historyWindow),
+      hasMoreHistory: mergedMessages.length > historyWindow,
+      pendingApproval: existing?.pendingApproval?.text ?? null,
+    },
+  };
+
+  threads.set(thread.id, runtimeState);
+  syncSelectedThreadSnapshots(threads, thread.id);
+}
