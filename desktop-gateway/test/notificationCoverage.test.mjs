@@ -166,6 +166,48 @@ test("handleBridgeNotification surfaces errors and thread warnings", async () =>
   );
 });
 
+test("handleBridgeNotification surfaces global notices on the selected thread", async () => {
+  const state = createState();
+  state.snapshot.selectedThreadId = "thread-1";
+  const context = createDeps(state);
+
+  await handleBridgeNotification(
+    {
+      method: "configWarning",
+      params: { summary: "配置项无效", details: "请检查 config.toml", path: "D:/repo/config.toml" },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "deprecationNotice",
+      params: { summary: "旧模型将停用", details: "请切换模型" },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "model/verification",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        verifications: ["trustedAccessForCyber"],
+      },
+    },
+    context.deps
+  );
+
+  assert.equal(context.emitCount, 3);
+  assert.deepEqual(
+    state.snapshot.messages.map((message) => message.blocks[0].value),
+    [
+      "配置警告: 配置项无效\n请检查 config.toml\nD:/repo/config.toml",
+      "废弃提示: 旧模型将停用\n请切换模型",
+      "模型验证: trustedAccessForCyber",
+    ]
+  );
+});
+
 test("handleBridgeNotification refreshes catalog for thread lifecycle notifications", async () => {
   const state = createState();
   const context = createDeps(state);

@@ -263,6 +263,28 @@ export function handleModelRerouted(
   deps.emitChanged();
 }
 
+export function handleModelVerification(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const { threadId, turnId, verifications } = notification.params as {
+    threadId: string;
+    turnId: string;
+    verifications?: string[];
+  };
+  const state = deps.threads.get(threadId);
+  if (!state) {
+    return;
+  }
+
+  const value = (verifications ?? []).filter(Boolean).join(", ");
+  replaceOrAppendMessage(
+    state,
+    systemStatus(`模型验证: ${value || "已更新"}`, `model-verification-${turnId}`)
+  );
+  deps.emitChanged();
+}
+
 export function handleErrorNotification(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
@@ -308,4 +330,38 @@ export function handleThreadLevelWarning(
     systemStatus(`警告: ${params.message || "unknown"}`)
   );
   deps.emitChanged();
+}
+
+export function handleGlobalNotice(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const state = resolveNoticeTargetState(deps);
+  if (!state) {
+    return;
+  }
+
+  const params = notification.params as {
+    summary?: string | null;
+    details?: string | null;
+    path?: string | null;
+  };
+  const prefix = notification.method === "configWarning" ? "配置警告" : "废弃提示";
+  const text = [
+    `${prefix}: ${asString(params.summary, "已更新")}`,
+    asString(params.details).trim(),
+    asString(params.path).trim(),
+  ].filter(Boolean).join("\n");
+  replaceOrAppendMessage(state, systemStatus(text, `${notification.method}-notice`));
+  deps.emitChanged();
+}
+
+function resolveNoticeTargetState(deps: BridgeNotificationDeps) {
+  for (const state of deps.threads.values()) {
+    const selectedThreadId = state.snapshot.selectedThreadId;
+    if (selectedThreadId && deps.threads.has(selectedThreadId)) {
+      return deps.threads.get(selectedThreadId);
+    }
+  }
+  return deps.threads.values().next().value;
 }

@@ -15,7 +15,9 @@ import {
 import {
   handleErrorNotification,
   handleModelRerouted,
+  handleModelVerification,
   handleServerRequestResolved,
+  handleGlobalNotice,
   handleThreadGoalCleared,
   handleThreadGoalUpdated,
   handleThreadCompacted,
@@ -110,12 +112,19 @@ export async function handleBridgeNotification(
     case "model/rerouted":
       handleModelRerouted(notification, deps);
       return;
+    case "model/verification":
+      handleModelVerification(notification, deps);
+      return;
     case "error":
       handleErrorNotification(notification, deps);
       return;
     case "warning":
     case "guardianWarning":
       handleThreadLevelWarning(notification, deps);
+      return;
+    case "configWarning":
+    case "deprecationNotice":
+      handleGlobalNotice(notification, deps);
       return;
     default:
       return;
