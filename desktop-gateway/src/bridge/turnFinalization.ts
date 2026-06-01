@@ -1,7 +1,7 @@
 import {
   hasTrailingSystemStatus,
   systemStatus,
-} from "./runtimeMessages.js";
+} from "./runtimeMessageStore.js";
 import {
   normalizeCompactMessages,
   pruneCompletedArtifacts,

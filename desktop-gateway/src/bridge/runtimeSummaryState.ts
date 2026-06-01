@@ -4,7 +4,7 @@ import {
   resolveThreadSummaryStatus,
 } from "../threadState.js";
 import type { GatewayThreadPayload } from "../protocol.js";
-import { systemStatus } from "./runtimeMessages.js";
+import { systemStatus } from "./runtimeMessageStore.js";
 import {
   dedupeSummaries,
   emptySnapshot,

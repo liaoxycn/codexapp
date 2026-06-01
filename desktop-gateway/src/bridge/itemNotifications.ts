@@ -3,13 +3,13 @@ import type {
   JsonRpcNotification,
 } from "../appServerTypes.js";
 import { buildFileChangeBlocks } from "./fileChanges.js";
+import { appendAssistantDelta } from "./runtimeAssistantMessages.js";
 import {
   appendOrMergeCodeMessage,
-  appendAssistantDelta,
   appendOrMergeMessage,
-  mergeThreadItem,
   replaceOrAppendMessage,
-} from "./runtimeMessages.js";
+} from "./runtimeMessageStore.js";
+import { mergeThreadItem } from "./runtimeMessages.js";
 import { touchThreadActivity } from "./summaries.js";
 import type { BridgeNotificationDeps } from "./notifications.js";
 import { asString } from "./appServerValues.js";

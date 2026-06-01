@@ -1,6 +1,6 @@
 import { AppServerClient } from "../appServerClient.js";
 import type { ClientSnapshot } from "../protocol.js";
-import { systemStatus } from "./runtimeMessages.js";
+import { systemStatus } from "./runtimeMessageStore.js";
 import { buildApprovalResponse } from "./summaries.js";
 import type {
   PendingApproval,

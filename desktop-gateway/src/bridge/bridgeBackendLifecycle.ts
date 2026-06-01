@@ -4,7 +4,7 @@ import type {
 } from "../appServerTypes.js";
 import { handleBridgeNotification } from "./notifications.js";
 import { applyServerRequest } from "./serverRequests.js";
-import { applyPendingApprovalState } from "./turnActions.js";
+import { applyPendingApprovalState } from "./approvalActions.js";
 import {
   finalizeCompactRuntimeState,
   finalizeTurnRuntimeState,

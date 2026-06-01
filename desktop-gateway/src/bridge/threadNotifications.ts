@@ -7,7 +7,7 @@ import { asString } from "./appServerValues.js";
 import {
   replaceOrAppendMessage,
   systemStatus,
-} from "./runtimeMessages.js";
+} from "./runtimeMessageStore.js";
 import { normalizeCompactMessages, pruneCompletedArtifacts } from "./runtimeSnapshotMessages.js";
 import { touchThreadActivity } from "./summaries.js";
 import type { BridgeNotificationDeps } from "./notifications.js";

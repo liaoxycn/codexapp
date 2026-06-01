@@ -2,10 +2,10 @@ import { AppServerClient } from "../appServerClient.js";
 import type { ClientSnapshot } from "../protocol.js";
 import {
   appendUserMessage,
-  ensureActiveAssistantMessage,
   hasTrailingSystemStatus,
   systemStatus,
-} from "./runtimeMessages.js";
+} from "./runtimeMessageStore.js";
+import { ensureActiveAssistantMessage } from "./runtimeAssistantMessages.js";
 import { upsertThreadState } from "./runtimeState.js";
 import type {
   ThreadLifecycleStatus,

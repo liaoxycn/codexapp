@@ -138,13 +138,12 @@ codexapp/
 │  │  │  ├─ runtimeAssistantMessages.ts  live assistant 占位消息、delta 合并、最终消息收口
 │  │  │  ├─ runtimeMessageStore.ts       snapshot 消息数组 upsert/merge/rename 底层写入器
 │  │  │  ├─ snapshotMapping.ts           兼容导出层，聚合 summary/message mapping 导出
-│  │  │  ├─ runtimeMessages.ts           thread item -> message 增量落盘入口与兼容导出层
+│  │  │  ├─ runtimeMessages.ts           thread item -> message 增量落盘入口
 │  │  │  ├─ runtimeSnapshotMessages.ts   snapshot 消息窗口、compact 状态归并、历史消息回灌
 │  │  │  ├─ runtimeState.ts              单线程 runtime state 组装与 snapshot 回写
 │  │  │  ├─ runtimeSummaryState.ts       summary 同步、占位态创建、failed 收口
 │  │  │  ├─ promptActions.ts             prompt 提交、compact、shell 前置审批、turn interrupt 编排
 │  │  │  ├─ approvalActions.ts           shell/权限审批通过拒绝、pendingApproval 状态回写
-│  │  │  ├─ turnActions.ts               兼容导出层，聚合 prompt/approval actions
 │  │  │  ├─ turnFinalization.ts          turn/compact 完成态刷新、消息收口、状态回写
 │  │  │  ├─ fileChanges.ts               文件变更块与 diff 摘要生成
 │  │  │  ├─ serverRequests.ts            app-server 审批请求 -> gateway PendingApproval 映射

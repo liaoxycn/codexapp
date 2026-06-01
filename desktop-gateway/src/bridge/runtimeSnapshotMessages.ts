@@ -9,7 +9,7 @@ import {
 } from "./messageMerging.js";
 import {
   systemStatus,
-} from "./runtimeMessages.js";
+} from "./runtimeMessageStore.js";
 import { trimMessagesToWindow } from "./summaries.js";
 import type { ThreadRuntimeState } from "./types.js";
 

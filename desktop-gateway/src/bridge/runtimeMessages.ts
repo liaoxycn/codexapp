@@ -8,31 +8,9 @@ import {
 } from "./messageMerging.js";
 import { buildCommandExecutionBlocks, mapItemToMessages } from "./messageMapping.js";
 import {
-  appendAssistantDelta,
-  collapseLiveAssistantMessage,
-  ensureActiveAssistantMessage,
-} from "./runtimeAssistantMessages.js";
-import {
-  appendOrMergeCodeMessage,
-  appendOrMergeMessage,
-  appendUserMessage,
-  hasTrailingSystemStatus,
   replaceOrAppendMessage,
-  systemStatus,
 } from "./runtimeMessageStore.js";
 import type { ThreadRuntimeState } from "./types.js";
-
-export {
-  appendAssistantDelta,
-  appendOrMergeCodeMessage,
-  appendOrMergeMessage,
-  appendUserMessage,
-  collapseLiveAssistantMessage,
-  ensureActiveAssistantMessage,
-  hasTrailingSystemStatus,
-  replaceOrAppendMessage,
-  systemStatus,
-};
 
 export function mergeThreadItem(state: ThreadRuntimeState, item: AppServerThreadItem, preferLiveAssistantId = false): void {
   if (item.type === "agentMessage") {

@@ -5,15 +5,17 @@ import {
 } from "./bridgeBackendLifecycle.js";
 import { BridgeCatalogController } from "./BridgeCatalogController.js";
 import { BridgeRuntimeStore } from "./bridgeRuntimeStore.js";
-import { ensureActiveAssistantMessage } from "./runtimeMessages.js";
+import { ensureActiveAssistantMessage } from "./runtimeAssistantMessages.js";
+import {
+  handleCurrentApproval,
+} from "./approvalActions.js";
+import {
+  handlePromptSubmission,
+  interruptRunningTurn,
+} from "./promptActions.js";
 import {
   ensureResumedThread,
 } from "./threadSubscriptions.js";
-import {
-  handleCurrentApproval,
-  handlePromptSubmission,
-  interruptRunningTurn,
-} from "./turnActions.js";
 import type { ThreadRuntimeState } from "./types.js";
 
 export class BridgeThreadController {
