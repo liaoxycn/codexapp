@@ -75,7 +75,7 @@ test("thread RPC helpers forward expected payloads", async () => {
   };
 
   const read = await readThread(request, "thread-1", false);
-  const resumed = await resumeThread(request, "thread-2", { excludeTurns: true });
+  const resumed = await resumeThread(request, "thread-2");
   const started = await startThread(request, "D:/Projects/Test");
   const forked = await forkThread(request, "thread-2");
   const rolledBack = await rollbackThread(request, "thread-2", 1);
@@ -91,7 +91,7 @@ test("thread RPC helpers forward expected payloads", async () => {
   assert.equal(rolledBack, null);
   assert.deepEqual(calls, [
     { method: "thread/read", params: { threadId: "thread-1", includeTurns: false } },
-    { method: "thread/resume", params: { threadId: "thread-2", excludeTurns: true } },
+    { method: "thread/resume", params: { threadId: "thread-2" } },
     { method: "thread/start", params: { cwd: "D:/Projects/Test" } },
     { method: "thread/fork", params: { threadId: "thread-2", threadSource: "user" } },
     { method: "thread/rollback", params: { threadId: "thread-2", numTurns: 1 } },

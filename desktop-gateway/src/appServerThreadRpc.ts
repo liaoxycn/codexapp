@@ -55,12 +55,10 @@ export async function readThread(
 
 export async function resumeThread(
   request: RequestFn,
-  threadId: string,
-  options: { excludeTurns?: boolean } = {}
+  threadId: string
 ): Promise<ThreadResumeResult> {
   return (await request("thread/resume", {
     threadId,
-    excludeTurns: options.excludeTurns ?? false,
   })) as ThreadResumeResult;
 }
 

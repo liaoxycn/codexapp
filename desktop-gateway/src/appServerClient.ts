@@ -72,8 +72,8 @@ export class AppServerClient {
     return await readThread(this.request.bind(this), threadId, includeTurns);
   }
 
-  async threadResume(threadId: string, options: { excludeTurns?: boolean } = {}): Promise<ThreadResumeResult> {
-    return await resumeThread(this.request.bind(this), threadId, options);
+  async threadResume(threadId: string): Promise<ThreadResumeResult> {
+    return await resumeThread(this.request.bind(this), threadId);
   }
 
   async threadStart(cwd?: string | null): Promise<ThreadStartResponse> {
