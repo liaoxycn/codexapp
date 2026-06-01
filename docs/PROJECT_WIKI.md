@@ -174,6 +174,7 @@ codexapp/
 ├─ scripts/                              本地构建、部署、自测 Node 脚本
 │  └─ logs/                              脚本本地运行日志，默认不提交
 ├─ docs/                                 项目文档、规范、wiki、调研资料入口
+│  ├─ MOBILE_GATEWAY_PROTOCOL.md         Android App 与 desktop-gateway 对接协议、payload 与高频流程测试清单
 │  └─ research/                          调研资料、外部协议资料、生成型参考数据
 │     └─ codex-app-server-protocol/
 │        ├─ types/                       Codex App Server 协议生成的 TypeScript 类型
