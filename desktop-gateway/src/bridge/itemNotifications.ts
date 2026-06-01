@@ -307,6 +307,26 @@ export function handleGuardianApprovalReview(
   deps.emitChanged();
 }
 
+export function handleRawResponseItemCompleted(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const params = notification.params as Record<string, unknown>;
+  const threadId = asString(params.threadId);
+  const turnId = asString(params.turnId, "turn");
+  const state = deps.threads.get(threadId);
+  if (!state) {
+    return;
+  }
+
+  const message = mapRawResponseItem(turnId, params.item);
+  if (!message) {
+    return;
+  }
+  replaceOrAppendMessage(state, message);
+  deps.emitChanged();
+}
+
 export function handleRealtimeNotification(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
@@ -315,6 +335,16 @@ export function handleRealtimeNotification(
   const threadId = asString(params.threadId);
   const state = deps.threads.get(threadId);
   if (!state) {
+    return;
+  }
+
+  if (notification.method === "thread/realtime/itemAdded") {
+    const item = asThreadItem(params.item);
+    if (!item) {
+      return;
+    }
+    mergeThreadItem(state, item, true);
+    deps.emitChanged();
     return;
   }
 
@@ -351,6 +381,109 @@ export function handleRealtimeNotification(
     blocks: [{ kind: "status", value: status }],
   });
   deps.emitChanged();
+}
+
+function mapRawResponseItem(turnId: string, value: unknown) {
+  if (typeof value !== "object" || value == null) {
+    return null;
+  }
+  const item = value as Record<string, unknown>;
+  const type = asString(item.type);
+  const itemId = asString(item.id, `raw-response-${turnId}-${type || "item"}`);
+
+  if (type === "message") {
+    const role = item.role === "user" ? "user" as const : "assistant" as const;
+    const text = textFromContentItems(item.content);
+    if (!text) {
+      return null;
+    }
+    return {
+      id: itemId,
+      role,
+      blocks: [{ kind: "text" as const, value: text }],
+    };
+  }
+
+  if (type === "reasoning") {
+    const text = [
+      textFromContentItems(item.summary),
+      textFromContentItems(item.content),
+    ].filter(Boolean).join("\n");
+    if (!text) {
+      return null;
+    }
+    return {
+      id: itemId,
+      role: "assistant" as const,
+      blocks: [{ kind: "reasoning" as const, value: text }],
+    };
+  }
+
+  if (type === "local_shell_call") {
+    const action = item.action as Record<string, unknown> | null;
+    const command = Array.isArray(action?.command)
+      ? action.command.filter((part): part is string => typeof part === "string").join(" ")
+      : "";
+    return {
+      id: itemId,
+      role: "assistant" as const,
+      blocks: [{ kind: "text" as const, value: `命令 ${asString(item.status, "updated")}: ${command}`.trim() }],
+    };
+  }
+
+  if (type === "function_call" || type === "custom_tool_call" || type === "tool_search_call") {
+    const name = asString(item.name, type);
+    const status = asString(item.status, "completed");
+    return {
+      id: itemId,
+      role: "assistant" as const,
+      blocks: [{ kind: "text" as const, value: `工具: ${name} · ${status}` }],
+    };
+  }
+
+  if (type === "web_search_call") {
+    return {
+      id: itemId,
+      role: "assistant" as const,
+      blocks: [{ kind: "text" as const, value: `Web search · ${asString(item.status, "completed")}` }],
+    };
+  }
+
+  if (type === "image_generation_call") {
+    return {
+      id: itemId,
+      role: "assistant" as const,
+      blocks: [{ kind: "text" as const, value: `生成图片 ${asString(item.status, "completed")}: ${asString(item.result)}` }],
+    };
+  }
+
+  return null;
+}
+
+function textFromContentItems(value: unknown): string {
+  if (!Array.isArray(value)) {
+    return "";
+  }
+  return value
+    .map((entry) => {
+      if (typeof entry !== "object" || entry == null) {
+        return "";
+      }
+      const item = entry as Record<string, unknown>;
+      return asString(item.text).trim();
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function asThreadItem(value: unknown): AppServerThreadItem | null {
+  if (typeof value !== "object" || value == null) {
+    return null;
+  }
+  const item = value as Record<string, unknown>;
+  return typeof item.type === "string" && typeof item.id === "string"
+    ? (item as AppServerThreadItem)
+    : null;
 }
 
 function formatReviewAction(action?: { type?: string | null } | null): string {

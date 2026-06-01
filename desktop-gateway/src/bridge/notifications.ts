@@ -9,6 +9,7 @@ import {
   handleItemLifecycle,
   handleMcpToolCallProgress,
   handlePlanDelta,
+  handleRawResponseItemCompleted,
   handleReasoningSummaryPartAdded,
   handleReasoningSummaryDelta,
   handleReasoningTextDelta,
@@ -101,7 +102,11 @@ export async function handleBridgeNotification(
     case "item/autoApprovalReview/completed":
       handleGuardianApprovalReview(notification, deps);
       return;
+    case "rawResponseItem/completed":
+      handleRawResponseItemCompleted(notification, deps);
+      return;
     case "thread/realtime/started":
+    case "thread/realtime/itemAdded":
     case "thread/realtime/transcript/delta":
     case "thread/realtime/transcript/done":
     case "thread/realtime/outputAudio/delta":

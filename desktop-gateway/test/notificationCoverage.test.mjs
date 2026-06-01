@@ -346,6 +346,50 @@ test("handleBridgeNotification surfaces auto approval review updates", async () 
   );
 });
 
+test("handleBridgeNotification surfaces raw response item completions", async () => {
+  const state = createState();
+  const context = createDeps(state);
+
+  await handleBridgeNotification(
+    {
+      method: "rawResponseItem/completed",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        item: {
+          id: "raw-message-1",
+          type: "message",
+          role: "assistant",
+          content: [{ type: "output_text", text: "原始回复" }],
+        },
+      },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "rawResponseItem/completed",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        item: {
+          type: "reasoning",
+          summary: [{ type: "summary_text", text: "摘要" }],
+          content: [{ type: "reasoning_text", text: "推理" }],
+          encrypted_content: null,
+        },
+      },
+    },
+    context.deps
+  );
+
+  assert.equal(context.emitCount, 2);
+  assert.deepEqual(
+    state.snapshot.messages.map((message) => message.blocks[0].value),
+    ["原始回复", "摘要\n推理"]
+  );
+});
+
 test("handleBridgeNotification surfaces realtime thread notifications", async () => {
   const state = createState();
   const context = createDeps(state);
@@ -380,6 +424,16 @@ test("handleBridgeNotification surfaces realtime thread notifications", async ()
   );
   await handleBridgeNotification(
     {
+      method: "thread/realtime/itemAdded",
+      params: {
+        threadId: "thread-1",
+        item: { type: "agentMessage", id: "rt-item-1", text: "实时 item" },
+      },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
       method: "thread/realtime/error",
       params: { threadId: "thread-1", message: "network" },
     },
@@ -393,10 +447,10 @@ test("handleBridgeNotification surfaces realtime thread notifications", async ()
     context.deps
   );
 
-  assert.equal(context.emitCount, 6);
+  assert.equal(context.emitCount, 7);
   assert.deepEqual(
     state.snapshot.messages.map((message) => message.blocks[0].value),
-    ["实时会话已关闭\ndone", "你好"]
+    ["实时会话已关闭\ndone", "你好", "实时 item"]
   );
 });
 
