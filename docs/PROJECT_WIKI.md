@@ -157,9 +157,9 @@ codexapp/
 │  │  ├─ server/                         gateway WebSocket/HTTP server 主实现
 │  │     ├─ GatewayServer.ts             server 装配、动作委托、backend 选择
 │  │     ├─ GatewayBackendController.ts  server 后端选择、refresh/action handler 装配、desktop poke 委托
-│  │     ├─ backendActions.ts            snapshot/status 出站、backend action 错误收口、refresh 调度桥接
-│  │     ├─ clientConnection.ts          Android 客户端上下文、socket 事件绑定、断开清理
-│  │     ├─ clientMessages.ts            Android 客户端入站消息解析、鉴权与路由分发
+│  │     ├─ backendActions.ts            snapshot/status/patch 出站、backend action 错误收口、refresh 调度桥接
+│  │     ├─ clientConnection.ts          Android 客户端上下文、patch 能力状态、socket 事件绑定、断开清理
+│  │     ├─ clientMessages.ts            Android 客户端入站消息解析、鉴权/能力协商与路由分发
 │  │     ├─ clientThreadMessages.ts      线程目录/刷新/历史加载等客户端消息处理
 │  │     ├─ clientTurnMessages.ts        prompt/停止/审批等 turn 客户端消息处理
 │  │     ├─ gatewayPaths.ts              gateway upgrade 路径规范化与判定纯函数

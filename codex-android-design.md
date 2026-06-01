@@ -311,11 +311,12 @@ Android -> gateway：
 gateway -> Android：
 - `status`
 - `snapshot`
+- `snapshot_patch`（Android `hello.capabilities` 声明后启用；未声明则继续整包 `snapshot`）
 
 说明：
 - `snapshot` 先覆盖线程列表、当前线程、消息流、审批、cwd、权限摘要、输入附件 chip。
-- 先做“整包快照 + 少量命令”方案，不急着一开始就做细粒度 event patch。
-- 等桌面端 gateway 跑通后，再补增量事件、ack、seq、重放。
+- 首包仍用整包 `snapshot` 建基线；后续在支持端优先发送 `snapshot_patch`，按 revision 校验基线。
+- 未协商 `snapshot_patch` 的客户端保持旧 `snapshot/status` 协议。
 - `send_prompt` 当前不仅发普通 prompt，也承载输入区命令：
   - `/compact` -> gateway 调 `thread/compact/start`
   - `! xxx` -> gateway 先生成审批，再在批准后调 `thread/shellCommand`
@@ -412,12 +413,13 @@ gateway -> Android：
   - `thread/goal/updated / thread/goal/cleared` 已映射为移动端系统状态
   - 已增加 `npm run protocol:selftest`，通过内存 app-server stub 覆盖审批、compact、goal 通知、命令输出增量与归档清理，不污染真实 Codex 会话
   - Android 审批卡片“拒绝”按钮已有稳定 Compose instrumentation 测试覆盖，不再依赖 adb 文本注入
+  - gateway 已支持 `snapshot_patch` 能力协商：支持端首包整包建基线，后续仅下发变更字段；旧客户端仍只收整包 `snapshot`
+  - Android 已支持 `snapshot_patch` 解码、revision 基线校验与局部状态归并
 - 已用本机 `codex 0.130.0` 重新生成 app-server schema 核对：仍无设置 goal 的 client request，当前只能消费 goal 通知，不能接真实 `/goal` 设置 RPC。
 - 已知缺口：
-  - 高频通知下当前仍是整包 `snapshot` 推送，后续应改成节流快照或增量 patch。
   - `/goal` 仍未接真实设置 RPC；当前 app-server schema 未暴露对应 client request，需跟随 app-server 版本再核对。
 - 下一开发阶段应切到：
-  - snapshot 节流与事件 patch
+  - `/goal` RPC 版本跟踪与真实设置链路
 
 ## 17. 本地开发标准流程
 

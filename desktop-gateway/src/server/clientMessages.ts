@@ -75,6 +75,7 @@ function handleHello(
   }
 
   context.authenticated = true;
+  context.supportsSnapshotPatch = message.capabilities?.includes("snapshot_patch") ?? false;
   console.log(`[gateway] paired client=${message.client ?? "android"} version=${message.version ?? "-"}`);
   handlers.sendStatus(context.socket, {
     type: "status",

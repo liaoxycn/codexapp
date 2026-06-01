@@ -17,6 +17,7 @@ export interface GatewayHelloMessage {
   client?: string;
   version?: string;
   pairToken?: string | null;
+  capabilities?: string[];
 }
 
 export interface GatewaySelectThreadMessage {
@@ -79,6 +80,7 @@ export interface GatewayStatusMessage {
 
 export interface GatewaySnapshotMessage {
   type: "snapshot";
+  revision?: number;
   threads: GatewayThreadPayload[];
   selectedThreadId?: string;
   messages: GatewayMessagePayload[];
@@ -89,6 +91,23 @@ export interface GatewaySnapshotMessage {
   cwd?: string;
   permissionSummary?: string;
   isGenerating: boolean;
+}
+
+export interface GatewaySnapshotPatchMessage {
+  type: "snapshot_patch";
+  baseRevision: number;
+  revision: number;
+  changed: Array<keyof Omit<GatewaySnapshotMessage, "type" | "revision">>;
+  threads?: GatewayThreadPayload[];
+  selectedThreadId?: string;
+  messages?: GatewayMessagePayload[];
+  hasMoreHistory?: boolean;
+  pendingApproval?: string | null;
+  chips?: GatewayChipPayload[];
+  slashCommands?: string[];
+  cwd?: string;
+  permissionSummary?: string | null;
+  isGenerating?: boolean;
 }
 
 export interface GatewayThreadPayload {

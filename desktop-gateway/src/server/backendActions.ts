@@ -1,6 +1,7 @@
 import type { WebSocket } from "ws";
 import type {
   ClientSnapshot,
+  GatewaySnapshotPatchMessage,
   GatewaySnapshotMessage,
   GatewayStatusMessage,
 } from "../protocol.js";
@@ -42,15 +43,72 @@ export function buildSnapshotMessage(snapshot: ClientSnapshot): GatewaySnapshotM
   };
 }
 
+type SnapshotPatchField = GatewaySnapshotPatchMessage["changed"][number];
+
+const PATCH_FIELDS: SnapshotPatchField[] = [
+  "threads",
+  "selectedThreadId",
+  "messages",
+  "hasMoreHistory",
+  "pendingApproval",
+  "chips",
+  "slashCommands",
+  "cwd",
+  "permissionSummary",
+  "isGenerating",
+];
+
+export function buildSnapshotPatchMessage(
+  previous: GatewaySnapshotMessage,
+  next: GatewaySnapshotMessage,
+  baseRevision: number,
+  revision: number
+): GatewaySnapshotPatchMessage | null {
+  const changed = PATCH_FIELDS.filter((field) => !sameSnapshotField(previous[field], next[field]));
+  if (changed.length === 0) {
+    return null;
+  }
+
+  const patch: GatewaySnapshotPatchMessage = {
+    type: "snapshot_patch",
+    baseRevision,
+    revision,
+    changed,
+  };
+  for (const field of changed) {
+    patch[field] = next[field] as never;
+  }
+  return patch;
+}
+
+function sameSnapshotField(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 export function sendSnapshot(
   context: ClientContext,
   snapshot: ClientSnapshot,
   handlers: SnapshotHandlers
 ): void {
-  const payload = JSON.stringify(buildSnapshotMessage(snapshot));
+  const message = buildSnapshotMessage(snapshot);
+  const payload = JSON.stringify(message);
   if (context.lastSnapshotPayload !== payload) {
+    const baseRevision = context.snapshotRevision;
+    const revision = baseRevision + 1;
+    const patch =
+      context.supportsSnapshotPatch && context.lastSnapshotMessage
+        ? buildSnapshotPatchMessage(context.lastSnapshotMessage, message, baseRevision, revision)
+        : null;
     context.lastSnapshotPayload = payload;
-    context.socket.send(payload);
+    context.lastSnapshotMessage = message;
+    context.snapshotRevision = revision;
+    if (patch) {
+      context.socket.send(JSON.stringify(patch));
+    } else if (context.supportsSnapshotPatch) {
+      context.socket.send(JSON.stringify({ ...message, revision }));
+    } else {
+      context.socket.send(payload);
+    }
   }
   scheduleLiveRefresh(context, snapshot, handlers.refreshSelectedThread);
   scheduleListRefresh(context, handlers.refreshThreadList);

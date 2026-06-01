@@ -1,5 +1,5 @@
 import type { WebSocket } from "ws";
-import type { ClientSnapshot } from "../protocol.js";
+import type { ClientSnapshot, GatewaySnapshotMessage } from "../protocol.js";
 
 export interface GatewayServerOptions {
   host: string;
@@ -19,6 +19,9 @@ export interface ClientContext {
   liveRefreshTimer: NodeJS.Timeout | null;
   listRefreshTimer: NodeJS.Timeout | null;
   lastSnapshotPayload: string | null;
+  lastSnapshotMessage: GatewaySnapshotMessage | null;
+  snapshotRevision: number;
+  supportsSnapshotPatch: boolean;
 }
 
 export type Backend = {

@@ -79,7 +79,51 @@ internal fun GatewaySnapshotMessage.applyTo(
         isManualRefreshing = false,
         connectionStatus = ConnectionStatus.CONNECTED,
         connectionDetail = if (threads.isEmpty()) "已连接，暂无会话" else "已同步 ${threads.size} 个会话",
-        isDemoMode = false
+        isDemoMode = false,
+        snapshotRevision = revision ?: previous.snapshotRevision
+    )
+}
+
+internal fun GatewaySnapshotPatchMessage.applyTo(
+    previous: SessionRemoteState
+): SessionRemoteState {
+    if (previous.snapshotRevision != 0L && baseRevision != previous.snapshotRevision) {
+        return previous.copy(
+            connectionStatus = ConnectionStatus.ERROR,
+            connectionDetail = "snapshot patch 基线不匹配，请刷新"
+        )
+    }
+
+    val changedFields = changed.toSet()
+    val nextThreads = if ("threads" in changedFields) {
+        threads.orEmpty().toThreadSummaries()
+    } else {
+        previous.threads
+    }
+
+    return previous.copy(
+        threads = nextThreads,
+        selectedThreadId = if ("selectedThreadId" in changedFields) {
+            selectedThreadId ?: nextThreads.firstOrNull()?.id.orEmpty()
+        } else {
+            previous.selectedThreadId
+        },
+        pendingThreadTitle = null,
+        isThreadSwitching = false,
+        messages = if ("messages" in changedFields) messages.orEmpty().toThreadMessages() else previous.messages,
+        hasMoreHistory = if ("hasMoreHistory" in changedFields) hasMoreHistory == true else previous.hasMoreHistory,
+        isLoadingOlder = false,
+        pendingApproval = if ("pendingApproval" in changedFields) pendingApproval else previous.pendingApproval,
+        chips = if ("chips" in changedFields) chips.orEmpty().toComposerChips() else previous.chips,
+        slashCommands = if ("slashCommands" in changedFields) slashCommands.orEmpty() else previous.slashCommands,
+        cwd = if ("cwd" in changedFields) cwd.orEmpty() else previous.cwd,
+        permissionSummary = if ("permissionSummary" in changedFields) permissionSummary.orEmpty() else previous.permissionSummary,
+        isGenerating = if ("isGenerating" in changedFields) isGenerating == true else previous.isGenerating,
+        isManualRefreshing = false,
+        connectionStatus = ConnectionStatus.CONNECTED,
+        connectionDetail = if (nextThreads.isEmpty()) "已连接，暂无会话" else "已同步 ${nextThreads.size} 个会话",
+        isDemoMode = false,
+        snapshotRevision = revision
     )
 }
 

@@ -12,7 +12,8 @@ internal data class GatewayHelloMessage(
     val type: String = "hello",
     val client: String = "android-shell",
     val version: String = "0.2.0",
-    val pairToken: String? = null
+    val pairToken: String? = null,
+    val capabilities: List<String> = listOf("snapshot_patch")
 )
 
 @Serializable
@@ -69,6 +70,7 @@ internal data class GatewayStatusMessage(
 @Serializable
 internal data class GatewaySnapshotMessage(
     val type: String = "snapshot",
+    val revision: Long? = null,
     val threads: List<GatewayThreadPayload> = emptyList(),
     val selectedThreadId: String? = null,
     val messages: List<GatewayMessagePayload> = emptyList(),
@@ -79,6 +81,24 @@ internal data class GatewaySnapshotMessage(
     val cwd: String? = null,
     val permissionSummary: String? = null,
     val isGenerating: Boolean = false
+)
+
+@Serializable
+internal data class GatewaySnapshotPatchMessage(
+    val type: String = "snapshot_patch",
+    val baseRevision: Long,
+    val revision: Long,
+    val changed: List<String> = emptyList(),
+    val threads: List<GatewayThreadPayload>? = null,
+    val selectedThreadId: String? = null,
+    val messages: List<GatewayMessagePayload>? = null,
+    val hasMoreHistory: Boolean? = null,
+    val pendingApproval: String? = null,
+    val chips: List<GatewayChipPayload>? = null,
+    val slashCommands: List<String>? = null,
+    val cwd: String? = null,
+    val permissionSummary: String? = null,
+    val isGenerating: Boolean? = null
 )
 
 @Serializable

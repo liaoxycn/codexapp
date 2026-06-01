@@ -2,6 +2,7 @@ package com.codex.mobile.data
 
 import com.codex.mobile.data.gateway.GatewayCommandSender
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
@@ -32,6 +33,7 @@ class GatewayCommandSenderTest {
         assertEquals("hello", payload.getValue("type").jsonPrimitive.content)
         assertEquals("android-shell", payload.getValue("client").jsonPrimitive.content)
         assertEquals("0.2.0", payload.getValue("version").jsonPrimitive.content)
+        assertEquals("snapshot_patch", payload.getValue("capabilities").jsonArray.single().jsonPrimitive.content)
         assertFalse(payload.containsKey("pairToken"))
     }
 

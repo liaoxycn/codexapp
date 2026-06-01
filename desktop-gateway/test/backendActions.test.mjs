@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildSnapshotPatchMessage,
   buildSnapshotMessage,
   runBackendAction,
   sendSnapshot,
@@ -44,6 +45,9 @@ function createContext(overrides = {}) {
     liveRefreshTimer: null,
     listRefreshTimer: null,
     lastSnapshotPayload: null,
+    lastSnapshotMessage: null,
+    snapshotRevision: 0,
+    supportsSnapshotPatch: false,
     ...overrides,
   };
 }
@@ -65,8 +69,46 @@ test("sendSnapshot serializes snapshot payload for client socket", () => {
 
   assert.equal(context.socket.sent.length, 1);
   assert.equal(context.socket.sent[0].type, "snapshot");
+  assert.equal("revision" in context.socket.sent[0], false);
   assert.equal(context.socket.sent[0].pendingApproval, "审批中");
   assert.equal(context.listRefreshTimer, null);
+});
+
+test("buildSnapshotPatchMessage includes only changed snapshot fields", () => {
+  const previous = buildSnapshotMessage(createSnapshot());
+  const next = buildSnapshotMessage(createSnapshot({
+    messages: [{ id: "msg-1", role: "assistant", blocks: [{ kind: "text", value: "done" }] }],
+    isGenerating: true,
+  }));
+
+  const patch = buildSnapshotPatchMessage(previous, next, 1, 2);
+
+  assert.equal(patch.type, "snapshot_patch");
+  assert.equal(patch.baseRevision, 1);
+  assert.equal(patch.revision, 2);
+  assert.deepEqual(patch.changed, ["messages", "isGenerating"]);
+  assert.equal(patch.messages.length, 1);
+  assert.equal(patch.isGenerating, true);
+  assert.equal("threads" in patch, false);
+});
+
+test("sendSnapshot sends patch after a negotiated baseline snapshot", () => {
+  const context = createContext({ supportsSnapshotPatch: true });
+  const handlers = {
+    refreshSelectedThread: async () => {},
+    refreshThreadList: async () => {},
+  };
+
+  sendSnapshot(context, createSnapshot(), handlers);
+  sendSnapshot(context, createSnapshot({ isGenerating: true }), handlers);
+
+  assert.equal(context.socket.sent.length, 2);
+  assert.equal(context.socket.sent[0].type, "snapshot");
+  assert.equal(context.socket.sent[0].revision, 1);
+  assert.equal(context.socket.sent[1].type, "snapshot_patch");
+  assert.equal(context.socket.sent[1].baseRevision, 1);
+  assert.equal(context.socket.sent[1].revision, 2);
+  assert.deepEqual(context.socket.sent[1].changed, ["isGenerating"]);
 });
 
 test("sendSnapshot skips duplicate payloads for the same client", () => {

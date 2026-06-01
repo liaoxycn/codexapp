@@ -3,6 +3,7 @@ package com.codex.mobile.ui
 import com.codex.mobile.data.gateway.GatewayBlockPayload
 import com.codex.mobile.data.gateway.GatewayChipPayload
 import com.codex.mobile.data.gateway.GatewaySnapshotMessage
+import com.codex.mobile.data.gateway.GatewaySnapshotPatchMessage
 import com.codex.mobile.data.gateway.GatewayStatusMessage
 import com.codex.mobile.data.gateway.applyTo
 import com.codex.mobile.data.gateway.decodeGatewayInboundMessage
@@ -27,6 +28,7 @@ class GatewaySnapshotMapperTest {
     fun snapshotApplyToMapsThreadsMessagesAndChips() {
         val previous = emptyRemoteState(GatewayConfig(url = "ws://10.0.2.2:8765/mobile"))
         val snapshot = GatewaySnapshotMessage(
+            revision = 7,
             threads = listOf(
                 com.codex.mobile.data.gateway.GatewayThreadPayload(
                     id = "thread-1",
@@ -61,11 +63,37 @@ class GatewaySnapshotMapperTest {
         val next = snapshot.applyTo(previous)
 
         assertEquals(ConnectionStatus.CONNECTED, next.connectionStatus)
+        assertEquals(7L, next.snapshotRevision)
         assertEquals("thread-1", next.selectedThreadId)
         assertEquals("codexapp", next.threads.single().groupLabel)
         assertEquals(ComposerChipIcon.CONTEXT, next.chips.single().icon)
         assertTrue(next.messages.first().blocks.first() is MessageBlock.Code)
         assertTrue(next.messages.first().blocks.last() is MessageBlock.FileChangeMeta)
+    }
+
+    @Test
+    fun snapshotPatchApplyToUpdatesOnlyChangedFields() {
+        val previous = emptyRemoteState(GatewayConfig(url = "ws://10.0.2.2:8765/mobile")).copy(
+            snapshotRevision = 7L,
+            slashCommands = listOf("/compact"),
+            cwd = "D:/Projects/home/codexapp"
+        )
+        val patch = GatewaySnapshotPatchMessage(
+            baseRevision = 7L,
+            revision = 8L,
+            changed = listOf("isGenerating", "permissionSummary"),
+            isGenerating = true,
+            permissionSummary = "danger-full-access"
+        )
+
+        val next = patch.applyTo(previous)
+
+        assertEquals(ConnectionStatus.CONNECTED, next.connectionStatus)
+        assertEquals(8L, next.snapshotRevision)
+        assertTrue(next.isGenerating)
+        assertEquals("danger-full-access", next.permissionSummary)
+        assertEquals(listOf("/compact"), next.slashCommands)
+        assertEquals("D:/Projects/home/codexapp", next.cwd)
     }
 
     @Test
@@ -90,5 +118,22 @@ class GatewaySnapshotMapperTest {
         val inbound = decodeGatewayInboundMessage(json, raw)
 
         assertEquals("Snapshot", inbound::class.simpleName)
+    }
+
+    @Test
+    fun decodeGatewayInboundMessageDetectsSnapshotPatchEnvelope() {
+        val raw = """
+            {
+              "type": "snapshot_patch",
+              "baseRevision": 1,
+              "revision": 2,
+              "changed": ["isGenerating"],
+              "isGenerating": true
+            }
+        """.trimIndent()
+
+        val inbound = decodeGatewayInboundMessage(json, raw)
+
+        assertEquals("SnapshotPatch", inbound::class.simpleName)
     }
 }

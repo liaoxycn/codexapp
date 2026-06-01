@@ -53,6 +53,75 @@ class GatewayInboundStateReducerTest {
     }
 
     @Test
+    fun reduceGatewayInboundStateAppliesSnapshotPatchPayload() {
+        val previous = emptyRemoteState(GatewayConfig(url = "ws://10.0.2.2:8765/mobile"))
+        val baseline = reduceGatewayInboundState(
+            json,
+            previous,
+            """
+                {
+                  "type": "snapshot",
+                  "revision": 1,
+                  "threads": [],
+                  "messages": [],
+                  "chips": [],
+                  "slashCommands": ["/compact"],
+                  "cwd": "D:/Projects/home/codexapp",
+                  "permissionSummary": "workspace-write",
+                  "isGenerating": false
+                }
+            """.trimIndent()
+        )
+        val raw = """
+            {
+              "type": "snapshot_patch",
+              "baseRevision": 1,
+              "revision": 2,
+              "changed": ["messages", "isGenerating"],
+              "messages": [
+                {
+                  "id": "msg-1",
+                  "role": "assistant",
+                  "blocks": [
+                    { "kind": "status", "value": "思考中" }
+                  ]
+                }
+              ],
+              "isGenerating": true
+            }
+        """.trimIndent()
+
+        val next = reduceGatewayInboundState(json, baseline, raw)
+
+        assertEquals(ConnectionStatus.CONNECTED, next.connectionStatus)
+        assertEquals(2L, next.snapshotRevision)
+        assertEquals("/compact", next.slashCommands.single())
+        assertEquals("msg-1", next.messages.single().id)
+        assertTrue(next.isGenerating)
+    }
+
+    @Test
+    fun reduceGatewayInboundStateRejectsStaleSnapshotPatchPayload() {
+        val previous = emptyRemoteState(GatewayConfig(url = "ws://10.0.2.2:8765/mobile"))
+            .copy(snapshotRevision = 5L)
+        val raw = """
+            {
+              "type": "snapshot_patch",
+              "baseRevision": 4,
+              "revision": 6,
+              "changed": ["isGenerating"],
+              "isGenerating": true
+            }
+        """.trimIndent()
+
+        val next = reduceGatewayInboundState(json, previous, raw)
+
+        assertEquals(ConnectionStatus.ERROR, next.connectionStatus)
+        assertEquals(5L, next.snapshotRevision)
+        assertTrue(next.connectionDetail.contains("基线不匹配"))
+    }
+
+    @Test
     fun reduceGatewayInboundStateTurnsDecodeFailureIntoErrorState() {
         val previous = emptyRemoteState(GatewayConfig(url = "ws://10.0.2.2:8765/mobile"))
 

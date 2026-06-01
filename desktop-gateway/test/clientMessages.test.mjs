@@ -41,6 +41,9 @@ function createContext(overrides = {}) {
     liveRefreshTimer: null,
     listRefreshTimer: null,
     lastSnapshotPayload: null,
+    lastSnapshotMessage: null,
+    snapshotRevision: 0,
+    supportsSnapshotPatch: false,
     ...overrides,
   };
 }
@@ -119,6 +122,20 @@ test("handleClientMessage rejects hello with invalid pair token", async () => {
   assert.equal(statuses.length, 1);
   assert.equal(statuses[0].detail, "pair token 无效");
   assert.deepEqual(context.socket.closed, { code: 4001, reason: "invalid pair token" });
+});
+
+test("handleClientMessage records negotiated snapshot patch support", async () => {
+  const context = createContext();
+  const { handlers } = createHandlers();
+
+  await handleClientMessage(
+    context,
+    JSON.stringify({ type: "hello", client: "android", capabilities: ["snapshot_patch"] }),
+    handlers
+  );
+
+  assert.equal(context.authenticated, true);
+  assert.equal(context.supportsSnapshotPatch, true);
 });
 
 test("handleClientMessage falls back to default thread when select target is missing", async () => {

@@ -14,6 +14,7 @@ internal fun reduceGatewayInboundState(
     return runCatching {
         when (val inbound = decodeGatewayInboundMessage(json, raw)) {
             is GatewayInboundMessage.Snapshot -> inbound.payload.applyTo(previous)
+            is GatewayInboundMessage.SnapshotPatch -> inbound.payload.applyTo(previous)
             is GatewayInboundMessage.Status -> inbound.payload.applyTo(previous)
         }
     }.getOrElse { error ->

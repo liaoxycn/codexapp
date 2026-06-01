@@ -18,5 +18,6 @@ data class SessionRemoteState(
     val connectionStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED,
     val connectionDetail: String = "未连接 gateway",
     val gatewayConfig: GatewayConfig = GatewayConfig(),
-    val isDemoMode: Boolean = true
+    val isDemoMode: Boolean = true,
+    val snapshotRevision: Long = 0L
 )
