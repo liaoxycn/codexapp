@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -75,16 +76,17 @@ internal fun ApprovalCard(
         )
         Spacer(Modifier.height(if (compactMode) 4.dp else 6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(if (compactMode) 5.dp else 6.dp)) {
-            ActionPill("允许", true, onClick = onApprove)
-            ActionPill("拒绝", false, onClick = onReject)
+            ActionPill("允许", true, testTag = "approval_allow_button", onClick = onApprove)
+            ActionPill("拒绝", false, testTag = "approval_reject_button", onClick = onReject)
         }
     }
 }
 
 @Composable
-internal fun ActionPill(label: String, filled: Boolean, onClick: () -> Unit) {
+internal fun ActionPill(label: String, filled: Boolean, testTag: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
+            .testTag(testTag)
             .clip(RoundedCornerShape(999.dp))
             .background(if (filled) CodexTheme.colors.textPrimary else CodexTheme.colors.surface)
             .border(

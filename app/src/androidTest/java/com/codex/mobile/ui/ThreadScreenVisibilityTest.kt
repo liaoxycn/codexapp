@@ -179,6 +179,36 @@ class ThreadScreenVisibilityTest {
     }
 
     @Test
+    fun approvalRejectButtonInvokesRejectCallback() {
+        var approveCalls = 0
+        var rejectCalls = 0
+        rule.setContent {
+            MaterialTheme {
+                ThreadScreen(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(pendingApproval = "允许执行 shell 命令\n! dir"),
+                    compactMode = false,
+                    onOpenConnection = {},
+                    onRefreshCurrent = {},
+                    onLoadOlderMessages = {},
+                    onApprovePending = { approveCalls += 1 },
+                    onRejectPending = { rejectCalls += 1 }
+                )
+            }
+        }
+
+        rule.onNodeWithTag("approval_reject_button")
+            .assertExists()
+            .performClick()
+
+        assertEquals(0, approveCalls)
+        assertEquals(1, rejectCalls)
+    }
+
+    @Test
     fun projectDrawerActionCreatesThreadWithProjectCwd() {
         var createdCwd: String? = null
         rule.setContent {

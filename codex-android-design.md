@@ -410,16 +410,14 @@ gateway -> Android：
   - 历史 `已请求压缩上下文 / 上下文已压缩` 状态会在回填时去重清洗
   - `item/commandExecution/outputDelta` 已改为增量累积，不再只保留最后一段输出
   - `thread/goal/updated / thread/goal/cleared` 已映射为移动端系统状态
+  - 已增加 `npm run protocol:selftest`，通过内存 app-server stub 覆盖审批、compact、goal 通知、命令输出增量与归档清理，不污染真实 Codex 会话
+  - Android 审批卡片“拒绝”按钮已有稳定 Compose instrumentation 测试覆盖，不再依赖 adb 文本注入
 - 已用本机 `codex 0.130.0` 重新生成 app-server schema 核对：仍无设置 goal 的 client request，当前只能消费 goal 通知，不能接真实 `/goal` 设置 RPC。
 - 已知缺口：
-  - 某些历史线程本身已包含旧探针数据，影响自测可读性；需要增加独立测试线程或清洁线程策略。
   - 高频通知下当前仍是整包 `snapshot` 推送，后续应改成节流快照或增量 patch。
-  - Android 真点击“拒绝”还需补一轮稳定自动化；问题不在协议，而在模拟器输入 `! dir` 时 adb 文本注入不稳定。
   - `/goal` 仍未接真实设置 RPC；当前 app-server schema 未暴露对应 client request，需跟随 app-server 版本再核对。
 - 下一开发阶段应切到：
-  - 测试线程清洁
   - snapshot 节流与事件 patch
-  - 独立测试线程 / 自动化回归脚本
 
 ## 17. 本地开发标准流程
 
