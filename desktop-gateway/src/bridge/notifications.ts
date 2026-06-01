@@ -3,15 +3,24 @@ import type { ThreadLifecycleStatus, ThreadRuntimeState } from "./types.js";
 import {
   handleAgentMessageDelta,
   handleCommandExecutionOutputDelta,
+  handleFileChangeOutputDelta,
   handleFileChangePatchUpdated,
   handleItemLifecycle,
+  handleMcpToolCallProgress,
+  handlePlanDelta,
   handleReasoningSummaryDelta,
+  handleReasoningTextDelta,
 } from "./itemNotifications.js";
 import {
+  handleErrorNotification,
+  handleModelRerouted,
   handleServerRequestResolved,
   handleThreadGoalCleared,
   handleThreadGoalUpdated,
   handleThreadCompacted,
+  handleThreadLevelWarning,
+  handleTurnDiffUpdated,
+  handleTurnPlanUpdated,
   handleThreadStatusChanged,
   handleTurnCompleted,
   handleTurnStarted,
@@ -47,11 +56,23 @@ export async function handleBridgeNotification(
     case "item/reasoning/summaryTextDelta":
       handleReasoningSummaryDelta(notification, deps);
       return;
+    case "item/reasoning/textDelta":
+      handleReasoningTextDelta(notification, deps);
+      return;
+    case "item/plan/delta":
+      handlePlanDelta(notification, deps);
+      return;
     case "item/commandExecution/outputDelta":
       handleCommandExecutionOutputDelta(notification, deps);
       return;
+    case "item/fileChange/outputDelta":
+      handleFileChangeOutputDelta(notification, deps);
+      return;
     case "item/fileChange/patchUpdated":
       handleFileChangePatchUpdated(notification, deps);
+      return;
+    case "item/mcpToolCall/progress":
+      handleMcpToolCallProgress(notification, deps);
       return;
     case "item/started":
     case "item/completed":
@@ -73,6 +94,22 @@ export async function handleBridgeNotification(
       return;
     case "thread/goal/cleared":
       handleThreadGoalCleared(notification, deps);
+      return;
+    case "turn/plan/updated":
+      handleTurnPlanUpdated(notification, deps);
+      return;
+    case "turn/diff/updated":
+      handleTurnDiffUpdated(notification, deps);
+      return;
+    case "model/rerouted":
+      handleModelRerouted(notification, deps);
+      return;
+    case "error":
+      handleErrorNotification(notification, deps);
+      return;
+    case "warning":
+    case "guardianWarning":
+      handleThreadLevelWarning(notification, deps);
       return;
     default:
       return;

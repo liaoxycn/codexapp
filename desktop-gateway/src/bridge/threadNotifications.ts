@@ -183,3 +183,129 @@ export function handleThreadGoalCleared(
   replaceOrAppendMessage(state, systemStatus("目标已清除", "thread-goal"));
   deps.emitChanged();
 }
+
+export function handleTurnPlanUpdated(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const { threadId, turnId, explanation, plan } = notification.params as {
+    threadId: string;
+    turnId: string;
+    explanation?: string | null;
+    plan?: Array<{ step?: string; status?: string }>;
+  };
+  const state = deps.threads.get(threadId);
+  if (!state) {
+    return;
+  }
+
+  const planLines = (plan ?? [])
+    .map((entry) => `${entry.status ?? "pending"}: ${entry.step ?? ""}`.trim())
+    .filter((line) => line.length > 0);
+  replaceOrAppendMessage(
+    state,
+    systemStatus([asString(explanation), ...planLines].filter(Boolean).join("\n") || "计划已更新", `turn-plan-${turnId}`)
+  );
+  deps.emitChanged();
+}
+
+export function handleTurnDiffUpdated(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const { threadId, turnId, diff } = notification.params as {
+    threadId: string;
+    turnId: string;
+    diff?: string | null;
+  };
+  const state = deps.threads.get(threadId);
+  if (!state) {
+    return;
+  }
+
+  const value = asString(diff).trim();
+  if (!value) {
+    return;
+  }
+  replaceOrAppendMessage(state, {
+    id: `turn-diff-${turnId}`,
+    role: "assistant",
+    blocks: [{ kind: "fileChangeDiff", value, language: "diff" }],
+  });
+  deps.emitChanged();
+}
+
+export function handleModelRerouted(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const { threadId, turnId, fromModel, toModel, reason } = notification.params as {
+    threadId: string;
+    turnId: string;
+    fromModel?: string | null;
+    toModel?: string | null;
+    reason?: string | null;
+  };
+  const state = deps.threads.get(threadId);
+  if (!state) {
+    return;
+  }
+
+  replaceOrAppendMessage(
+    state,
+    systemStatus(
+      `模型已切换: ${asString(fromModel, "unknown")} -> ${asString(toModel, "unknown")}${
+        reason ? ` · ${reason}` : ""
+      }`,
+      `model-rerouted-${turnId}`
+    )
+  );
+  deps.emitChanged();
+}
+
+export function handleErrorNotification(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const { threadId, error, willRetry } = notification.params as {
+    threadId: string;
+    turnId?: string;
+    error?: { message?: string | null; additionalDetails?: string | null } | null;
+    willRetry?: boolean;
+  };
+  const state = deps.threads.get(threadId);
+  if (!state) {
+    return;
+  }
+
+  const message = [error?.message, error?.additionalDetails, willRetry ? "将重试" : null]
+    .filter(Boolean)
+    .join("\n");
+  state.snapshot.messages = state.snapshot.messages.concat(systemStatus(`错误: ${message || "unknown"}`));
+  state.snapshot.isGenerating = Boolean(willRetry);
+  deps.updateSummaryStatus(threadId, willRetry ? "running" : "failed");
+  deps.emitChanged();
+}
+
+export function handleThreadLevelWarning(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const params = notification.params as {
+    threadId?: string | null;
+    message?: string | null;
+  };
+  const threadId = params.threadId;
+  if (!threadId) {
+    return;
+  }
+  const state = deps.threads.get(threadId);
+  if (!state) {
+    return;
+  }
+
+  state.snapshot.messages = state.snapshot.messages.concat(
+    systemStatus(`警告: ${params.message || "unknown"}`)
+  );
+  deps.emitChanged();
+}

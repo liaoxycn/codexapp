@@ -60,6 +60,56 @@ export function handleReasoningSummaryDelta(
   deps.emitChanged();
 }
 
+export function handleReasoningTextDelta(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const { threadId, itemId, delta } = notification.params as {
+    threadId: string;
+    turnId: string;
+    itemId: string;
+    delta: string;
+  };
+  const state = deps.threads.get(threadId);
+  if (!state || state.transientOperation === "compact") {
+    return;
+  }
+
+  appendOrMergeMessage(
+    state,
+    itemId,
+    "assistant",
+    { kind: "reasoning", value: delta },
+    true
+  );
+  deps.emitChanged();
+}
+
+export function handlePlanDelta(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const { threadId, itemId, delta } = notification.params as {
+    threadId: string;
+    turnId: string;
+    itemId: string;
+    delta: string;
+  };
+  const state = deps.threads.get(threadId);
+  if (!state || state.transientOperation === "compact") {
+    return;
+  }
+
+  appendOrMergeMessage(
+    state,
+    itemId,
+    "assistant",
+    { kind: "text", value: delta },
+    true
+  );
+  deps.emitChanged();
+}
+
 export function handleCommandExecutionOutputDelta(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
@@ -76,6 +126,25 @@ export function handleCommandExecutionOutputDelta(
   }
 
   appendOrMergeCodeMessage(state, itemId, delta, "shell", "命令执行中");
+  deps.emitChanged();
+}
+
+export function handleFileChangeOutputDelta(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const { threadId, itemId, delta } = notification.params as {
+    threadId: string;
+    turnId: string;
+    itemId: string;
+    delta: string;
+  };
+  const state = deps.threads.get(threadId);
+  if (!state || state.transientOperation === "compact") {
+    return;
+  }
+
+  appendOrMergeCodeMessage(state, itemId, delta, "diff", "文件改动中");
   deps.emitChanged();
 }
 
@@ -98,6 +167,29 @@ export function handleFileChangePatchUpdated(
     id: itemId,
     role: "assistant",
     blocks: buildFileChangeBlocks(changes, "inProgress", state.snapshot.cwd),
+  });
+  deps.emitChanged();
+}
+
+export function handleMcpToolCallProgress(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const { threadId, itemId, message } = notification.params as {
+    threadId: string;
+    turnId: string;
+    itemId: string;
+    message: string;
+  };
+  const state = deps.threads.get(threadId);
+  if (!state || state.transientOperation === "compact") {
+    return;
+  }
+
+  replaceOrAppendMessage(state, {
+    id: itemId,
+    role: "assistant",
+    blocks: [{ kind: "text", value: `MCP 进度: ${message}` }],
   });
   deps.emitChanged();
 }
