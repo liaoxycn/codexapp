@@ -184,6 +184,46 @@ export function handleThreadGoalCleared(
   deps.emitChanged();
 }
 
+export function handleThreadTokenUsageUpdated(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const { threadId, turnId, tokenUsage } = notification.params as {
+    threadId: string;
+    turnId: string;
+    tokenUsage?: {
+      total?: TokenUsageBreakdown | null;
+      last?: TokenUsageBreakdown | null;
+      modelContextWindow?: number | null;
+    } | null;
+  };
+  const state = deps.threads.get(threadId);
+  if (!state) {
+    return;
+  }
+
+  const total = tokenUsage?.total;
+  const window = Number.isFinite(tokenUsage?.modelContextWindow)
+    ? Number(tokenUsage?.modelContextWindow)
+    : null;
+  const totalTokens = formatTokenCount(total?.totalTokens);
+  const inputTokens = formatTokenCount(total?.inputTokens);
+  const outputTokens = formatTokenCount(total?.outputTokens);
+  const reasoningTokens = formatTokenCount(total?.reasoningOutputTokens);
+  const context = window && Number.isFinite(total?.totalTokens)
+    ? ` · 上下文 ${Math.round((Number(total?.totalTokens) / window) * 100)}%`
+    : "";
+
+  replaceOrAppendMessage(
+    state,
+    systemStatus(
+      `Token: 总计 ${totalTokens} · 输入 ${inputTokens} · 输出 ${outputTokens} · 推理 ${reasoningTokens}${context}`,
+      `thread-token-usage-${turnId}`
+    )
+  );
+  deps.emitChanged();
+}
+
 export function handleTurnPlanUpdated(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
@@ -364,4 +404,15 @@ function resolveNoticeTargetState(deps: BridgeNotificationDeps) {
     }
   }
   return deps.threads.values().next().value;
+}
+
+interface TokenUsageBreakdown {
+  totalTokens?: number | null;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  reasoningOutputTokens?: number | null;
+}
+
+function formatTokenCount(value: unknown): string {
+  return Number.isFinite(value) ? Number(value).toLocaleString("en-US") : "0";
 }

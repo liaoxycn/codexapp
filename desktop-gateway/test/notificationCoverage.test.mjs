@@ -215,6 +215,45 @@ test("handleBridgeNotification surfaces global notices on the selected thread", 
   );
 });
 
+test("handleBridgeNotification surfaces thread token usage updates", async () => {
+  const state = createState();
+  const context = createDeps(state);
+
+  await handleBridgeNotification(
+    {
+      method: "thread/tokenUsage/updated",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        tokenUsage: {
+          total: {
+            totalTokens: 12345,
+            inputTokens: 10000,
+            cachedInputTokens: 5000,
+            outputTokens: 2345,
+            reasoningOutputTokens: 345,
+          },
+          last: {
+            totalTokens: 123,
+            inputTokens: 100,
+            cachedInputTokens: 50,
+            outputTokens: 23,
+            reasoningOutputTokens: 3,
+          },
+          modelContextWindow: 20000,
+        },
+      },
+    },
+    context.deps
+  );
+
+  assert.equal(context.emitCount, 1);
+  assert.deepEqual(
+    state.snapshot.messages.map((message) => message.blocks[0].value),
+    ["Token: 总计 12,345 · 输入 10,000 · 输出 2,345 · 推理 345 · 上下文 62%"]
+  );
+});
+
 test("handleBridgeNotification refreshes catalog for thread lifecycle notifications", async () => {
   const state = createState();
   const context = createDeps(state);

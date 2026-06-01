@@ -25,6 +25,7 @@ import {
   handleThreadLevelWarning,
   handleTurnDiffUpdated,
   handleTurnPlanUpdated,
+  handleThreadTokenUsageUpdated,
   handleThreadStatusChanged,
   handleTurnCompleted,
   handleTurnStarted,
@@ -106,6 +107,9 @@ export async function handleBridgeNotification(
       return;
     case "thread/goal/cleared":
       handleThreadGoalCleared(notification, deps);
+      return;
+    case "thread/tokenUsage/updated":
+      handleThreadTokenUsageUpdated(notification, deps);
       return;
     case "turn/plan/updated":
       handleTurnPlanUpdated(notification, deps);
