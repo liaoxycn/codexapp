@@ -30,6 +30,7 @@ internal data class CodexAppController(
     val createThread: () -> Unit,
     val createThreadInProject: (String) -> Unit,
     val selectThread: (String) -> Unit,
+    val closeDrawer: () -> Unit,
     val onComposerPanelChange: (ComposerPanel) -> Unit,
     val toggleCompactMode: () -> Unit,
 )
@@ -112,6 +113,9 @@ internal fun rememberCodexAppController(
         },
         selectThread = { threadId ->
             viewModel.selectThread(threadId)
+            scope.launch { drawerState.close() }
+        },
+        closeDrawer = {
             scope.launch { drawerState.close() }
         },
         onComposerPanelChange = { composerPanel = it },
