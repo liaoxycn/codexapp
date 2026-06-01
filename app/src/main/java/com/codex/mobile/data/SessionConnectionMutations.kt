@@ -41,7 +41,9 @@ internal fun SessionRemoteState.withDisconnectedGateway(reason: String): Session
     return copy(
         connectionStatus = ConnectionStatus.DISCONNECTED,
         connectionDetail = if (reason.isBlank()) "desktop gateway 已断开" else reason,
-        isDemoMode = true
+        isDemoMode = false,
+        isGenerating = false,
+        pendingApproval = null
     )
 }
 
@@ -49,7 +51,9 @@ internal fun SessionRemoteState.withConnectionFailure(detail: String): SessionRe
     return copy(
         connectionStatus = ConnectionStatus.ERROR,
         connectionDetail = detail,
-        isDemoMode = true
+        isDemoMode = false,
+        isGenerating = false,
+        pendingApproval = null
     )
 }
 
@@ -86,6 +90,8 @@ internal fun SessionRemoteState.withInboundDecodeFailure(message: String?): Sess
     return copy(
         connectionStatus = ConnectionStatus.ERROR,
         connectionDetail = "网关消息解析失败: $message",
-        isDemoMode = true
+        isDemoMode = false,
+        isGenerating = false,
+        pendingApproval = null
     )
 }

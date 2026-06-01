@@ -2,6 +2,8 @@ package com.codex.mobile.ui
 
 import com.codex.mobile.data.startCreatingThread
 import com.codex.mobile.data.startSelectingThread
+import com.codex.mobile.data.withConnectionFailure
+import com.codex.mobile.data.withDisconnectedGateway
 import com.codex.mobile.data.withOptimisticPrompt
 import com.codex.mobile.data.withSendFailure
 import com.codex.mobile.data.withUnavailableAction
@@ -105,6 +107,40 @@ class SessionRemoteMutationsTest {
         assertFalse(next.isManualRefreshing)
         assertFalse(next.isGenerating)
         assertEquals("连接断开", next.connectionDetail)
+    }
+
+    @Test
+    fun gatewayDisconnectClearsTransientRunStateButKeepsRealSessionMode() {
+        val next = SessionRemoteState(
+            connectionStatus = ConnectionStatus.CONNECTED,
+            isDemoMode = false,
+            isGenerating = true,
+            pendingApproval = "允许执行命令？",
+            messages = listOf(message("user-1", MessageRole.USER))
+        ).withDisconnectedGateway("")
+
+        assertEquals(ConnectionStatus.DISCONNECTED, next.connectionStatus)
+        assertEquals("desktop gateway 已断开", next.connectionDetail)
+        assertFalse(next.isDemoMode)
+        assertFalse(next.isGenerating)
+        assertNull(next.pendingApproval)
+        assertEquals(listOf("user-1"), next.messages.map { it.id })
+    }
+
+    @Test
+    fun gatewayFailureClearsTransientRunStateButKeepsRealSessionMode() {
+        val next = SessionRemoteState(
+            connectionStatus = ConnectionStatus.CONNECTED,
+            isDemoMode = false,
+            isGenerating = true,
+            pendingApproval = "允许执行命令？"
+        ).withConnectionFailure("连接失败")
+
+        assertEquals(ConnectionStatus.ERROR, next.connectionStatus)
+        assertEquals("连接失败", next.connectionDetail)
+        assertFalse(next.isDemoMode)
+        assertFalse(next.isGenerating)
+        assertNull(next.pendingApproval)
     }
 
     private fun message(id: String, role: MessageRole): ThreadMessage {
