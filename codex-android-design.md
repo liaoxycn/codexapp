@@ -280,6 +280,8 @@ v1 不推荐保留：
 - 注入结构化上下文：`thread/inject_items`
 - 执行 `!` 命令：Android 先发 `send_prompt`，gateway 识别后先触发移动端审批；批准后才调用 `thread/shellCommand`
 - 手动压缩：`thread/compact/start`
+- 编辑后重发：历史用户消息回填输入区，用户修改后仍走 `send_prompt` / 生成中 `turn/steer`
+- 原样重发：历史用户消息直接再次走 `send_prompt` / 生成中 `turn/steer`
 
 ### 10.3 历史
 - 默认读取线程：`thread/read`
@@ -395,6 +397,11 @@ gateway -> Android：
   - 抽屉会话更多菜单
   - 重命名会话
   - 归档 / 取消归档会话
+- 已接入用户消息补发高频操作：
+  - 用户消息更多菜单
+  - 编辑后重发：回填输入区，用户修改后再发送
+  - 重发：原文直接再次发送
+  - 当前不改写历史消息；真实历史改写需等待 app-server 暴露对应 RPC
 - 已跑通真实输入区链路：
   - `/` 命令面板展开
   - slash 搜索过滤

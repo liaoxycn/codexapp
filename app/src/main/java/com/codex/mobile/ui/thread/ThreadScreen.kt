@@ -39,6 +39,8 @@ internal fun ThreadScreen(
     onOpenConnection: () -> Unit,
     onRefreshCurrent: () -> Unit,
     onLoadOlderMessages: () -> Unit,
+    onEditUserMessage: (String) -> Unit,
+    onResendUserMessage: (String) -> Unit,
     onApprovePending: () -> Unit,
     onRejectPending: () -> Unit
 ) {
@@ -67,6 +69,8 @@ internal fun ThreadScreen(
                 bottom = controller.metrics.composerPadding + 28.dp
             ),
             isLoadingOlder = controller.isLoadingOlder,
+            onEditUserMessage = onEditUserMessage,
+            onResendUserMessage = onResendUserMessage,
             onApprovePending = onApprovePending,
             onRejectPending = onRejectPending,
         )

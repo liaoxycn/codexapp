@@ -104,6 +104,8 @@ fun CodexApp(
                 onOpenConnection = controller.openGatewayDialog,
                 onRefreshCurrent = viewModel::refreshCurrentThreadAnimated,
                 onLoadOlderMessages = viewModel::loadOlderMessages,
+                onEditUserMessage = viewModel::replaceComposer,
+                onResendUserMessage = viewModel::resendUserMessage,
                 onApprovePending = viewModel::approvePending,
                 onRejectPending = viewModel::rejectPending
             )

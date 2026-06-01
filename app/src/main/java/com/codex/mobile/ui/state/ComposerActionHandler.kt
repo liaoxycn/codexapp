@@ -39,6 +39,11 @@ internal class ComposerActionHandler(
         composerSession.replace(text, selectedThreadId())
     }
 
+    fun resendText(text: String) {
+        composerSession.replace(text, selectedThreadId())
+        send()
+    }
+
     fun send() {
         val threadId = composerSession.currentThreadId(selectedThreadId())
         val prompt = composerSession.currentText().trim()

@@ -66,6 +66,27 @@ class ComposerActionHandlerTest {
     }
 
     @Test
+    fun resendTextReplacesDraftAndSubmitsImmediately() {
+        val session = ComposerSession("thread-1")
+        val sentPrompts = mutableListOf<String>()
+        val handler = ComposerActionHandler(
+            composerSession = session,
+            selectedThreadId = { "thread-1" },
+            launch = { block -> runBlockingImmediate(block) },
+            sendPrompt = { prompt ->
+                sentPrompts += prompt
+                true
+            }
+        )
+
+        handler.updateComposer("old draft")
+        handler.resendText(" previous prompt ")
+
+        assertEquals(listOf("previous prompt"), sentPrompts)
+        assertEquals("", session.currentText())
+    }
+
+    @Test
     fun insertsGoalAndShellTemplatesAsSeparateLines() {
         val session = ComposerSession("thread-1")
         val handler = ComposerActionHandler(

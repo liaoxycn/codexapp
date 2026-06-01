@@ -23,6 +23,8 @@ internal fun ThreadMessageList(
     listState: LazyListState,
     contentPadding: PaddingValues,
     isLoadingOlder: Boolean,
+    onEditUserMessage: (String) -> Unit,
+    onResendUserMessage: (String) -> Unit,
     onApprovePending: () -> Unit,
     onRejectPending: () -> Unit,
 ) {
@@ -60,7 +62,13 @@ internal fun ThreadMessageList(
             items = state.messages,
             key = { _, message -> message.id }
         ) { index, message ->
-            MessageCard(message, compactMode, index)
+            MessageCard(
+                message = message,
+                compactMode = compactMode,
+                messageIndex = index,
+                onEditUserMessage = onEditUserMessage,
+                onResendUserMessage = onResendUserMessage
+            )
         }
 
         if (state.pendingApproval != null) {

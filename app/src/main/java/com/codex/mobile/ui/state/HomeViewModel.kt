@@ -55,6 +55,8 @@ class HomeViewModel(
 
     fun replaceComposer(text: String) = delegate.replaceComposer(text)
 
+    fun resendUserMessage(text: String) = delegate.resendUserMessage(text)
+
     fun send() = delegate.send()
 
     fun stopGenerating() = delegate.stopGenerating()

@@ -47,6 +47,8 @@ class ThreadScreenVisibilityTest {
                     onOpenConnection = {},
                     onRefreshCurrent = {},
                     onLoadOlderMessages = {},
+                    onEditUserMessage = {},
+                    onResendUserMessage = {},
                     onApprovePending = {},
                     onRejectPending = {}
                 )
@@ -73,6 +75,8 @@ class ThreadScreenVisibilityTest {
                     onOpenConnection = {},
                     onRefreshCurrent = {},
                     onLoadOlderMessages = {},
+                    onEditUserMessage = {},
+                    onResendUserMessage = {},
                     onApprovePending = {},
                     onRejectPending = {}
                 )
@@ -98,6 +102,8 @@ class ThreadScreenVisibilityTest {
                     onOpenConnection = {},
                     onRefreshCurrent = {},
                     onLoadOlderMessages = {},
+                    onEditUserMessage = {},
+                    onResendUserMessage = {},
                     onApprovePending = {},
                     onRejectPending = {}
                 )
@@ -128,6 +134,8 @@ class ThreadScreenVisibilityTest {
                     onOpenConnection = {},
                     onRefreshCurrent = {},
                     onLoadOlderMessages = { loadCalls += 1 },
+                    onEditUserMessage = {},
+                    onResendUserMessage = {},
                     onApprovePending = {},
                     onRejectPending = {}
                 )
@@ -165,6 +173,8 @@ class ThreadScreenVisibilityTest {
                     onOpenConnection = {},
                     onRefreshCurrent = {},
                     onLoadOlderMessages = {},
+                    onEditUserMessage = {},
+                    onResendUserMessage = {},
                     onApprovePending = {},
                     onRejectPending = {}
                 )
@@ -196,6 +206,8 @@ class ThreadScreenVisibilityTest {
                     onOpenConnection = {},
                     onRefreshCurrent = {},
                     onLoadOlderMessages = {},
+                    onEditUserMessage = {},
+                    onResendUserMessage = {},
                     onApprovePending = { approveCalls += 1 },
                     onRejectPending = { rejectCalls += 1 }
                 )
@@ -208,6 +220,47 @@ class ThreadScreenVisibilityTest {
 
         assertEquals(0, approveCalls)
         assertEquals(1, rejectCalls)
+    }
+
+    @Test
+    fun userMessageMenuSupportsEditAndResend() {
+        var editedText: String? = null
+        var resentText: String? = null
+        rule.setContent {
+            MaterialTheme {
+                ThreadScreen(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(
+                        messages = listOf(
+                            ThreadMessage(
+                                id = "user-editable",
+                                role = MessageRole.USER,
+                                blocks = listOf(MessageBlock.Text("please inspect build failure"))
+                            )
+                        )
+                    ),
+                    compactMode = false,
+                    onOpenConnection = {},
+                    onRefreshCurrent = {},
+                    onLoadOlderMessages = {},
+                    onEditUserMessage = { editedText = it },
+                    onResendUserMessage = { resentText = it },
+                    onApprovePending = {},
+                    onRejectPending = {}
+                )
+            }
+        }
+
+        rule.onNodeWithTag("user_message_more_user-editable").performClick()
+        rule.onNodeWithText("编辑后重发").performClick()
+        assertEquals("please inspect build failure", editedText)
+
+        rule.onNodeWithTag("user_message_more_user-editable").performClick()
+        rule.onNodeWithText("重发").performClick()
+        assertEquals("please inspect build failure", resentText)
     }
 
     @Test

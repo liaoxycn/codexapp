@@ -117,6 +117,10 @@ internal class HomeViewModelDelegate(
         composerActions.replaceComposer(text)
     }
 
+    fun resendUserMessage(text: String) {
+        composerActions.resendText(text)
+    }
+
     fun send() {
         composerActions.send()
     }
