@@ -11,6 +11,7 @@ import {
   handleReasoningSummaryPartAdded,
   handleReasoningSummaryDelta,
   handleReasoningTextDelta,
+  handleTerminalInteraction,
 } from "./itemNotifications.js";
 import {
   handleErrorNotification,
@@ -70,6 +71,9 @@ export async function handleBridgeNotification(
       return;
     case "item/commandExecution/outputDelta":
       handleCommandExecutionOutputDelta(notification, deps);
+      return;
+    case "item/commandExecution/terminalInteraction":
+      handleTerminalInteraction(notification, deps);
       return;
     case "item/fileChange/outputDelta":
       handleFileChangeOutputDelta(notification, deps);

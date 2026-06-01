@@ -126,11 +126,18 @@ test("handleBridgeNotification surfaces streaming item notifications", async () 
     },
     context.deps
   );
+  await handleBridgeNotification(
+    {
+      method: "item/commandExecution/terminalInteraction",
+      params: { threadId: "thread-1", turnId: "turn-1", itemId: "cmd-1", processId: "p1", stdin: "y\n" },
+    },
+    context.deps
+  );
 
-  assert.equal(context.emitCount, 5);
+  assert.equal(context.emitCount, 6);
   assert.deepEqual(
     state.snapshot.messages.map((message) => message.blocks.at(-1).value),
-    ["思考摘要 1", "思考", "步骤", "+line", "MCP 进度: 连接中"]
+    ["思考摘要 1", "思考", "步骤", "+line", "MCP 进度: 连接中", "\nstdin> y\n"]
   );
 });
 

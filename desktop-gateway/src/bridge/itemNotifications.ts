@@ -154,6 +154,26 @@ export function handleCommandExecutionOutputDelta(
   deps.emitChanged();
 }
 
+export function handleTerminalInteraction(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const { threadId, itemId, stdin } = notification.params as {
+    threadId: string;
+    turnId: string;
+    itemId: string;
+    processId: string;
+    stdin: string;
+  };
+  const state = deps.threads.get(threadId);
+  if (!state || state.transientOperation === "compact") {
+    return;
+  }
+
+  appendOrMergeCodeMessage(state, itemId, `\nstdin> ${stdin}`, "shell", "终端交互");
+  deps.emitChanged();
+}
+
 export function handleFileChangeOutputDelta(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
