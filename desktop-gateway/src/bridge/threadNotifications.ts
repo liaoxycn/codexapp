@@ -510,6 +510,47 @@ function formatOperationalNotice(notification: JsonRpcNotification): { id: strin
         text: `MCP 授权 ${name}: ${success ? "已完成" : "失败"}${error ? `\n${error}` : ""}`,
       };
     }
+    case "mcpServer/startupStatus/updated": {
+      const name = asString(params.name, "MCP");
+      const status = asString(params.status, "updated");
+      const error = asString(params.error).trim();
+      return {
+        id: `mcp-startup-${name}`,
+        text: `MCP 服务 ${name}: ${formatMcpStartupStatus(status)}${error ? `\n${error}` : ""}`,
+      };
+    }
+    case "skills/changed":
+      return {
+        id: "skills-changed",
+        text: "技能列表已变更",
+      };
+    case "account/updated": {
+      const authMode = asString(params.authMode, "unknown");
+      const planType = asString(params.planType, "unknown");
+      return {
+        id: "account-updated",
+        text: `账号状态已更新: ${authMode} · ${planType}`,
+      };
+    }
+    case "account/rateLimits/updated": {
+      const rateLimits = (params.rateLimits ?? {}) as Record<string, unknown>;
+      const primary = (rateLimits.primary ?? {}) as Record<string, unknown>;
+      const usedPercent = Number.isFinite(primary.usedPercent) ? `${Math.round(Number(primary.usedPercent))}%` : "未知";
+      const limitName = asString(rateLimits.limitName, asString(rateLimits.limitId, "额度"));
+      const reachedType = asString(rateLimits.rateLimitReachedType).trim();
+      return {
+        id: "account-rate-limits",
+        text: `额度状态 ${limitName}: ${usedPercent}${reachedType ? `\n${reachedType}` : ""}`,
+      };
+    }
+    case "remoteControl/status/changed": {
+      const status = asString(params.status, "unknown");
+      const environmentId = asString(params.environmentId).trim();
+      return {
+        id: "remote-control-status",
+        text: `远程控制: ${formatRemoteControlStatus(status)}${environmentId ? `\n${environmentId}` : ""}`,
+      };
+    }
     case "externalAgentConfig/import/completed":
       return {
         id: "external-agent-config-import",
@@ -549,5 +590,35 @@ function formatOperationalNotice(notification: JsonRpcNotification): { id: strin
     }
     default:
       return null;
+  }
+}
+
+function formatMcpStartupStatus(status: string): string {
+  switch (status) {
+    case "starting":
+      return "启动中";
+    case "ready":
+      return "已就绪";
+    case "failed":
+      return "启动失败";
+    case "cancelled":
+      return "已取消";
+    default:
+      return status || "已更新";
+  }
+}
+
+function formatRemoteControlStatus(status: string): string {
+  switch (status) {
+    case "disabled":
+      return "已停用";
+    case "connecting":
+      return "连接中";
+    case "connected":
+      return "已连接";
+    case "errored":
+      return "异常";
+    default:
+      return status || "已更新";
   }
 }

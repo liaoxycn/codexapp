@@ -141,6 +141,11 @@ export async function handleBridgeNotification(
       handleGlobalNotice(notification, deps);
       return;
     case "mcpServer/oauthLogin/completed":
+    case "mcpServer/startupStatus/updated":
+    case "skills/changed":
+    case "account/updated":
+    case "account/rateLimits/updated":
+    case "remoteControl/status/changed":
     case "externalAgentConfig/import/completed":
     case "windows/worldWritableWarning":
     case "windowsSandbox/setupCompleted":

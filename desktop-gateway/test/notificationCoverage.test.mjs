@@ -316,6 +316,51 @@ test("handleBridgeNotification surfaces operational global notices", async () =>
   );
   await handleBridgeNotification(
     {
+      method: "mcpServer/startupStatus/updated",
+      params: { name: "playwright", status: "ready", error: null },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "skills/changed",
+      params: {},
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "account/updated",
+      params: { authMode: "chatgpt", planType: "pro" },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "account/rateLimits/updated",
+      params: {
+        rateLimits: {
+          limitId: "primary",
+          limitName: "主额度",
+          primary: { usedPercent: 72, windowDurationMins: 300, resetsAt: null },
+          secondary: null,
+          credits: null,
+          planType: "pro",
+          rateLimitReachedType: null,
+        },
+      },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "remoteControl/status/changed",
+      params: { status: "connected", environmentId: "env-1" },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
       method: "windowsSandbox/setupCompleted",
       params: { mode: "unelevated", success: true, error: null },
     },
@@ -343,11 +388,16 @@ test("handleBridgeNotification surfaces operational global notices", async () =>
     context.deps
   );
 
-  assert.equal(context.emitCount, 5);
+  assert.equal(context.emitCount, 10);
   assert.deepEqual(
     state.snapshot.messages.map((message) => message.blocks[0].value),
     [
       "MCP 授权 github: 失败\ndenied",
+      "MCP 服务 playwright: 已就绪",
+      "技能列表已变更",
+      "账号状态已更新: chatgpt · pro",
+      "额度状态 主额度: 72%",
+      "远程控制: 已连接\nenv-1",
       "Windows Sandbox unelevated: 已就绪",
       "Windows 权限警告: 发现可被其他用户写入的路径 等 3 项\nC:/tmp/a\nC:/tmp/b",
       "账号登录: 已完成",
