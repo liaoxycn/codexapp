@@ -63,6 +63,9 @@ class HomeRepositoryActionsTest {
 
         actions.selectThread("thread-1")
         actions.createThread("D:/Projects/Test")
+        actions.renameThread("thread-1", "Renamed")
+        actions.archiveThread("thread-2")
+        actions.unarchiveThread("thread-3")
         actions.refreshThreads()
         actions.loadOlderMessages()
         actions.stopGenerating()
@@ -71,6 +74,9 @@ class HomeRepositoryActionsTest {
 
         assertEquals(listOf("thread-1"), repository.selectCalls)
         assertEquals(listOf("D:/Projects/Test"), repository.createThreadCalls)
+        assertEquals(listOf("thread-1" to "Renamed"), repository.renameThreadCalls)
+        assertEquals(listOf("thread-2"), repository.archiveThreadCalls)
+        assertEquals(listOf("thread-3"), repository.unarchiveThreadCalls)
         assertEquals(1, repository.refreshThreadsCalls)
         assertEquals(1, repository.loadOlderMessagesCalls)
         assertEquals(1, repository.stopTurnCalls)
@@ -84,6 +90,9 @@ class HomeRepositoryActionsTest {
         var disconnectCalls = 0
         val createThreadCalls = mutableListOf<String?>()
         val selectCalls = mutableListOf<String>()
+        val renameThreadCalls = mutableListOf<Pair<String, String>>()
+        val archiveThreadCalls = mutableListOf<String>()
+        val unarchiveThreadCalls = mutableListOf<String>()
         var refreshThreadsCalls = 0
         var loadOlderMessagesCalls = 0
         var stopTurnCalls = 0
@@ -106,6 +115,18 @@ class HomeRepositoryActionsTest {
 
         override suspend fun selectThread(id: String) {
             selectCalls += id
+        }
+
+        override suspend fun renameThread(id: String, name: String) {
+            renameThreadCalls += id to name
+        }
+
+        override suspend fun archiveThread(id: String) {
+            archiveThreadCalls += id
+        }
+
+        override suspend fun unarchiveThread(id: String) {
+            unarchiveThreadCalls += id
         }
 
         override suspend fun refreshThreads() {

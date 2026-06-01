@@ -58,6 +58,30 @@ class GatewayCommandSenderTest {
     }
 
     @Test
+    fun threadManagementCommandsEncodeExpectedPayloads() {
+        val captured = mutableListOf<String>()
+        val sender = GatewayCommandSender(json) {
+            captured += it
+            true
+        }
+
+        sender.renameThread("thread-1", "Renamed")
+        sender.archiveThread("thread-2")
+        sender.unarchiveThread("thread-3")
+
+        val rename = json.parseToJsonElement(captured[0]).jsonObject
+        val archive = json.parseToJsonElement(captured[1]).jsonObject
+        val unarchive = json.parseToJsonElement(captured[2]).jsonObject
+        assertEquals("rename_thread", rename.getValue("type").jsonPrimitive.content)
+        assertEquals("thread-1", rename.getValue("threadId").jsonPrimitive.content)
+        assertEquals("Renamed", rename.getValue("name").jsonPrimitive.content)
+        assertEquals("archive_thread", archive.getValue("type").jsonPrimitive.content)
+        assertEquals("thread-2", archive.getValue("threadId").jsonPrimitive.content)
+        assertEquals("unarchive_thread", unarchive.getValue("type").jsonPrimitive.content)
+        assertEquals("thread-3", unarchive.getValue("threadId").jsonPrimitive.content)
+    }
+
+    @Test
     fun senderReturnsTransportResult() {
         val sender = GatewayCommandSender(json) { false }
 

@@ -49,6 +49,18 @@ internal class HomeViewModelDelegate(
         repositoryActions.createThread(cwd)
     }
 
+    fun renameThread(id: String, name: String) {
+        repositoryActions.renameThread(id, name)
+    }
+
+    fun archiveThread(id: String) {
+        repositoryActions.archiveThread(id)
+    }
+
+    fun unarchiveThread(id: String) {
+        repositoryActions.unarchiveThread(id)
+    }
+
     fun refreshThreads() {
         repositoryActions.refreshThreads()
     }

@@ -67,6 +67,18 @@ class DefaultSessionRepository(
         commandActions.selectThread(id)
     }
 
+    override suspend fun renameThread(id: String, name: String) {
+        commandActions.renameThread(id, name)
+    }
+
+    override suspend fun archiveThread(id: String) {
+        commandActions.archiveThread(id)
+    }
+
+    override suspend fun unarchiveThread(id: String) {
+        commandActions.unarchiveThread(id)
+    }
+
     override suspend fun refreshThreads() {
         commandActions.refreshThreads()
     }

@@ -18,6 +18,18 @@ internal class HomeRepositoryActions(
         launch { repository.createThread(cwd) }
     }
 
+    fun renameThread(id: String, name: String) {
+        launch { repository.renameThread(id, name) }
+    }
+
+    fun archiveThread(id: String) {
+        launch { repository.archiveThread(id) }
+    }
+
+    fun unarchiveThread(id: String) {
+        launch { repository.unarchiveThread(id) }
+    }
+
     fun refreshThreads() {
         launch { repository.refreshThreads() }
     }

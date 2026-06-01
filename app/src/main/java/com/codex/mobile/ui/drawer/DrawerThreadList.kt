@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.codex.mobile.model.ThreadSummary
 import com.codex.mobile.ui.theme.CodexTheme
 
 @Composable
@@ -20,6 +21,9 @@ internal fun DrawerThreadList(
     sections: DrawerThreadSections,
     onCreateThreadInProject: (String) -> Unit,
     onSelectThread: (String) -> Unit,
+    onRenameThread: (ThreadSummary) -> Unit,
+    onArchiveThread: (String) -> Unit,
+    onUnarchiveThread: (String) -> Unit,
     onToggleProjectGroup: (DrawerProjectGroup) -> Unit,
 ) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -56,7 +60,11 @@ internal fun DrawerThreadList(
                             summary = thread,
                             selected = thread.id == selectedThreadId,
                             indentLevel = 1,
-                            onClick = { onSelectThread(thread.id) }
+                            onClick = { onSelectThread(thread.id) },
+                            onRename = { onRenameThread(thread) },
+                            onArchiveToggle = {
+                                if (thread.archived) onUnarchiveThread(thread.id) else onArchiveThread(thread.id)
+                            }
                         )
                     }
                 }
@@ -79,7 +87,11 @@ internal fun DrawerThreadList(
                     summary = thread,
                     selected = thread.id == selectedThreadId,
                     indentLevel = 0,
-                    onClick = { onSelectThread(thread.id) }
+                    onClick = { onSelectThread(thread.id) },
+                    onRename = { onRenameThread(thread) },
+                    onArchiveToggle = {
+                        if (thread.archived) onUnarchiveThread(thread.id) else onArchiveThread(thread.id)
+                    }
                 )
             }
         }

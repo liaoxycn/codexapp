@@ -8,6 +8,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
 import com.codex.mobile.model.ComposerChip
 import com.codex.mobile.model.ComposerChipIcon
 import com.codex.mobile.model.ConnectionStatus
@@ -218,7 +220,10 @@ class ThreadScreenVisibilityTest {
                     onCreateThread = {},
                     onCreateThreadInProject = { createdCwd = it },
                     onRefreshThreads = {},
-                    onSelectThread = {}
+                    onSelectThread = {},
+                    onRenameThread = { _, _ -> },
+                    onArchiveThread = {},
+                    onUnarchiveThread = {}
                 )
             }
         }
@@ -228,6 +233,57 @@ class ThreadScreenVisibilityTest {
             .performClick()
 
         assertEquals("D:/Projects/Project A", createdCwd)
+    }
+
+    @Test
+    fun drawerThreadMenuRenamesThread() {
+        var renameCall: Pair<String, String>? = null
+        rule.setContent {
+            CodexTheme {
+                DrawerContent(
+                    state = sampleDrawerState(),
+                    onCreateThread = {},
+                    onCreateThreadInProject = {},
+                    onRefreshThreads = {},
+                    onSelectThread = {},
+                    onRenameThread = { id, name -> renameCall = id to name },
+                    onArchiveThread = {},
+                    onUnarchiveThread = {}
+                )
+            }
+        }
+
+        rule.onNodeWithTag("thread_row_more_project-a-1").performClick()
+        rule.onNodeWithText("重命名").performClick()
+        rule.onNodeWithTag("rename_thread_field").performTextClearance()
+        rule.onNodeWithTag("rename_thread_field").performTextInput("Renamed Project")
+        rule.onNodeWithTag("rename_thread_confirm").performClick()
+
+        assertEquals("project-a-1" to "Renamed Project", renameCall)
+    }
+
+    @Test
+    fun drawerThreadMenuArchivesThread() {
+        var archivedThreadId: String? = null
+        rule.setContent {
+            CodexTheme {
+                DrawerContent(
+                    state = sampleDrawerState(),
+                    onCreateThread = {},
+                    onCreateThreadInProject = {},
+                    onRefreshThreads = {},
+                    onSelectThread = {},
+                    onRenameThread = { _, _ -> },
+                    onArchiveThread = { archivedThreadId = it },
+                    onUnarchiveThread = {}
+                )
+            }
+        }
+
+        rule.onNodeWithTag("thread_row_more_chat-1").performClick()
+        rule.onNodeWithText("归档").performClick()
+
+        assertEquals("chat-1", archivedThreadId)
     }
 
     private fun sampleState(

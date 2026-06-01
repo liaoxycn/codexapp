@@ -104,6 +104,50 @@ class GatewayRepositoryCommandActionsTest {
     }
 
     @Test
+    fun threadManagementActionsSendExpectedMessagesWhenConnected() {
+        var state = SessionRemoteState(connectionStatus = ConnectionStatus.CONNECTED)
+        val sentMessages = mutableListOf<String>()
+        val actions = GatewayRepositoryCommandActions(
+            commandSender = GatewayCommandSender(json) { payload ->
+                sentMessages += payload
+                true
+            },
+            readState = { state },
+            updateState = { transform -> state = transform(state) },
+            logDebug = {}
+        )
+
+        assertTrue(actions.renameThread("thread-1", "  Renamed  "))
+        assertTrue(actions.archiveThread("thread-2"))
+        assertTrue(actions.unarchiveThread("thread-3"))
+
+        assertTrue(sentMessages[0].contains("\"type\":\"rename_thread\""))
+        assertTrue(sentMessages[0].contains("\"name\":\"Renamed\""))
+        assertTrue(sentMessages[1].contains("\"type\":\"archive_thread\""))
+        assertTrue(sentMessages[2].contains("\"type\":\"unarchive_thread\""))
+    }
+
+    @Test
+    fun renameThreadRejectsBlankNameBeforeSending() {
+        var state = SessionRemoteState(connectionStatus = ConnectionStatus.CONNECTED)
+        val sentMessages = mutableListOf<String>()
+        val actions = GatewayRepositoryCommandActions(
+            commandSender = GatewayCommandSender(json) { payload ->
+                sentMessages += payload
+                true
+            },
+            readState = { state },
+            updateState = { transform -> state = transform(state) },
+            logDebug = {}
+        )
+
+        val accepted = actions.renameThread("thread-1", "   ")
+
+        assertFalse(accepted)
+        assertTrue(sentMessages.isEmpty())
+    }
+
+    @Test
     fun sendPromptTurnsSendFailureIntoSystemErrorMessage() {
         var state = SessionRemoteState(
             connectionStatus = ConnectionStatus.CONNECTED,

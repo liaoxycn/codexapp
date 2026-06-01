@@ -95,6 +95,12 @@ class HomeRepositoryCoordinatorTest {
 
         override suspend fun selectThread(id: String) = Unit
 
+        override suspend fun renameThread(id: String, name: String) = Unit
+
+        override suspend fun archiveThread(id: String) = Unit
+
+        override suspend fun unarchiveThread(id: String) = Unit
+
         override suspend fun refreshThreads() = Unit
 
         override suspend fun loadOlderMessages() = Unit

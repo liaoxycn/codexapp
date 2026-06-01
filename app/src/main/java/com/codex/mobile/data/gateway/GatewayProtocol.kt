@@ -29,6 +29,25 @@ internal data class GatewayCreateThreadMessage(
 )
 
 @Serializable
+internal data class GatewayRenameThreadMessage(
+    val type: String = "rename_thread",
+    val threadId: String,
+    val name: String
+)
+
+@Serializable
+internal data class GatewayArchiveThreadMessage(
+    val type: String = "archive_thread",
+    val threadId: String
+)
+
+@Serializable
+internal data class GatewayUnarchiveThreadMessage(
+    val type: String = "unarchive_thread",
+    val threadId: String
+)
+
+@Serializable
 internal data class GatewayRefreshThreadsMessage(
     val type: String = "refresh_threads"
 )

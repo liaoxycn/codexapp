@@ -28,6 +28,18 @@ internal class GatewayCommandSender(
         )
     }
 
+    fun renameThread(threadId: String, name: String): Boolean {
+        return send(GatewayRenameThreadMessage(threadId = threadId, name = name))
+    }
+
+    fun archiveThread(threadId: String): Boolean {
+        return send(GatewayArchiveThreadMessage(threadId = threadId))
+    }
+
+    fun unarchiveThread(threadId: String): Boolean {
+        return send(GatewayUnarchiveThreadMessage(threadId = threadId))
+    }
+
     fun refreshThreads(): Boolean {
         return send(GatewayRefreshThreadsMessage())
     }
@@ -67,6 +79,18 @@ internal class GatewayCommandSender(
 
     private fun send(message: GatewaySelectThreadMessage): Boolean {
         return sendText(json.encodeToString(GatewaySelectThreadMessage.serializer(), message))
+    }
+
+    private fun send(message: GatewayRenameThreadMessage): Boolean {
+        return sendText(json.encodeToString(GatewayRenameThreadMessage.serializer(), message))
+    }
+
+    private fun send(message: GatewayArchiveThreadMessage): Boolean {
+        return sendText(json.encodeToString(GatewayArchiveThreadMessage.serializer(), message))
+    }
+
+    private fun send(message: GatewayUnarchiveThreadMessage): Boolean {
+        return sendText(json.encodeToString(GatewayUnarchiveThreadMessage.serializer(), message))
     }
 
     private fun send(message: GatewayRefreshThreadsMessage): Boolean {

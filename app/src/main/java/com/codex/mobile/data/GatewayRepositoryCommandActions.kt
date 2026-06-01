@@ -34,6 +34,28 @@ internal class GatewayRepositoryCommandActions(
         }
     }
 
+    fun renameThread(id: String, name: String): Boolean {
+        val trimmedName = name.trim()
+        if (id.isBlank() || trimmedName.isBlank()) return false
+        return runConnectedAction("未连接 gateway，无法重命名会话") {
+            commandSender.renameThread(id, trimmedName)
+        }
+    }
+
+    fun archiveThread(id: String): Boolean {
+        if (id.isBlank()) return false
+        return runConnectedAction("未连接 gateway，无法归档会话") {
+            commandSender.archiveThread(id)
+        }
+    }
+
+    fun unarchiveThread(id: String): Boolean {
+        if (id.isBlank()) return false
+        return runConnectedAction("未连接 gateway，无法恢复会话") {
+            commandSender.unarchiveThread(id)
+        }
+    }
+
     fun refreshThreads(): Boolean {
         return runConnectedAction("未连接 gateway，无法刷新会话") {
             commandSender.refreshThreads()

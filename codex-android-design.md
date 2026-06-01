@@ -303,6 +303,9 @@ Android 不直接暴露 app-server 协议给 UI，而是先走一层更窄的移
 Android -> gateway：
 - `hello`
 - `select_thread`
+- `rename_thread`
+- `archive_thread`
+- `unarchive_thread`
 - `send_prompt`
 - `stop_turn`
 - `approve_pending`
@@ -383,8 +386,15 @@ gateway -> Android：
   - `status`
   - `snapshot`
   - `select_thread`
+  - `rename_thread`
+  - `archive_thread`
+  - `unarchive_thread`
   - `send_prompt`
   - `stop_turn`
+- 已接入会话管理高频操作：
+  - 抽屉会话更多菜单
+  - 重命名会话
+  - 归档 / 取消归档会话
 - 已跑通真实输入区链路：
   - `/` 命令面板展开
   - slash 搜索过滤
