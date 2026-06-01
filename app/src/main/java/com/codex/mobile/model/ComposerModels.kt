@@ -6,6 +6,11 @@ data class ComposerChip(
     val path: String? = null
 )
 
+data class ComposerFile(
+    val label: String,
+    val path: String
+)
+
 enum class ComposerChipIcon {
     FILE,
     CONTEXT

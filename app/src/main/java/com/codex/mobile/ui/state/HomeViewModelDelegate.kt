@@ -2,13 +2,16 @@ package com.codex.mobile.ui.state
 
 import com.codex.mobile.data.SessionRepository
 import com.codex.mobile.model.HomeUiState
+import com.codex.mobile.model.AppUpdateStatus
+import com.codex.mobile.update.AppUpdateManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 internal class HomeViewModelDelegate(
     private val repository: SessionRepository,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val appUpdateManager: AppUpdateManager
 ) {
     private val composerSession = ComposerSession(repository.state.value.selectedThreadId)
     private val uiStateStore = HomeUiStateStore(
@@ -23,9 +26,16 @@ internal class HomeViewModelDelegate(
     )
     private val composerActions = ComposerActionHandler(
         composerSession = composerSession,
-        selectedThreadId = { repository.state.value.selectedThreadId },
+        selectedThreadId = { uiStateStore.state.value.selectedThreadId },
+        newThreadDraft = { uiStateStore.state.value.newThreadDraft.takeIf { uiStateStore.state.value.isNewThreadDraft } },
         launch = { block -> scope.launch { block() } },
-        sendPrompt = repository::sendPrompt
+        sendPrompt = repository::sendPrompt,
+        resendPrompt = repository::resendPrompt,
+        onPromptAccepted = { wasDraft ->
+            if (wasDraft) {
+                uiStateStore.exitNewThreadDraft()
+            }
+        }
     )
     private val repositoryActions = HomeRepositoryActions(
         repository = repository,
@@ -39,18 +49,25 @@ internal class HomeViewModelDelegate(
 
     init {
         repositoryCoordinator.start()
+        checkAppUpdate()
+        scope.launch {
+            repository.state.collect { remote ->
+                uiStateStore.syncDraftDefaults(remote)
+            }
+        }
     }
 
     fun selectThread(id: String) {
+        uiStateStore.exitNewThreadDraft()
         repositoryActions.selectThread(id)
     }
 
     fun createThread(cwd: String? = null) {
-        repositoryActions.createThread(cwd)
+        uiStateStore.startNewThreadDraft(cwd)
     }
 
-    fun forkThread(id: String) {
-        repositoryActions.forkThread(id)
+    fun forkThread(id: String, numTurns: Int? = null) {
+        repositoryActions.forkThread(id, numTurns)
     }
 
     fun renameThread(id: String, name: String) {
@@ -58,7 +75,12 @@ internal class HomeViewModelDelegate(
     }
 
     fun archiveThread(id: String) {
+        uiStateStore.startNewThreadDraft()
         repositoryActions.archiveThread(id)
+    }
+
+    fun updateNewThreadDraft(transform: (com.codex.mobile.model.NewThreadDraft) -> com.codex.mobile.model.NewThreadDraft) {
+        uiStateStore.updateNewThreadDraft(transform)
     }
 
     fun unarchiveThread(id: String) {
@@ -122,8 +144,15 @@ internal class HomeViewModelDelegate(
         uiStateStore.requestComposerFocus()
     }
 
-    fun resendUserMessage(text: String) {
-        composerActions.resendText(text)
+    fun editAndResendUserMessage(text: String, rollbackNumTurns: Int) {
+        composerActions.editAndResendText(text, rollbackNumTurns)
+        uiStateStore.requestComposerFocus()
+    }
+
+    fun resendUserMessage(text: String, rollbackNumTurns: Int) {
+        scope.launch {
+            repository.resendPrompt(text, rollbackNumTurns)
+        }
     }
 
     fun send() {
@@ -142,11 +171,41 @@ internal class HomeViewModelDelegate(
         repositoryActions.rejectPending()
     }
 
+    fun restartDesktop() {
+        repositoryActions.restartDesktop()
+    }
+
     fun connect(url: String, pairToken: String) {
         repositoryActions.connect(url, pairToken)
     }
 
     fun disconnect() {
         repositoryActions.disconnect()
+    }
+
+    fun checkAppUpdate() {
+        scope.launch {
+            uiStateStore.updateAppUpdate(
+                uiStateStore.state.value.appUpdate.copy(status = AppUpdateStatus.CHECKING, message = "")
+            )
+            val next = appUpdateManager.checkLatest()
+            uiStateStore.updateAppUpdate(next)
+        }
+    }
+
+    fun downloadAppUpdate() {
+        val current = uiStateStore.state.value.appUpdate
+        if (current.status != AppUpdateStatus.AVAILABLE && current.status != AppUpdateStatus.ERROR) return
+        scope.launch {
+            val next = appUpdateManager.download(current) { progress ->
+                uiStateStore.updateAppUpdate(progress)
+            }
+            uiStateStore.updateAppUpdate(next)
+        }
+    }
+
+    fun installAppUpdate() {
+        val next = appUpdateManager.install(uiStateStore.state.value.appUpdate)
+        uiStateStore.updateAppUpdate(next)
     }
 }

@@ -53,6 +53,10 @@ internal fun filterSlashCommands(commands: List<String>, slashQuery: String): Li
     }
 }
 
+internal fun composerFileMention(path: String): String {
+    return "@{${path.trim()}}"
+}
+
 internal fun composerPlaceholder(
     composerEnabled: Boolean,
     connectionStatus: ConnectionStatus

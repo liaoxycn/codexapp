@@ -4,10 +4,12 @@ import com.codex.mobile.model.ComposerChip
 import com.codex.mobile.model.ConnectionStatus
 import com.codex.mobile.model.GatewayConfig
 import com.codex.mobile.model.HomeUiState
+import com.codex.mobile.model.NewThreadDraft
 import com.codex.mobile.model.ThreadMessage
 import com.codex.mobile.model.ThreadSummary
 import com.codex.mobile.ui.thread.calculateThreadListMetrics
 import com.codex.mobile.ui.thread.restoredHistoryAnchorIndex
+import com.codex.mobile.ui.thread.shouldTriggerHistoryLoad
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -31,14 +33,14 @@ class ThreadScreenStateTest {
     }
 
     @Test
-    fun metricsUseComposerDetailPadding() {
+    fun metricsUseSmallBottomPaddingBecauseScaffoldAlreadyInsetsComposer() {
         val state = homeUiState(showComposerDetails = true)
 
         val compactMetrics = calculateThreadListMetrics(state, compactMode = true, isAtBottom = true)
         val regularMetrics = calculateThreadListMetrics(state, compactMode = false, isAtBottom = true)
 
-        assertEquals(278, compactMetrics.composerPadding.value.toInt())
-        assertEquals(298, regularMetrics.composerPadding.value.toInt())
+        assertEquals(8, compactMetrics.composerPadding.value.toInt())
+        assertEquals(10, regularMetrics.composerPadding.value.toInt())
         assertFalse(compactMetrics.showJumpToBottom)
     }
 
@@ -70,6 +72,50 @@ class ThreadScreenStateTest {
         assertEquals(3, restoredIndex)
     }
 
+    @Test
+    fun historyLoadRequiresTopPullPastThreshold() {
+        assertTrue(
+            shouldTriggerHistoryLoad(
+                isAtTop = true,
+                hasMoreHistory = true,
+                isLoadingOlder = false,
+                isThreadSwitching = false,
+                hasMessages = true,
+                pullDistance = 130f,
+                pullThreshold = 120f,
+                loadArmed = true
+            )
+        )
+    }
+
+    @Test
+    fun historyLoadDoesNotTriggerWhenNotAtTopOrBusy() {
+        assertFalse(
+            shouldTriggerHistoryLoad(
+                isAtTop = false,
+                hasMoreHistory = true,
+                isLoadingOlder = false,
+                isThreadSwitching = false,
+                hasMessages = true,
+                pullDistance = 160f,
+                pullThreshold = 120f,
+                loadArmed = true
+            )
+        )
+        assertFalse(
+            shouldTriggerHistoryLoad(
+                isAtTop = true,
+                hasMoreHistory = true,
+                isLoadingOlder = true,
+                isThreadSwitching = false,
+                hasMessages = true,
+                pullDistance = 160f,
+                pullThreshold = 120f,
+                loadArmed = true
+            )
+        )
+    }
+
     private fun homeUiState(
         threads: List<ThreadSummary> = emptyList(),
         messages: List<ThreadMessage> = emptyList(),
@@ -91,6 +137,7 @@ class ThreadScreenStateTest {
         isManualRefreshing = false,
         showComposerDetails = showComposerDetails,
         chips = emptyList<ComposerChip>(),
+        files = emptyList(),
         slashCommands = emptyList(),
         pendingApproval = pendingApproval,
         cwd = "",
@@ -98,7 +145,10 @@ class ThreadScreenStateTest {
         connectionStatus = connectionStatus,
         connectionDetail = "",
         gatewayConfig = GatewayConfig(),
-        isDemoMode = false
+        desktopRestartRequired = false,
+        isDemoMode = false,
+        isNewThreadDraft = false,
+        newThreadDraft = NewThreadDraft()
     )
 
     private fun message(id: String) = ThreadMessage(

@@ -10,11 +10,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import com.codex.mobile.model.HomeUiState
 import com.codex.mobile.ui.composer.ComposerPanel
 import com.codex.mobile.ui.state.HomeViewModel
 import kotlinx.coroutines.launch
+import android.app.Activity
+import android.widget.Toast
 
 internal data class CodexAppController(
     val drawerState: DrawerState,
@@ -32,7 +35,6 @@ internal data class CodexAppController(
     val selectThread: (String) -> Unit,
     val closeDrawer: () -> Unit,
     val onComposerPanelChange: (ComposerPanel) -> Unit,
-    val toggleCompactMode: () -> Unit,
 )
 
 @Composable
@@ -43,9 +45,10 @@ internal fun rememberCodexAppController(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
     var showGatewayDialog by rememberSaveable { mutableStateOf(false) }
-    var compactMode by rememberSaveable { mutableStateOf(false) }
+    var compactMode by rememberSaveable { mutableStateOf(true) }
     var composerPanel by rememberSaveable { mutableStateOf(ComposerPanel.NONE) }
     var lastBackPressAt by rememberSaveable { mutableStateOf(0L) }
 
@@ -77,9 +80,10 @@ internal fun rememberCodexAppController(
         }
         val now = System.currentTimeMillis()
         if (now - lastBackPressAt < 1800L) {
-            android.os.Process.killProcess(android.os.Process.myPid())
+            (context as? Activity)?.finish()
         } else {
             lastBackPressAt = now
+            Toast.makeText(context, "再按一次退出", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -93,11 +97,9 @@ internal fun rememberCodexAppController(
         dismissGatewayDialog = { showGatewayDialog = false },
         connectGateway = { url, pairToken ->
             viewModel.connect(url, pairToken)
-            showGatewayDialog = false
         },
         disconnectGateway = {
             viewModel.disconnect()
-            showGatewayDialog = false
         },
         openDrawer = {
             dismissComposerChrome()
@@ -119,6 +121,5 @@ internal fun rememberCodexAppController(
             scope.launch { drawerState.close() }
         },
         onComposerPanelChange = { composerPanel = it },
-        toggleCompactMode = { compactMode = !compactMode },
     )
 }

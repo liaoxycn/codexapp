@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.codex.mobile.data.DefaultSessionRepository
 import com.codex.mobile.model.HomeUiState
+import com.codex.mobile.model.NewThreadDraft
+import com.codex.mobile.update.AppUpdateManager
 import kotlinx.coroutines.flow.StateFlow
 
 class HomeViewModel(
@@ -12,7 +14,8 @@ class HomeViewModel(
 ) : AndroidViewModel(application) {
     private val delegate = HomeViewModelDelegate(
         repository = DefaultSessionRepository(application.applicationContext),
-        scope = viewModelScope
+        scope = viewModelScope,
+        appUpdateManager = AppUpdateManager(application.applicationContext)
     )
 
     val state: StateFlow<HomeUiState> = delegate.state
@@ -21,7 +24,9 @@ class HomeViewModel(
 
     fun createThread(cwd: String? = null) = delegate.createThread(cwd)
 
-    fun forkThread(id: String) = delegate.forkThread(id)
+    fun updateNewThreadDraft(transform: (NewThreadDraft) -> NewThreadDraft) = delegate.updateNewThreadDraft(transform)
+
+    fun forkThread(id: String, numTurns: Int? = null) = delegate.forkThread(id, numTurns)
 
     fun renameThread(id: String, name: String) = delegate.renameThread(id, name)
 
@@ -57,7 +62,10 @@ class HomeViewModel(
 
     fun replaceComposer(text: String) = delegate.replaceComposer(text)
 
-    fun resendUserMessage(text: String) = delegate.resendUserMessage(text)
+    fun editAndResendUserMessage(text: String, rollbackNumTurns: Int) =
+        delegate.editAndResendUserMessage(text, rollbackNumTurns)
+
+    fun resendUserMessage(text: String, rollbackNumTurns: Int) = delegate.resendUserMessage(text, rollbackNumTurns)
 
     fun send() = delegate.send()
 
@@ -67,7 +75,15 @@ class HomeViewModel(
 
     fun rejectPending() = delegate.rejectPending()
 
+    fun restartDesktop() = delegate.restartDesktop()
+
     fun connect(url: String, pairToken: String) = delegate.connect(url, pairToken)
 
     fun disconnect() = delegate.disconnect()
+
+    fun checkAppUpdate() = delegate.checkAppUpdate()
+
+    fun downloadAppUpdate() = delegate.downloadAppUpdate()
+
+    fun installAppUpdate() = delegate.installAppUpdate()
 }

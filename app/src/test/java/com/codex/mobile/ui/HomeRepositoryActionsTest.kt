@@ -2,6 +2,7 @@ package com.codex.mobile.ui
 
 import com.codex.mobile.data.SessionRepository
 import com.codex.mobile.model.GatewayConfig
+import com.codex.mobile.model.NewThreadDraft
 import com.codex.mobile.model.SessionRemoteState
 import com.codex.mobile.ui.state.HomeRepositoryActions
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,7 +64,7 @@ class HomeRepositoryActionsTest {
 
         actions.selectThread("thread-1")
         actions.createThread("D:/Projects/Test")
-        actions.forkThread("thread-fork")
+        actions.forkThread("thread-fork", 3)
         actions.renameThread("thread-1", "Renamed")
         actions.archiveThread("thread-2")
         actions.unarchiveThread("thread-3")
@@ -72,10 +73,11 @@ class HomeRepositoryActionsTest {
         actions.stopGenerating()
         actions.approvePending()
         actions.rejectPending()
+        actions.restartDesktop()
 
         assertEquals(listOf("thread-1"), repository.selectCalls)
         assertEquals(listOf("D:/Projects/Test"), repository.createThreadCalls)
-        assertEquals(listOf("thread-fork"), repository.forkThreadCalls)
+        assertEquals(listOf("thread-fork" to 3), repository.forkThreadCalls)
         assertEquals(listOf("thread-1" to "Renamed"), repository.renameThreadCalls)
         assertEquals(listOf("thread-2"), repository.archiveThreadCalls)
         assertEquals(listOf("thread-3"), repository.unarchiveThreadCalls)
@@ -84,6 +86,7 @@ class HomeRepositoryActionsTest {
         assertEquals(1, repository.stopTurnCalls)
         assertEquals(1, repository.approveCalls)
         assertEquals(1, repository.rejectCalls)
+        assertEquals(1, repository.restartDesktopCalls)
     }
 
     private class FakeSessionRepository : SessionRepository {
@@ -92,7 +95,7 @@ class HomeRepositoryActionsTest {
         var disconnectCalls = 0
         val createThreadCalls = mutableListOf<String?>()
         val selectCalls = mutableListOf<String>()
-        val forkThreadCalls = mutableListOf<String>()
+        val forkThreadCalls = mutableListOf<Pair<String, Int?>>()
         val renameThreadCalls = mutableListOf<Pair<String, String>>()
         val archiveThreadCalls = mutableListOf<String>()
         val unarchiveThreadCalls = mutableListOf<String>()
@@ -101,6 +104,7 @@ class HomeRepositoryActionsTest {
         var stopTurnCalls = 0
         var approveCalls = 0
         var rejectCalls = 0
+        var restartDesktopCalls = 0
 
         override val state: StateFlow<SessionRemoteState> = snapshot
 
@@ -112,7 +116,7 @@ class HomeRepositoryActionsTest {
             disconnectCalls += 1
         }
 
-        override suspend fun createThread(cwd: String?) {
+        override suspend fun createThread(cwd: String?, draft: NewThreadDraft?) {
             createThreadCalls += cwd
         }
 
@@ -120,8 +124,8 @@ class HomeRepositoryActionsTest {
             selectCalls += id
         }
 
-        override suspend fun forkThread(id: String) {
-            forkThreadCalls += id
+        override suspend fun forkThread(id: String, numTurns: Int?) {
+            forkThreadCalls += id to numTurns
         }
 
         override suspend fun renameThread(id: String, name: String) {
@@ -146,7 +150,11 @@ class HomeRepositoryActionsTest {
 
         override fun markManualRefreshing(refreshing: Boolean) = Unit
 
-        override suspend fun sendPrompt(prompt: String): Boolean = true
+        override suspend fun sendPrompt(prompt: String, newThreadDraft: NewThreadDraft?): Boolean = true
+
+        override suspend fun rollbackThread(numTurns: Int): Boolean = true
+
+        override suspend fun resendPrompt(prompt: String, rollbackNumTurns: Int): Boolean = true
 
         override suspend fun stopTurn() {
             stopTurnCalls += 1
@@ -158,6 +166,10 @@ class HomeRepositoryActionsTest {
 
         override suspend fun rejectPending() {
             rejectCalls += 1
+        }
+
+        override suspend fun restartDesktop() {
+            restartDesktopCalls += 1
         }
     }
 

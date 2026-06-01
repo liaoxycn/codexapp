@@ -7,6 +7,7 @@ import type {
   JsonRpcServerRequest,
   ThreadResumeResult,
 } from "../src/appServerTypes.js";
+import type { GatewayConfigOptionsPayload } from "../src/protocol.js";
 
 type Listener<T> = (event: T) => void;
 
@@ -25,6 +26,10 @@ class FakeAppServer {
 
   async start(): Promise<void> {}
 
+  async configOptions(): Promise<GatewayConfigOptionsPayload> {
+    return fakeConfigOptions();
+  }
+
   onNotification(listener: Listener<JsonRpcNotification>): () => void {
     this.notifications.on("notification", listener);
     return () => this.notifications.off("notification", listener);
@@ -40,6 +45,7 @@ class FakeAppServer {
   }
 
   async threadList(archived = false): Promise<AppServerThread[]> {
+    assert.equal(archived, false, "mobile gateway must not query archived threads");
     const ids = archived ? this.archivedThreadIdsSet : this.activeThreadIds;
     return [...ids].map((threadId) => this.requireThread(threadId));
   }
@@ -159,6 +165,7 @@ async function main(): Promise<void> {
   const created = await backend.createThread("D:/Projects/protocol-selftest");
   const threadId = created.selectedThreadId;
   assert.ok(threadId.startsWith("protocol-selftest-"));
+  assert.equal(created.configOptions.defaults.model, "gpt-5");
 
   await backend.renameThread(threadId, "Renamed protocol selftest");
   assert.equal(
@@ -230,6 +237,19 @@ async function main(): Promise<void> {
   assert.deepEqual(fake.unarchivedThreadIds, [threadId]);
   assert.equal(restored.selectedThreadId, threadId);
   console.log(`[protocol-selftest] passed thread=${threadId}`);
+}
+
+function fakeConfigOptions(): GatewayConfigOptionsPayload {
+  return {
+    models: [{ label: "gpt-5", value: "gpt-5" }],
+    reasoningEfforts: [{ label: "high", value: "high" }],
+    sandboxModes: [{ label: "workspace-write", value: "workspace-write" }],
+    defaults: {
+      model: "gpt-5",
+      reasoningEffort: "high",
+      sandboxMode: "workspace-write",
+    },
+  };
 }
 
 function createThread(id: string, cwd: string): AppServerThread {

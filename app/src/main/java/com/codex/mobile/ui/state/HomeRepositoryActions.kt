@@ -2,6 +2,7 @@ package com.codex.mobile.ui.state
 
 import com.codex.mobile.data.SessionRepository
 import com.codex.mobile.model.GatewayConfig
+import com.codex.mobile.model.NewThreadDraft
 
 internal class HomeRepositoryActions(
     private val repository: SessionRepository,
@@ -14,12 +15,12 @@ internal class HomeRepositoryActions(
         launch { repository.selectThread(id) }
     }
 
-    fun createThread(cwd: String? = null) {
-        launch { repository.createThread(cwd) }
+    fun createThread(cwd: String? = null, draft: NewThreadDraft? = null) {
+        launch { repository.createThread(cwd, draft) }
     }
 
-    fun forkThread(id: String) {
-        launch { repository.forkThread(id) }
+    fun forkThread(id: String, numTurns: Int? = null) {
+        launch { repository.forkThread(id, numTurns) }
     }
 
     fun renameThread(id: String, name: String) {
@@ -56,6 +57,10 @@ internal class HomeRepositoryActions(
 
     fun rejectPending() {
         launch { repository.rejectPending() }
+    }
+
+    fun restartDesktop() {
+        launch { repository.restartDesktop() }
     }
 
     fun connect(url: String, pairToken: String) {

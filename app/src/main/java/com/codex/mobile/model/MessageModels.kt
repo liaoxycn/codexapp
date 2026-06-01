@@ -3,7 +3,11 @@ package com.codex.mobile.model
 data class ThreadMessage(
     val id: String,
     val role: MessageRole,
-    val blocks: List<MessageBlock>
+    val blocks: List<MessageBlock>,
+    val forkNumTurns: Int? = null,
+    val rollbackNumTurns: Int? = null,
+    val durationMs: Long? = null,
+    val isFinal: Boolean = false
 )
 
 sealed interface MessageBlock {

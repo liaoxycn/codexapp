@@ -10,6 +10,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import com.codex.mobile.model.HomeUiState
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.Velocity
 
 internal data class ThreadListController(
     val listState: LazyListState,
@@ -47,6 +49,32 @@ internal fun rememberThreadListController(
         isAtBottom = isAtBottom,
         onRefreshCurrent = onRefreshCurrent,
     )
+    val historyPaging = rememberThreadHistoryPagingController(
+        state = state,
+        listState = listState,
+        metrics = metrics,
+        isAtTop = isAtTop,
+        onLoadOlderMessages = onLoadOlderMessages,
+    )
+    val nestedScrollConnection = remember(historyPaging.nestedScrollConnection, pullRefresh.nestedScrollConnection) {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: androidx.compose.ui.input.nestedscroll.NestedScrollSource
+            ): Offset {
+                historyPaging.nestedScrollConnection.onPostScroll(consumed, available, source)
+                pullRefresh.nestedScrollConnection.onPostScroll(consumed, available, source)
+                return Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                historyPaging.nestedScrollConnection.onPostFling(consumed, available)
+                pullRefresh.nestedScrollConnection.onPostFling(consumed, available)
+                return Velocity.Zero
+            }
+        }
+    }
 
     HandleThreadAutoScroll(
         state = state,
@@ -55,17 +83,9 @@ internal fun rememberThreadListController(
         lastMessageRevision = lastMessageRevision,
         isAtBottom = isAtBottom,
     )
-    HandleThreadHistoryPaging(
-        state = state,
-        listState = listState,
-        metrics = metrics,
-        isAtTop = isAtTop,
-        onLoadOlderMessages = onLoadOlderMessages,
-    )
-
     return ThreadListController(
         listState = listState,
-        nestedScrollConnection = pullRefresh.nestedScrollConnection,
+        nestedScrollConnection = nestedScrollConnection,
         pullProgress = pullRefresh.pullProgress,
         showPullHint = pullRefresh.showPullHint,
         isLoadingOlder = state.isLoadingOlder,

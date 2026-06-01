@@ -30,6 +30,7 @@ interface UpsertThreadStateParams {
   resume?: ThreadResumeResult | null;
   preserveLiveMessages?: boolean;
   archived?: boolean;
+  isLocalCatalogEntry?: boolean;
   syncSelection?: boolean;
 }
 
@@ -40,6 +41,7 @@ export function upsertThreadState({
   resume = null,
   preserveLiveMessages = false,
   archived = false,
+  isLocalCatalogEntry = false,
   syncSelection = true,
 }: UpsertThreadStateParams): void {
   const existing = threads.get(thread.id);
@@ -84,6 +86,7 @@ export function upsertThreadState({
     summary: nextSummary,
     thread,
     isSubscribed: resume != null || existing?.isSubscribed === true,
+    isLocalCatalogEntry: existing?.isLocalCatalogEntry === true || isLocalCatalogEntry,
     lastActivityAtMs,
     historyWindow,
     currentTurnId,
@@ -94,6 +97,7 @@ export function upsertThreadState({
     stopRequested: retainRuntimeOverlay ? existing?.stopRequested ?? false : false,
     isFinalizing: retainRuntimeOverlay ? existing?.isFinalizing ?? false : false,
     model: resume?.model ?? existing?.model ?? null,
+    modelProvider: resume?.modelProvider ?? existing?.modelProvider ?? thread.modelProvider ?? null,
     instructionSources: resume?.instructionSources ?? existing?.instructionSources ?? [],
     approvalPolicy: resume?.approvalPolicy ?? existing?.approvalPolicy ?? null,
     approvalsReviewer: resume?.approvalsReviewer ?? existing?.approvalsReviewer ?? null,

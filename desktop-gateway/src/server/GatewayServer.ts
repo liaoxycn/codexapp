@@ -9,7 +9,7 @@ import {
 } from "./clientConnection.js";
 import { GatewayBackendController } from "./GatewayBackendController.js";
 import { isExpectedGatewayPath, normalizeGatewayPath } from "./gatewayPaths.js";
-import { focusDesktopWindow, handlePokeHttpRequest } from "./httpPoke.js";
+import { handlePokeHttpRequest, restartCodexDesktop } from "./httpPoke.js";
 import type { ClientContext, GatewayServerOptions } from "./types.js";
 
 export class GatewayServer {
@@ -24,7 +24,7 @@ export class GatewayServer {
     await this.controller.startRealBackend();
     const expectedPath = normalizeGatewayPath(this.options.path);
     const server = createServer((request, response) => {
-      void handlePokeHttpRequest(request, response, (payload) => focusDesktopWindow(payload));
+      void handlePokeHttpRequest(request, response, (payload) => restartCodexDesktop(payload));
     });
     const wss = new WebSocketServer({ noServer: true });
 

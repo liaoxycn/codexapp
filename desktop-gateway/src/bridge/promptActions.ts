@@ -140,6 +140,61 @@ export async function handlePromptSubmission({
   return getSnapshot(threadId);
 }
 
+export async function rollbackThreadTurns({
+  appServer,
+  emitChanged,
+  getSnapshot,
+  state,
+  threadId,
+  threads,
+  updateSummaryStatus,
+}: Omit<SendPromptParams, "text">, numTurns: number): Promise<ClientSnapshot> {
+  const rollbackCount = normalizeRollbackCount(numTurns);
+  state.transientOperation = "rollback";
+  state.currentTurnId = null;
+  state.liveAssistantItemId = null;
+  state.activeAssistantMessageId = null;
+  state.pendingApproval = null;
+  state.snapshot.pendingApproval = null;
+  state.snapshot.isGenerating = false;
+
+  try {
+    const rolledBack = await appServer.threadRollback(threadId, rollbackCount);
+    upsertThreadState({
+      threads,
+      thread: rolledBack.thread,
+      preserveLiveMessages: false,
+    });
+    updateSummaryStatus(threadId, "idle");
+  } catch (error) {
+    const latest = threads.get(threadId) ?? state;
+    latest.snapshot.messages = latest.snapshot.messages.concat(
+      systemStatus(`回滚失败: ${error instanceof Error ? error.message : "unknown"}`)
+    );
+    updateSummaryStatus(threadId, "failed");
+    throw error;
+  } finally {
+    const latest = threads.get(threadId) ?? state;
+    latest.transientOperation = null;
+  }
+
+  emitChanged();
+  return getSnapshot(threadId);
+}
+
+export async function resendPromptFromTurn(
+  params: SendPromptParams,
+  rollbackNumTurns: number
+): Promise<ClientSnapshot> {
+  await rollbackThreadTurns(params, rollbackNumTurns);
+  const latest = params.threads.get(params.threadId) ?? params.state;
+  return handlePromptSubmission({
+    ...params,
+    state: latest,
+    text: params.text,
+  });
+}
+
 export async function interruptRunningTurn(
   appServer: Pick<AppServerClient, "turnInterrupt">,
   threads: Map<string, ThreadRuntimeState>,
@@ -152,4 +207,11 @@ export async function interruptRunningTurn(
     state.stopRequested = true;
   }
   return getSnapshot(threadId);
+}
+
+function normalizeRollbackCount(numTurns: number): number {
+  if (!Number.isInteger(numTurns) || numTurns <= 0) {
+    return 1;
+  }
+  return numTurns;
 }

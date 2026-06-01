@@ -32,7 +32,8 @@ export interface PendingApproval {
 export interface ThreadRuntimeState {
   summary: GatewayThreadPayload;
   thread: AppServerThread | null;
-  isSubscribed: boolean;
+  isSubscribed: boolean;
+  isLocalCatalogEntry: boolean;
   lastActivityAtMs: number;
   historyWindow: number;
   currentTurnId: string | null;
@@ -42,7 +43,8 @@ export interface ThreadRuntimeState {
   pendingApproval: PendingApproval | null;
   stopRequested: boolean;
   isFinalizing: boolean;
-  model: string | null;
+  model: string | null;
+  modelProvider: string | null;
   instructionSources: string[];
   approvalPolicy: AppServerApprovalPolicy | null;
   approvalsReviewer: string | null;

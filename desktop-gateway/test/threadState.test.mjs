@@ -221,6 +221,30 @@ test("new empty active thread stays idle", () => {
   );
 });
 
+test("recent forked thread with completed historical turns stays idle", () => {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  assert.equal(
+    resolveThreadSummaryStatus(
+      thread({
+        status: { type: "active", activeFlags: [] },
+        updatedAt: nowSeconds,
+        turns: [
+          {
+            id: "turn-before-fork",
+            status: "completed",
+            startedAt: nowSeconds - 600,
+            completedAt: nowSeconds - 590,
+            items: [
+              { type: "agentMessage", id: "item-before-fork", text: "done" },
+            ],
+          },
+        ],
+      })
+    ),
+    "idle"
+  );
+});
+
 test("runtime generating state keeps thread listed as running", () => {
   assert.equal(
     resolveDisplayedThreadStatus("idle", {
@@ -394,5 +418,34 @@ test("stale idle refresh drops an existing live runtime overlay", () => {
       }
     ),
     false
+  );
+});
+
+test("older idle refresh keeps a newer live runtime overlay", () => {
+  assert.equal(
+    shouldRetainThreadRuntimeOverlay(
+      thread({
+        status: "idle",
+        turns: [
+          {
+            id: "turn-live",
+            status: "completed",
+            startedAt: 100,
+            completedAt: 100,
+            items: [
+              { type: "agentMessage", id: "item-stale", text: "old" },
+            ],
+          },
+        ],
+      }),
+      {
+        isGenerating: true,
+        currentTurnId: "turn-live",
+        transientOperation: null,
+        pendingApproval: null,
+        lastActivityAtMs: 200_000,
+      }
+    ),
+    true
   );
 });

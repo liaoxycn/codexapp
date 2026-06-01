@@ -2,10 +2,16 @@ package com.codex.mobile.data.gateway
 
 import com.codex.mobile.model.ComposerChip
 import com.codex.mobile.model.ComposerChipIcon
+import com.codex.mobile.model.ComposerFile
 import com.codex.mobile.model.ConnectionStatus
 import com.codex.mobile.model.GatewayConfig
+import com.codex.mobile.model.GatewayConfigDefaults
+import com.codex.mobile.model.GatewayConfigOption
+import com.codex.mobile.model.GatewayConfigOptions
 import com.codex.mobile.model.MessageRole
 import com.codex.mobile.model.MessageBlock
+import com.codex.mobile.model.OperationalNotice
+import com.codex.mobile.model.SessionConfig
 import com.codex.mobile.model.SessionRemoteState
 import com.codex.mobile.model.ThreadGroupKind
 import com.codex.mobile.model.ThreadMessage
@@ -44,6 +50,7 @@ internal fun emptyRemoteState(
     isLoadingOlder = false,
     isGenerating = false,
     chips = emptyList(),
+    files = emptyList(),
     slashCommands = listOf(
         "/compact  压缩当前上下文",
         "/rollback 回滚最近一轮",
@@ -52,9 +59,13 @@ internal fun emptyRemoteState(
     pendingApproval = null,
     cwd = "",
     permissionSummary = "",
+    sessionConfig = SessionConfig(),
+    configOptions = GatewayConfigOptions(),
     connectionStatus = ConnectionStatus.DISCONNECTED,
     connectionDetail = if (config.url.isBlank()) "未连接 desktop gateway" else "未连接 ${config.url}",
     gatewayConfig = config,
+    desktopRestartRequired = false,
+    operationalNotices = emptyList(),
     isDemoMode = true
 )
 
@@ -72,9 +83,14 @@ internal fun GatewaySnapshotMessage.applyTo(
         isLoadingOlder = false,
         pendingApproval = pendingApproval,
         chips = chips.toComposerChips(),
+        files = files.toComposerFiles(),
         slashCommands = slashCommands,
         cwd = cwd.orEmpty(),
         permissionSummary = permissionSummary.orEmpty(),
+        sessionConfig = sessionConfig.toSessionConfig(),
+        configOptions = configOptions.toConfigOptions(),
+        desktopRestartRequired = desktopRestartRequired,
+        operationalNotices = operationalNotices.toOperationalNotices(),
         isGenerating = isGenerating,
         isManualRefreshing = false,
         connectionStatus = ConnectionStatus.CONNECTED,
@@ -116,9 +132,30 @@ internal fun GatewaySnapshotPatchMessage.applyTo(
         isLoadingOlder = false,
         pendingApproval = if ("pendingApproval" in changedFields) pendingApproval else previous.pendingApproval,
         chips = if ("chips" in changedFields) chips.orEmpty().toComposerChips() else previous.chips,
+        files = if ("files" in changedFields) files.orEmpty().toComposerFiles() else previous.files,
         slashCommands = if ("slashCommands" in changedFields) slashCommands.orEmpty() else previous.slashCommands,
         cwd = if ("cwd" in changedFields) cwd.orEmpty() else previous.cwd,
         permissionSummary = if ("permissionSummary" in changedFields) permissionSummary.orEmpty() else previous.permissionSummary,
+        sessionConfig = if ("sessionConfig" in changedFields) {
+            sessionConfig?.toSessionConfig() ?: SessionConfig()
+        } else {
+            previous.sessionConfig
+        },
+        configOptions = if ("configOptions" in changedFields) {
+            configOptions?.toConfigOptions() ?: GatewayConfigOptions()
+        } else {
+            previous.configOptions
+        },
+        desktopRestartRequired = if ("desktopRestartRequired" in changedFields) {
+            desktopRestartRequired == true
+        } else {
+            previous.desktopRestartRequired
+        },
+        operationalNotices = if ("operationalNotices" in changedFields) {
+            operationalNotices.orEmpty().toOperationalNotices()
+        } else {
+            emptyList()
+        },
         isGenerating = if ("isGenerating" in changedFields) isGenerating == true else previous.isGenerating,
         isManualRefreshing = false,
         connectionStatus = ConnectionStatus.CONNECTED,
@@ -147,7 +184,7 @@ internal fun GatewayStatusMessage.applyTo(
 }
 
 internal fun List<GatewayThreadPayload>.toThreadSummaries(): List<ThreadSummary> {
-    return map {
+    return filterNot { it.archived == true }.map {
         ThreadSummary(
             id = it.id,
             title = it.title,
@@ -169,7 +206,11 @@ internal fun List<GatewayMessagePayload>.toThreadMessages(): List<ThreadMessage>
         ThreadMessage(
             id = message.id,
             role = message.role.toMessageRole(),
-            blocks = message.blocks.map { it.toMessageBlock() }
+            blocks = message.blocks.map { it.toMessageBlock() },
+            forkNumTurns = message.forkNumTurns?.takeIf { it > 0 },
+            rollbackNumTurns = message.rollbackNumTurns?.takeIf { it > 0 },
+            durationMs = message.durationMs?.takeIf { it > 0L },
+            isFinal = message.isFinal
         )
     }
 }
@@ -182,6 +223,60 @@ internal fun List<GatewayChipPayload>.toComposerChips(): List<ComposerChip> {
             path = chip.path
         )
     }
+}
+
+internal fun List<GatewayFilePayload>.toComposerFiles(): List<ComposerFile> {
+    return mapNotNull { file ->
+        val label = file.label.trim()
+        val path = file.path.trim()
+        if (label.isBlank() || path.isBlank()) {
+            null
+        } else {
+            ComposerFile(label = label, path = path)
+        }
+    }
+}
+
+internal fun List<GatewayOperationalNoticePayload>.toOperationalNotices(): List<OperationalNotice> {
+    return mapNotNull { notice ->
+        val id = notice.id.trim()
+        val text = notice.text.trim()
+        if (id.isBlank() || text.isBlank()) {
+            null
+        } else {
+            OperationalNotice(id = id, text = text, createdAt = notice.createdAt)
+        }
+    }
+}
+
+internal fun GatewayConfigOptionsPayload.toConfigOptions(): GatewayConfigOptions {
+    return GatewayConfigOptions(
+        models = models.map { it.toConfigOption() },
+        reasoningEfforts = reasoningEfforts.map { it.toConfigOption() },
+        sandboxModes = sandboxModes.map { it.toConfigOption() },
+        defaults = GatewayConfigDefaults(
+            model = defaults.model.orEmpty(),
+            reasoningEffort = defaults.reasoningEffort.orEmpty(),
+            sandboxMode = defaults.sandboxMode.orEmpty()
+        )
+    )
+}
+
+internal fun GatewaySessionConfigPayload.toSessionConfig(): SessionConfig {
+    return SessionConfig(
+        permissionMode = permissionMode.orEmpty(),
+        provider = provider.orEmpty(),
+        model = model.orEmpty(),
+        reasoningEffort = reasoningEffort.orEmpty()
+    )
+}
+
+private fun GatewayConfigOptionPayload.toConfigOption(): GatewayConfigOption {
+    return GatewayConfigOption(
+        label = label.ifBlank { value },
+        value = value,
+        description = description.orEmpty()
+    )
 }
 
 internal fun GatewayBlockPayload.toMessageBlock(): MessageBlock {

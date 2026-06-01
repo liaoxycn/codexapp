@@ -1,5 +1,5 @@
 import { AppServerClient } from "../appServerClient.js";
-import type { ClientSnapshot } from "../protocol.js";
+import type { ClientSnapshot, ThreadStartOptions } from "../protocol.js";
 import {
   type BridgeBackendLifecycleDeps,
 } from "./bridgeBackendLifecycle.js";
@@ -12,6 +12,8 @@ import {
 import {
   handlePromptSubmission,
   interruptRunningTurn,
+  resendPromptFromTurn,
+  rollbackThreadTurns,
 } from "./promptActions.js";
 import {
   ensureResumedThread,
@@ -36,12 +38,12 @@ export class BridgeThreadController {
     return this.catalog.selectThread(threadId);
   }
 
-  async createThread(cwd?: string): Promise<ClientSnapshot> {
-    return this.catalog.createThread(cwd);
+  async createThread(cwd?: string, options: ThreadStartOptions = {}): Promise<ClientSnapshot> {
+    return this.catalog.createThread(cwd, options);
   }
 
-  async forkThread(threadId: string): Promise<ClientSnapshot> {
-    return this.catalog.forkThread(threadId);
+  async forkThread(threadId: string, numTurns?: number): Promise<ClientSnapshot> {
+    return this.catalog.forkThread(threadId, numTurns);
   }
 
   async renameThread(threadId: string, name: string): Promise<ClientSnapshot> {
@@ -56,8 +58,8 @@ export class BridgeThreadController {
     return this.catalog.unarchiveThread(threadId);
   }
 
-  async refreshThreads(selectedThreadId?: string): Promise<ClientSnapshot> {
-    return this.catalog.refreshThreads(selectedThreadId);
+  async refreshThreads(selectedThreadId?: string, requestedSelectionVersion?: number): Promise<ClientSnapshot> {
+    return this.catalog.refreshThreads(selectedThreadId, requestedSelectionVersion);
   }
 
   async loadOlderMessages(threadId: string): Promise<ClientSnapshot> {
@@ -77,6 +79,35 @@ export class BridgeThreadController {
       threads: this.threads,
       updateSummaryStatus: (targetThreadId, status) => this.runtime.updateSummaryStatus(targetThreadId, status),
     });
+  }
+
+  async rollbackThread(threadId: string, numTurns: number): Promise<ClientSnapshot> {
+    const resolved = this.runtime.resolveThreadId(threadId);
+    const state = await this.ensureResumed(resolved);
+    return rollbackThreadTurns({
+      appServer: this.getAppServer(),
+      emitChanged: () => this.runtime.emitChanged(),
+      getSnapshot: (selectedThreadId) => this.runtime.getSnapshot(selectedThreadId),
+      state,
+      threadId: resolved,
+      threads: this.threads,
+      updateSummaryStatus: (targetThreadId, status) => this.runtime.updateSummaryStatus(targetThreadId, status),
+    }, numTurns);
+  }
+
+  async resendPrompt(threadId: string, text: string, rollbackNumTurns: number): Promise<ClientSnapshot> {
+    const resolved = this.runtime.resolveThreadId(threadId);
+    const state = await this.ensureResumed(resolved);
+    return resendPromptFromTurn({
+      appServer: this.getAppServer(),
+      emitChanged: () => this.runtime.emitChanged(),
+      getSnapshot: (selectedThreadId) => this.runtime.getSnapshot(selectedThreadId),
+      state,
+      text,
+      threadId: resolved,
+      threads: this.threads,
+      updateSummaryStatus: (targetThreadId, status) => this.runtime.updateSummaryStatus(targetThreadId, status),
+    }, rollbackNumTurns);
   }
 
   async stopTurn(threadId: string): Promise<ClientSnapshot> {
@@ -116,6 +147,7 @@ export class BridgeThreadController {
       hydrateThreads: async () => this.hydrateThreads(),
       refreshThread: async (threadId: string) => this.catalog.refreshThread(threadId),
       ensureActiveAssistantMessage: (state, turnId) => ensureActiveAssistantMessage(state, turnId),
+      pushOperationalNotice: (notice) => this.runtime.pushOperationalNotice(notice),
       updateSummaryStatus: (threadId, status) => this.runtime.updateSummaryStatus(threadId, status),
     };
   }

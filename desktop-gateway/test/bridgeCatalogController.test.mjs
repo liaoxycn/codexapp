@@ -51,6 +51,7 @@ function existingState(id, overrides = {}) {
       hasMoreHistory: false,
       pendingApproval: null,
       chips: [],
+    files: [],
       slashCommands: [],
       cwd: "C:/work",
       permissionSummary: "workspace-write · never",
@@ -80,4 +81,16 @@ test("BridgeCatalogController loadOlderMessages falls back when thread is missin
 
   assert.equal(snapshot.selectedThreadId, "");
   assert.deepEqual(snapshot.messages, []);
+});
+
+test("BridgeRuntimeStore explicit empty snapshot keeps catalog in draft state", () => {
+  const runtime = new BridgeRuntimeStore();
+  runtime.currentThreadId = "";
+  runtime.threads.set("thread-a", existingState("thread-a"));
+
+  const snapshot = runtime.getSnapshot("");
+
+  assert.equal(snapshot.selectedThreadId, "");
+  assert.deepEqual(snapshot.messages, []);
+  assert.deepEqual(snapshot.threads.map((thread) => thread.id), ["thread-a"]);
 });

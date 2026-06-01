@@ -1,11 +1,18 @@
 package com.codex.mobile.ui.state
 
+import com.codex.mobile.model.NewThreadDraft
+
 internal class ComposerActionHandler(
     private val composerSession: ComposerSession,
     private val selectedThreadId: () -> String,
+    private val newThreadDraft: () -> NewThreadDraft?,
     private val launch: (suspend () -> Unit) -> Unit,
-    private val sendPrompt: suspend (String) -> Boolean
+    private val sendPrompt: suspend (String, NewThreadDraft?) -> Boolean,
+    private val resendPrompt: suspend (String, Int) -> Boolean = { _, _ -> false },
+    private val onPromptAccepted: (Boolean) -> Unit = {}
 ) {
+    private var pendingEditResend: PendingEditResend? = null
+
     fun updateComposer(text: String) {
         composerSession.replace(text, selectedThreadId())
     }
@@ -29,6 +36,7 @@ internal class ComposerActionHandler(
     }
 
     fun clearComposer() {
+        pendingEditResend = null
         composerSession.clear()
     }
 
@@ -37,10 +45,21 @@ internal class ComposerActionHandler(
     }
 
     fun replaceComposer(text: String) {
+        pendingEditResend = null
         composerSession.replace(text, selectedThreadId())
     }
 
+    fun editAndResendText(text: String, rollbackNumTurns: Int) {
+        val threadId = selectedThreadId()
+        if (threadId.isBlank()) {
+            return
+        }
+        pendingEditResend = PendingEditResend(threadId = threadId, rollbackNumTurns = rollbackNumTurns.coerceAtLeast(1))
+        composerSession.replace(text, threadId)
+    }
+
     fun resendText(text: String) {
+        pendingEditResend = null
         composerSession.replace(text, selectedThreadId())
         send()
     }
@@ -50,10 +69,25 @@ internal class ComposerActionHandler(
         val prompt = composerSession.currentText().trim()
         if (prompt.isBlank()) return
         launch {
-            val accepted = sendPrompt(prompt)
+            val pending = pendingEditResend?.takeIf { it.threadId == threadId }
+            val draft = if (pending == null) newThreadDraft() else null
+            val accepted = if (pending != null) {
+                resendPrompt(prompt, pending.rollbackNumTurns)
+            } else {
+                sendPrompt(prompt, draft)
+            }
             if (accepted) {
+                if (pending != null) {
+                    pendingEditResend = null
+                }
                 composerSession.clearAcceptedDraft(threadId)
+                onPromptAccepted(draft != null)
             }
         }
     }
+
+    private data class PendingEditResend(
+        val threadId: String,
+        val rollbackNumTurns: Int
+    )
 }

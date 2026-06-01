@@ -2,6 +2,9 @@ package com.codex.mobile.ui
 
 import com.codex.mobile.data.gateway.GatewayBlockPayload
 import com.codex.mobile.data.gateway.GatewayChipPayload
+import com.codex.mobile.data.gateway.GatewayFilePayload
+import com.codex.mobile.data.gateway.GatewayOperationalNoticePayload
+import com.codex.mobile.data.gateway.GatewaySessionConfigPayload
 import com.codex.mobile.data.gateway.GatewaySnapshotMessage
 import com.codex.mobile.data.gateway.GatewaySnapshotPatchMessage
 import com.codex.mobile.data.gateway.GatewayStatusMessage
@@ -42,6 +45,13 @@ class GatewaySnapshotMapperTest {
                     groupLabel = "codexapp",
                     gitBranch = "feature/mobile-shell",
                     gitSha = "1234567"
+                ),
+                com.codex.mobile.data.gateway.GatewayThreadPayload(
+                    id = "thread-archived",
+                    title = "旧会话",
+                    preview = "archived",
+                    status = "idle",
+                    archived = true
                 )
             ),
             selectedThreadId = "thread-1",
@@ -49,6 +59,10 @@ class GatewaySnapshotMapperTest {
                 com.codex.mobile.data.gateway.GatewayMessagePayload(
                     id = "msg-1",
                     role = "assistant",
+                    forkNumTurns = 2,
+                    rollbackNumTurns = 3,
+                    durationMs = 61_000L,
+                    isFinal = true,
                     blocks = listOf(
                         GatewayBlockPayload(kind = "code", value = "println(1)", language = "kotlin"),
                         GatewayBlockPayload(kind = "fileChangeMeta", value = "已编辑 Main.kt", path = "app/src/Main.kt")
@@ -56,9 +70,20 @@ class GatewaySnapshotMapperTest {
                 )
             ),
             chips = listOf(GatewayChipPayload(label = "app/Main.kt", icon = "file", path = "D:/Projects/app/Main.kt")),
+            files = listOf(GatewayFilePayload(label = "app/src/Main.kt", path = "D:/Projects/app/app/src/Main.kt")),
+            operationalNotices = listOf(
+                GatewayOperationalNoticePayload(id = "mcp-startup-playwright", text = "MCP 服务 playwright: 已就绪", createdAt = 1234L)
+            ),
             slashCommands = listOf("/compact"),
             cwd = "D:/Projects/home/codexapp",
             permissionSummary = "workspace-write",
+            sessionConfig = GatewaySessionConfigPayload(
+                permissionMode = "workspace-write",
+                provider = "openai",
+                model = "gpt-5",
+                reasoningEffort = "high"
+            ),
+            desktopRestartRequired = true,
             isGenerating = true
         )
 
@@ -72,6 +97,20 @@ class GatewaySnapshotMapperTest {
         assertEquals("1234567", next.threads.single().gitSha)
         assertEquals(ComposerChipIcon.FILE, next.chips.single().icon)
         assertEquals("D:/Projects/app/Main.kt", next.chips.single().path)
+        assertEquals("app/src/Main.kt", next.files.single().label)
+        assertEquals("D:/Projects/app/app/src/Main.kt", next.files.single().path)
+        assertEquals("mcp-startup-playwright", next.operationalNotices.single().id)
+        assertEquals("MCP 服务 playwright: 已就绪", next.operationalNotices.single().text)
+        assertEquals(1234L, next.operationalNotices.single().createdAt)
+        assertEquals("workspace-write", next.sessionConfig.permissionMode)
+        assertEquals("openai", next.sessionConfig.provider)
+        assertEquals("gpt-5", next.sessionConfig.model)
+        assertEquals("high", next.sessionConfig.reasoningEffort)
+        assertTrue(next.desktopRestartRequired)
+        assertEquals(2, next.messages.first().forkNumTurns)
+        assertEquals(3, next.messages.first().rollbackNumTurns)
+        assertEquals(61_000L, next.messages.first().durationMs)
+        assertTrue(next.messages.first().isFinal)
         assertTrue(next.messages.first().blocks.first() is MessageBlock.Code)
         assertTrue(next.messages.first().blocks.last() is MessageBlock.FileChangeMeta)
     }
@@ -81,14 +120,32 @@ class GatewaySnapshotMapperTest {
         val previous = emptyRemoteState(GatewayConfig(url = "ws://10.0.2.2:8765/mobile")).copy(
             snapshotRevision = 7L,
             slashCommands = listOf("/compact"),
-            cwd = "D:/Projects/home/codexapp"
+            files = listOf(com.codex.mobile.model.ComposerFile("README.md", "D:/Projects/home/codexapp/README.md")),
+            cwd = "D:/Projects/home/codexapp",
+            sessionConfig = com.codex.mobile.model.SessionConfig(provider = "openai", model = "gpt-5")
         )
         val patch = GatewaySnapshotPatchMessage(
             baseRevision = 7L,
             revision = 8L,
-            changed = listOf("isGenerating", "permissionSummary"),
+            changed = listOf(
+                "isGenerating",
+                "permissionSummary",
+                "sessionConfig",
+                "desktopRestartRequired",
+                "operationalNotices"
+            ),
             isGenerating = true,
-            permissionSummary = "danger-full-access"
+            permissionSummary = "danger-full-access",
+            sessionConfig = GatewaySessionConfigPayload(
+                permissionMode = "danger-full-access",
+                provider = "openai",
+                model = "gpt-5.1",
+                reasoningEffort = "medium"
+            ),
+            operationalNotices = listOf(
+                GatewayOperationalNoticePayload(id = "account-updated", text = "账号状态已更新: chatgpt · pro", createdAt = 9L)
+            ),
+            desktopRestartRequired = true
         )
 
         val next = patch.applyTo(previous)
@@ -97,6 +154,13 @@ class GatewaySnapshotMapperTest {
         assertEquals(8L, next.snapshotRevision)
         assertTrue(next.isGenerating)
         assertEquals("danger-full-access", next.permissionSummary)
+        assertEquals("danger-full-access", next.sessionConfig.permissionMode)
+        assertEquals("openai", next.sessionConfig.provider)
+        assertEquals("gpt-5.1", next.sessionConfig.model)
+        assertEquals("medium", next.sessionConfig.reasoningEffort)
+        assertEquals("account-updated", next.operationalNotices.single().id)
+        assertTrue(next.desktopRestartRequired)
+        assertEquals("README.md", next.files.single().label)
         assertEquals(listOf("/compact"), next.slashCommands)
         assertEquals("D:/Projects/home/codexapp", next.cwd)
     }

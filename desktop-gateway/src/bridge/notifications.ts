@@ -1,4 +1,5 @@
 import type { JsonRpcNotification } from "../appServerTypes.js";
+import type { GatewayOperationalNoticePayload } from "../protocol.js";
 import type { ThreadLifecycleStatus, ThreadRuntimeState } from "./types.js";
 import {
   handleAgentMessageDelta,
@@ -43,6 +44,7 @@ export interface BridgeNotificationDeps {
   finalizeTurnState(threadId: string, turnStatus?: string): Promise<void>;
   hydrateThreads(): Promise<void>;
   ensureActiveAssistantMessage(state: ThreadRuntimeState, turnId: string): void;
+  pushOperationalNotice?(notice: GatewayOperationalNoticePayload): void;
   updateSummaryStatus(threadId: string, status: ThreadLifecycleStatus): void;
 }
 
@@ -119,10 +121,18 @@ export async function handleBridgeNotification(
       handleServerRequestResolved(notification, deps);
       return;
     case "thread/started":
-    case "thread/archived":
     case "thread/unarchived":
     case "thread/name/updated":
     case "thread/closed":
+      await deps.hydrateThreads();
+      return;
+    case "thread/archived":
+      {
+        const params = notification.params as { threadId?: unknown } | undefined;
+        if (typeof params?.threadId === "string") {
+          deps.threads.delete(params.threadId);
+        }
+      }
       await deps.hydrateThreads();
       return;
     case "thread/compacted":

@@ -15,12 +15,14 @@ import com.codex.mobile.model.HomeUiState
 internal data class ComposerControllerLocalState(
     val dismissImeAfterSend: Boolean,
     val slashQuery: String,
+    val fileQuery: String,
     val suppressInlineSlashPanel: Boolean,
     val composerFieldValue: TextFieldValue,
     val focusRequester: FocusRequester,
     val inputInteractionSource: MutableInteractionSource,
     val updateDismissImeAfterSend: (Boolean) -> Unit,
     val updateSlashQuery: (String) -> Unit,
+    val updateFileQuery: (String) -> Unit,
     val updateSuppressInlineSlashPanel: (Boolean) -> Unit,
     val updateComposerFieldValue: (TextFieldValue) -> Unit,
 )
@@ -31,6 +33,7 @@ internal fun rememberComposerControllerLocalState(
 ): ComposerControllerLocalState {
     var dismissImeAfterSend by rememberSaveable { mutableStateOf(false) }
     var slashQuery by rememberSaveable { mutableStateOf("") }
+    var fileQuery by rememberSaveable { mutableStateOf("") }
     var suppressInlineSlashPanel by rememberSaveable { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val inputInteractionSource = remember { MutableInteractionSource() }
@@ -41,12 +44,14 @@ internal fun rememberComposerControllerLocalState(
     return ComposerControllerLocalState(
         dismissImeAfterSend = dismissImeAfterSend,
         slashQuery = slashQuery,
+        fileQuery = fileQuery,
         suppressInlineSlashPanel = suppressInlineSlashPanel,
         composerFieldValue = composerFieldValue,
         focusRequester = focusRequester,
         inputInteractionSource = inputInteractionSource,
         updateDismissImeAfterSend = { dismissImeAfterSend = it },
         updateSlashQuery = { slashQuery = it },
+        updateFileQuery = { fileQuery = it },
         updateSuppressInlineSlashPanel = { suppressInlineSlashPanel = it },
         updateComposerFieldValue = { composerFieldValue = it }
     )

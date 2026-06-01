@@ -1,5 +1,6 @@
 package com.codex.mobile.ui
 
+import com.codex.mobile.model.NewThreadDraft
 import com.codex.mobile.ui.state.ComposerActionHandler
 import com.codex.mobile.ui.state.ComposerSession
 import org.junit.Assert.assertEquals
@@ -12,11 +13,9 @@ class ComposerActionHandlerTest {
     fun sendTrimsPromptAndClearsAcceptedDraft() {
         val session = ComposerSession("thread-1")
         val sentPrompts = mutableListOf<String>()
-        val handler = ComposerActionHandler(
-            composerSession = session,
-            selectedThreadId = { "thread-1" },
-            launch = { block -> runBlockingImmediate(block) },
-            sendPrompt = { prompt ->
+        val handler = handlerFor(
+            session = session,
+            sendPrompt = { prompt, _ ->
                 sentPrompts += prompt
                 true
             }
@@ -32,11 +31,9 @@ class ComposerActionHandlerTest {
     @Test
     fun sendKeepsDraftWhenPromptRejected() {
         val session = ComposerSession("thread-1")
-        val handler = ComposerActionHandler(
-            composerSession = session,
-            selectedThreadId = { "thread-1" },
-            launch = { block -> runBlockingImmediate(block) },
-            sendPrompt = { false }
+        val handler = handlerFor(
+            session = session,
+            sendPrompt = { _, _ -> false }
         )
 
         handler.updateComposer("draft")
@@ -49,11 +46,9 @@ class ComposerActionHandlerTest {
     fun compactContextWritesCommandAndSubmitsIt() {
         val session = ComposerSession("thread-1")
         val sentPrompts = mutableListOf<String>()
-        val handler = ComposerActionHandler(
-            composerSession = session,
-            selectedThreadId = { "thread-1" },
-            launch = { block -> runBlockingImmediate(block) },
-            sendPrompt = { prompt ->
+        val handler = handlerFor(
+            session = session,
+            sendPrompt = { prompt, _ ->
                 sentPrompts += prompt
                 true
             }
@@ -69,11 +64,9 @@ class ComposerActionHandlerTest {
     fun rollbackLastTurnWritesCommandAndSubmitsIt() {
         val session = ComposerSession("thread-1")
         val sentPrompts = mutableListOf<String>()
-        val handler = ComposerActionHandler(
-            composerSession = session,
-            selectedThreadId = { "thread-1" },
-            launch = { block -> runBlockingImmediate(block) },
-            sendPrompt = { prompt ->
+        val handler = handlerFor(
+            session = session,
+            sendPrompt = { prompt, _ ->
                 sentPrompts += prompt
                 true
             }
@@ -89,11 +82,9 @@ class ComposerActionHandlerTest {
     fun resendTextReplacesDraftAndSubmitsImmediately() {
         val session = ComposerSession("thread-1")
         val sentPrompts = mutableListOf<String>()
-        val handler = ComposerActionHandler(
-            composerSession = session,
-            selectedThreadId = { "thread-1" },
-            launch = { block -> runBlockingImmediate(block) },
-            sendPrompt = { prompt ->
+        val handler = handlerFor(
+            session = session,
+            sendPrompt = { prompt, _ ->
                 sentPrompts += prompt
                 true
             }
@@ -107,14 +98,54 @@ class ComposerActionHandlerTest {
     }
 
     @Test
+    fun editAndResendOnlyPrefillsUntilUserSends() {
+        val session = ComposerSession("thread-1")
+        val sentPrompts = mutableListOf<String>()
+        val resentPrompts = mutableListOf<Pair<String, Int>>()
+        val handler = handlerFor(
+            session = session,
+            sendPrompt = { prompt, _ ->
+                sentPrompts += prompt
+                true
+            },
+            resendPrompt = { prompt, rollbackNumTurns ->
+                resentPrompts += prompt to rollbackNumTurns
+                true
+            }
+        )
+
+        handler.updateComposer("old draft")
+        handler.editAndResendText(" previous prompt ", 3)
+
+        assertEquals(" previous prompt ", session.currentText())
+        assertEquals(emptyList<String>(), sentPrompts)
+        assertEquals(emptyList<Pair<String, Int>>(), resentPrompts)
+
+        handler.send()
+
+        assertEquals(listOf("previous prompt" to 3), resentPrompts)
+        assertEquals(emptyList<String>(), sentPrompts)
+        assertEquals("", session.currentText())
+    }
+
+    @Test
+    fun editAndResendKeepsDraftWhenResendRejected() {
+        val session = ComposerSession("thread-1")
+        val handler = handlerFor(
+            session = session,
+            resendPrompt = { _, _ -> false }
+        )
+
+        handler.editAndResendText("editable", 2)
+        handler.send()
+
+        assertEquals("editable", session.currentText())
+    }
+
+    @Test
     fun insertsShellTemplate() {
         val session = ComposerSession("thread-1")
-        val handler = ComposerActionHandler(
-            composerSession = session,
-            selectedThreadId = { "thread-1" },
-            launch = { block -> runBlockingImmediate(block) },
-            sendPrompt = { true }
-        )
+        val handler = handlerFor(session)
 
         handler.insertShellTemplate()
 
@@ -124,17 +155,50 @@ class ComposerActionHandlerTest {
     @Test
     fun applySlashCommandReplacesTrailingCommandToken() {
         val session = ComposerSession("thread-1")
-        val handler = ComposerActionHandler(
-            composerSession = session,
-            selectedThreadId = { "thread-1" },
-            launch = { block -> runBlockingImmediate(block) },
-            sendPrompt = { true }
-        )
+        val handler = handlerFor(session)
 
         handler.updateComposer("请执行 /com")
         handler.applySlashCommand("/compact")
 
         assertTrue(session.currentText().endsWith("/compact "))
+    }
+
+    @Test
+    fun acceptedDraftPromptNotifiesNewThreadCreation() {
+        val session = ComposerSession("")
+        var acceptedDraft = false
+        val handler = handlerFor(
+            session = session,
+            selectedThreadId = { "" },
+            newThreadDraft = { NewThreadDraft(cwd = "D:/Projects/App") },
+            sendPrompt = { _, draft -> draft != null },
+            onPromptAccepted = { acceptedDraft = it }
+        )
+
+        handler.updateComposer("start")
+        handler.send()
+
+        assertTrue(acceptedDraft)
+        assertEquals("", session.currentText())
+    }
+
+    private fun handlerFor(
+        session: ComposerSession,
+        selectedThreadId: () -> String = { "thread-1" },
+        newThreadDraft: () -> NewThreadDraft? = { null },
+        sendPrompt: suspend (String, NewThreadDraft?) -> Boolean = { _, _ -> true },
+        resendPrompt: suspend (String, Int) -> Boolean = { _, _ -> true },
+        onPromptAccepted: (Boolean) -> Unit = {}
+    ): ComposerActionHandler {
+        return ComposerActionHandler(
+            composerSession = session,
+            selectedThreadId = selectedThreadId,
+            newThreadDraft = newThreadDraft,
+            launch = { block -> runBlockingImmediate(block) },
+            sendPrompt = sendPrompt,
+            resendPrompt = resendPrompt,
+            onPromptAccepted = onPromptAccepted
+        )
     }
 
     private fun runBlockingImmediate(block: suspend () -> Unit) {

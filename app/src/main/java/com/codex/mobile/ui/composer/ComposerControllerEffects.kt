@@ -22,6 +22,7 @@ internal fun HandleComposerControllerEffects(
         if (localState.dismissImeAfterSend && composerText.isBlank()) {
             onActivePanelChange(ComposerPanel.NONE)
             localState.updateSlashQuery("")
+            localState.updateFileQuery("")
             localState.updateSuppressInlineSlashPanel(false)
             focusManager.clearFocus(force = true)
             rootView.clearFocus()

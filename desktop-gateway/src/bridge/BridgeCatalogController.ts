@@ -1,5 +1,5 @@
 import type { AppServerClient } from "../appServerClient.js";
-import type { ClientSnapshot } from "../protocol.js";
+import type { ClientSnapshot, ThreadStartOptions } from "../protocol.js";
 import { BridgeRuntimeStore } from "./bridgeRuntimeStore.js";
 import { hydrateThreadCatalog } from "./threadHydration.js";
 import {
@@ -46,12 +46,12 @@ export class BridgeCatalogController {
     });
   }
 
-  async createThread(cwd?: string): Promise<ClientSnapshot> {
-    return createCatalogThread(this.threadCatalogActionDeps(), cwd);
+  async createThread(cwd?: string, options: ThreadStartOptions = {}): Promise<ClientSnapshot> {
+    return createCatalogThread(this.threadCatalogActionDeps(), cwd, options);
   }
 
-  async forkThread(threadId: string): Promise<ClientSnapshot> {
-    return forkCatalogThread(this.threadCatalogActionDeps(), threadId);
+  async forkThread(threadId: string, numTurns?: number): Promise<ClientSnapshot> {
+    return forkCatalogThread(this.threadCatalogActionDeps(), threadId, numTurns);
   }
 
   async renameThread(threadId: string, name: string): Promise<ClientSnapshot> {
@@ -66,8 +66,8 @@ export class BridgeCatalogController {
     return unarchiveCatalogThread(this.threadCatalogActionDeps(), threadId);
   }
 
-  async refreshThreads(selectedThreadId?: string): Promise<ClientSnapshot> {
-    return refreshCatalogThreads(this.threadCatalogActionDeps(), selectedThreadId);
+  async refreshThreads(selectedThreadId?: string, requestedSelectionVersion?: number): Promise<ClientSnapshot> {
+    return refreshCatalogThreads(this.threadCatalogActionDeps(), selectedThreadId, requestedSelectionVersion);
   }
 
   async loadOlderMessages(threadId: string): Promise<ClientSnapshot> {

@@ -40,7 +40,6 @@ test("listThreads reads updated threads across pages", async () => {
         limit: 100,
         sortKey: "updated_at",
         sortDirection: "desc",
-        sourceKinds: ["cli", "vscode", "appServer", "unknown"],
         archived: false,
       },
     },
@@ -51,7 +50,6 @@ test("listThreads reads updated threads across pages", async () => {
         limit: 100,
         sortKey: "updated_at",
         sortDirection: "desc",
-        sourceKinds: ["cli", "vscode", "appServer", "unknown"],
         archived: false,
       },
     },
@@ -99,5 +97,32 @@ test("thread RPC helpers forward expected payloads", async () => {
     { method: "thread/archive", params: { threadId: "thread-4" } },
     { method: "thread/unarchive", params: { threadId: "thread-5" } },
     { method: "thread/unsubscribe", params: { threadId: "thread-6" } },
+  ]);
+});
+
+test("startThread forwards draft model and permission options", async () => {
+  const calls = [];
+  const request = async (method, params) => {
+    calls.push({ method, params });
+    return { threadId: "started-1" };
+  };
+
+  await startThread(request, null, {
+    cwd: "D:/Projects/App",
+    model: "gpt-5",
+    reasoningEffort: "high",
+    sandboxMode: "workspace-write",
+  });
+
+  assert.deepEqual(calls, [
+    {
+      method: "thread/start",
+      params: {
+        cwd: "D:/Projects/App",
+        model: "gpt-5",
+        reasoningEffort: "high",
+        sandbox: "workspace-write",
+      },
+    },
   ]);
 });

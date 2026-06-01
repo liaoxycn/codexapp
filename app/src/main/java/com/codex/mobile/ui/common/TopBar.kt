@@ -1,22 +1,20 @@
 package com.codex.mobile.ui.common
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Divider
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,15 +34,13 @@ import com.codex.mobile.ui.theme.CodexTheme
 internal fun TopBar(
     title: String,
     status: ThreadStatus,
-    onOpenDrawer: () -> Unit,
-    onCreateThread: () -> Unit,
-    onOpenConnection: () -> Unit
+    onOpenDrawer: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(CodexTheme.colors.surface)
-            .padding(horizontal = 9.dp, vertical = 5.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         HeaderIconButton(
@@ -55,35 +51,43 @@ internal fun TopBar(
         Row(
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.Start,
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ThreadStatusIcon(status)
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = title,
-                color = CodexTheme.colors.textPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                lineHeight = 20.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = title,
+                    color = CodexTheme.colors.textPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 20.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ThreadStatusIcon(status)
+                    Text(
+                        text = threadStatusLabel(status),
+                        color = CodexTheme.colors.textSecondary,
+                        fontSize = 10.sp,
+                        lineHeight = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
+                    )
+                }
+            }
         }
-        HeaderIconButton(
-            icon = Icons.Filled.Add,
-            contentDescription = "新建会话",
-            onClick = onCreateThread
-        )
-        HeaderIconButton(
-            icon = Icons.Filled.Settings,
-            contentDescription = "连接设置",
-            onClick = onOpenConnection
-        )
+        Spacer(Modifier.size(42.dp))
     }
-    Divider(color = CodexTheme.colors.border)
 }
 @Composable
 internal fun HeaderIconButton(
@@ -94,8 +98,9 @@ internal fun HeaderIconButton(
     Box(
         modifier = Modifier
             .size(42.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(CircleShape)
             .background(CodexTheme.colors.surfaceSubtle)
+            .border(1.dp, CodexTheme.colors.border.copy(alpha = 0.66f), CircleShape)
             .semantics { this.contentDescription = contentDescription }
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center

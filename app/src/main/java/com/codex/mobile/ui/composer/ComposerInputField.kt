@@ -1,6 +1,7 @@
 package com.codex.mobile.ui.composer
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
@@ -14,6 +15,7 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
@@ -22,7 +24,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.codex.mobile.model.ConnectionStatus
 import com.codex.mobile.ui.theme.CodexTheme
 
@@ -41,7 +43,9 @@ internal fun RowScope.ComposerInputField(
     Box(
         modifier = Modifier
             .weight(1f)
-            .defaultMinSize(minHeight = 34.dp)
+            .defaultMinSize(minHeight = 40.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(CodexTheme.colors.surfaceSubtle)
             .clickable(
                 enabled = composerEnabled,
                 interactionSource = interactionSource,
@@ -49,7 +53,7 @@ internal fun RowScope.ComposerInputField(
             ) {
                 onFocusComposer()
             }
-            .padding(horizontal = 2.dp, vertical = 0.dp),
+            .padding(horizontal = 12.dp, vertical = 0.dp),
         contentAlignment = Alignment.CenterStart
     ) {
         BasicTextField(
@@ -75,15 +79,15 @@ internal fun RowScope.ComposerInputField(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .defaultMinSize(minHeight = 34.dp),
+                        .defaultMinSize(minHeight = 40.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {
                     if (value.text.isEmpty()) {
                         Text(
                             composerPlaceholder(composerEnabled, connectionStatus),
                             color = if (composerEnabled) CodexTheme.colors.textSecondary else CodexTheme.colors.textTertiary,
-                            fontSize = if (compactMode) 13.sp else 14.sp,
-                            lineHeight = if (compactMode) 17.sp else 19.sp
+                            fontSize = ComposerTextSize,
+                            lineHeight = ComposerTextLineHeight
                         )
                     }
                     inner()
@@ -100,8 +104,8 @@ internal fun composerInputTextStyle(
 ): TextStyle {
     return TextStyle(
         color = if (composerEnabled) CodexTheme.colors.textPrimary else CodexTheme.colors.textTertiary,
-        fontSize = if (compactMode) 13.sp else 14.sp,
-        lineHeight = if (compactMode) 17.sp else 19.sp,
+        fontSize = ComposerTextSize,
+        lineHeight = ComposerTextLineHeight,
         platformStyle = PlatformTextStyle(includeFontPadding = false)
     )
 }

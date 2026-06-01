@@ -427,7 +427,7 @@ function mapRawResponseItem(turnId: string, value: unknown) {
     return {
       id: itemId,
       role: "assistant" as const,
-      blocks: [{ kind: "text" as const, value: `命令 ${asString(item.status, "updated")}: ${command}`.trim() }],
+      blocks: [{ kind: "status" as const, value: formatRawCommandStatus(command, asString(item.status, "updated")) }],
     };
   }
 
@@ -437,7 +437,7 @@ function mapRawResponseItem(turnId: string, value: unknown) {
     return {
       id: itemId,
       role: "assistant" as const,
-      blocks: [{ kind: "text" as const, value: `工具: ${name} · ${status}` }],
+      blocks: [{ kind: "status" as const, value: formatRawToolStatus(name, status) }],
     };
   }
 
@@ -445,7 +445,7 @@ function mapRawResponseItem(turnId: string, value: unknown) {
     return {
       id: itemId,
       role: "assistant" as const,
-      blocks: [{ kind: "text" as const, value: `Web search · ${asString(item.status, "completed")}` }],
+      blocks: [{ kind: "status" as const, value: formatRawSearchStatus(asString(item.status, "completed")) }],
     };
   }
 
@@ -458,6 +458,57 @@ function mapRawResponseItem(turnId: string, value: unknown) {
   }
 
   return null;
+}
+
+function formatRawCommandStatus(command: string, status: string): string {
+  const normalized = normalizeRawStatus(status);
+  const suffix = command.trim() ? ` ${command.trim()}` : "";
+  if (normalized === "running") return `正在运行${suffix || "命令"}`;
+  if (normalized === "completed") return `已运行命令${suffix}`;
+  if (normalized === "failed") return `命令执行失败${suffix}`;
+  return `命令 ${status || "已更新"}${suffix}`;
+}
+
+function formatRawToolStatus(name: string, status: string): string {
+  const normalized = normalizeRawStatus(status);
+  const cleanName = name.trim() || "工具";
+  if (normalized === "running") return `正在调用工具 ${cleanName}`;
+  if (normalized === "completed") return `已调用工具 ${cleanName}`;
+  if (normalized === "failed") return `工具 ${cleanName} 调用失败`;
+  return `工具 ${cleanName} · ${status || "已更新"}`;
+}
+
+function formatRawSearchStatus(status: string): string {
+  const normalized = normalizeRawStatus(status);
+  if (normalized === "running") return "正在搜索网页";
+  if (normalized === "completed") return "已搜索网页";
+  if (normalized === "failed") return "网页搜索失败";
+  return `网页搜索 ${status || "已更新"}`;
+}
+
+function normalizeRawStatus(status: string): "running" | "completed" | "failed" | "other" {
+  switch (status.toLowerCase()) {
+    case "inprogress":
+    case "in_progress":
+    case "running":
+    case "started":
+    case "pending":
+      return "running";
+    case "completed":
+    case "complete":
+    case "done":
+    case "succeeded":
+    case "success":
+      return "completed";
+    case "failed":
+    case "error":
+    case "errored":
+    case "cancelled":
+    case "canceled":
+      return "failed";
+    default:
+      return "other";
+  }
 }
 
 function textFromContentItems(value: unknown): string {

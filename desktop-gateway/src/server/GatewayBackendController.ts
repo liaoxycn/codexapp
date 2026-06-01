@@ -9,7 +9,7 @@ import {
   sendStatus,
 } from "./backendActions.js";
 import { handleClientMessage } from "./clientMessages.js";
-import { focusDesktopWindow } from "./httpPoke.js";
+import { restartCodexDesktop } from "./httpPoke.js";
 import type { Backend, ClientContext, RefreshSource } from "./types.js";
 
 interface GatewayBackendControllerOptions {
@@ -19,7 +19,7 @@ interface GatewayBackendControllerOptions {
 
 interface GatewayBackendControllerDeps {
   appBackend?: RealBackend;
-  focusDesktop?: typeof focusDesktopWindow;
+  restartDesktop?: typeof restartCodexDesktop;
   mockBackend?: Backend;
 }
 
@@ -28,7 +28,8 @@ type RealBackend = Backend & { start(): Promise<void> };
 export class GatewayBackendController {
   private readonly mockBackend: Backend;
   private readonly appBackend: RealBackend;
-  private readonly focusDesktop: typeof focusDesktopWindow;
+  private readonly restartDesktopFn: typeof restartCodexDesktop;
+  private desktopRestartRequired = false;
   private useRealBackend = false;
 
   constructor(
@@ -37,7 +38,7 @@ export class GatewayBackendController {
   ) {
     this.mockBackend = deps.mockBackend ?? new InMemoryDesktopBackend(options.workspacePath);
     this.appBackend = deps.appBackend ?? new AppServerBridgeBackend();
-    this.focusDesktop = deps.focusDesktop ?? focusDesktopWindow;
+    this.restartDesktopFn = deps.restartDesktop ?? restartCodexDesktop;
   }
 
   async startRealBackend(): Promise<void> {
@@ -67,12 +68,13 @@ export class GatewayBackendController {
       sendSnapshot: (nextContext, snapshot) => this.sendSnapshot(nextContext, snapshot),
       runBackendAction: (nextContext, action) => this.runBackendAction(nextContext, action),
       refreshSelectedThread: (nextContext, source) => this.refreshSelectedThread(nextContext, source),
-      pokeDesktop: (threadId, reason) => this.pokeDesktop(threadId, reason),
+      markDesktopRestartRequired: (reason) => this.markDesktopRestartRequired(reason),
+      restartDesktop: () => this.restartDesktop(),
     });
   }
 
   sendSnapshot(context: ClientContext, snapshot: ClientSnapshot): void {
-    sendSnapshot(context, snapshot, {
+    sendSnapshot(context, this.withDesktopRestartState(snapshot), {
       refreshSelectedThread: (nextContext, source) => this.refreshSelectedThread(nextContext, source),
       refreshThreadList: (nextContext) => this.refreshThreadList(nextContext),
     });
@@ -96,20 +98,37 @@ export class GatewayBackendController {
     await refreshThreadList(context, this.serverActionHandlers());
   }
 
-  private async pokeDesktop(threadId: string, reason: string): Promise<void> {
+  private markDesktopRestartRequired(reason: string): void {
+    if (!this.desktopRestartRequired) {
+      console.log(`[gateway] desktop restart required reason=${reason}`);
+    }
+    this.desktopRestartRequired = true;
+  }
+
+  private async restartDesktop(): Promise<void> {
     try {
-      console.log(`[gateway] desktop poke -> /poke reason=${reason} thread=${threadId}`);
-      const result = await this.focusDesktop({
-        reason,
-        threadId,
+      console.log("[gateway] restarting Codex desktop by client request");
+      const result = await this.restartDesktopFn({
+        reason: "client_restart_desktop",
         source: "desktop-gateway",
         timestamp: Date.now(),
       });
-      console.log(`[gateway] desktop poke sent body=${JSON.stringify(result)}`);
+      if (result.ok) {
+        this.desktopRestartRequired = false;
+      }
+      console.log(`[gateway] desktop restart result=${JSON.stringify(result)}`);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
-      console.warn(`[gateway] desktop poke unavailable: ${detail}`);
+      console.warn(`[gateway] desktop restart unavailable: ${detail}`);
+      throw error;
     }
+  }
+
+  private withDesktopRestartState(snapshot: ClientSnapshot): ClientSnapshot {
+    return {
+      ...snapshot,
+      desktopRestartRequired: this.desktopRestartRequired,
+    };
   }
 
   private serverActionHandlers() {

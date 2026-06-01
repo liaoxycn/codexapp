@@ -10,9 +10,12 @@ function createSnapshot(overrides = {}) {
     hasMoreHistory: false,
     pendingApproval: null,
     chips: [],
+    files: [],
     slashCommands: [],
     cwd: "D:/Projects/Test",
     permissionSummary: "workspace-write · never",
+    configOptions: { models: [], reasoningEfforts: [], sandboxModes: [], defaults: {} },
+    desktopRestartRequired: false,
     isGenerating: false,
     ...overrides,
   };
@@ -62,6 +65,8 @@ function createBackend(overrides = {}) {
     refreshThreads: async (threadId) => createSnapshot({ selectedThreadId: threadId ?? "thread-1" }),
     loadOlderMessages: async (threadId) => createSnapshot({ selectedThreadId: threadId }),
     sendPrompt: async (threadId) => createSnapshot({ selectedThreadId: threadId }),
+    rollbackThread: async (threadId) => createSnapshot({ selectedThreadId: threadId }),
+    resendPrompt: async (threadId) => createSnapshot({ selectedThreadId: threadId }),
     stopTurn: async (threadId) => createSnapshot({ selectedThreadId: threadId }),
     approveCurrent: async (threadId) => createSnapshot({ selectedThreadId: threadId }),
     ...overrides,
@@ -87,7 +92,8 @@ function createHandlers(overrides = {}) {
       context.selectedThreadId = snapshot.selectedThreadId;
     },
     refreshSelectedThread: async () => {},
-    pokeDesktop: async () => {},
+    markDesktopRestartRequired: () => {},
+    restartDesktop: async () => {},
     ...handlerOverrides,
   };
   return {
@@ -137,6 +143,30 @@ test("handleClientMessage records negotiated snapshot patch support", async () =
 
   assert.equal(context.authenticated, true);
   assert.equal(context.supportsSnapshotPatch, true);
+});
+
+test("handleClientMessage restores requested selected thread from hello", async () => {
+  const context = createContext({ selectedThreadId: "thread-default" });
+  const snapshotCalls = [];
+  const { handlers, snapshots } = createHandlers({
+    backend: createBackend({
+      hasThread: (threadId) => threadId === "thread-2",
+      getSnapshot: (selectedThreadId = "thread-default") => {
+        snapshotCalls.push(selectedThreadId);
+        return createSnapshot({ selectedThreadId });
+      },
+    }),
+  });
+
+  await handleClientMessage(
+    context,
+    JSON.stringify({ type: "hello", client: "android", selectedThreadId: "thread-2" }),
+    handlers
+  );
+
+  assert.equal(context.selectedThreadId, "thread-2");
+  assert.deepEqual(snapshotCalls, ["thread-2"]);
+  assert.equal(snapshots.at(-1).selectedThreadId, "thread-2");
 });
 
 test("handleClientMessage falls back to default thread when select target is missing", async () => {
@@ -213,32 +243,30 @@ test("handleClientMessage switches selected thread after fork_thread", async () 
   const context = createContext({ authenticated: true, selectedThreadId: "thread-1" });
   const forkCalls = [];
   const { handlers, backend, snapshots } = createHandlers({ backend: createBackend() });
-  backend.forkThread = async (threadId) => {
-    forkCalls.push(threadId);
+  backend.forkThread = async (threadId, numTurns) => {
+    forkCalls.push([threadId, numTurns]);
     return createSnapshot({ selectedThreadId: "thread-forked" });
   };
 
   await handleClientMessage(
     context,
-    JSON.stringify({ type: "fork_thread", threadId: "thread-1" }),
+    JSON.stringify({ type: "fork_thread", threadId: "thread-1", numTurns: 2 }),
     handlers
   );
 
   assert.equal(context.selectionVersion, 1);
   assert.equal(context.selectedThreadId, "thread-forked");
-  assert.deepEqual(forkCalls, ["thread-1"]);
+  assert.deepEqual(forkCalls, [["thread-1", 2]]);
   assert.equal(snapshots.at(-1).selectedThreadId, "thread-forked");
 });
 
-test("handleClientMessage switches selected thread for send_prompt and pokes desktop", async () => {
+test("handleClientMessage switches selected thread for send_prompt and marks desktop restart", async () => {
   const context = createContext({ authenticated: true, selectedThreadId: "thread-1" });
   const sendCalls = [];
-  const pokeCalls = [];
+  const restartReasons = [];
   const { handlers, backend, snapshots } = createHandlers({
     backend: createBackend(),
-    pokeDesktop: async (threadId, reason) => {
-      pokeCalls.push([threadId, reason]);
-    },
+    markDesktopRestartRequired: (reason) => restartReasons.push(reason),
   });
   backend.sendPrompt = async (threadId, text) => {
     sendCalls.push([threadId, text]);
@@ -254,6 +282,136 @@ test("handleClientMessage switches selected thread for send_prompt and pokes des
   assert.equal(context.selectionVersion, 1);
   assert.equal(context.selectedThreadId, "thread-2");
   assert.deepEqual(sendCalls, [["thread-2", "hello"]]);
-  assert.deepEqual(pokeCalls, [["thread-2", "send_prompt"]]);
+  assert.deepEqual(restartReasons, ["send_prompt"]);
   assert.equal(snapshots.at(-1).selectedThreadId, "thread-2");
+});
+
+test("handleClientMessage restarts desktop on explicit request", async () => {
+  const context = createContext({ authenticated: true, selectedThreadId: "thread-1" });
+  let restarted = 0;
+  const { handlers, snapshots } = createHandlers({
+    restartDesktop: async () => {
+      restarted += 1;
+    },
+  });
+
+  await handleClientMessage(
+    context,
+    JSON.stringify({ type: "restart_desktop" }),
+    handlers
+  );
+
+  assert.equal(restarted, 1);
+  assert.equal(snapshots.at(-1).selectedThreadId, "thread-1");
+});
+
+test("handleClientMessage rolls back a thread from a user message action", async () => {
+  const context = createContext({ authenticated: true, selectedThreadId: "thread-1" });
+  const rollbackCalls = [];
+  const restartReasons = [];
+  const { handlers, backend, snapshots } = createHandlers({
+    backend: createBackend(),
+    markDesktopRestartRequired: (reason) => restartReasons.push(reason),
+  });
+  backend.rollbackThread = async (threadId, numTurns) => {
+    rollbackCalls.push([threadId, numTurns]);
+    return createSnapshot({ selectedThreadId: threadId });
+  };
+
+  await handleClientMessage(
+    context,
+    JSON.stringify({ type: "rollback_thread", threadId: "thread-1", numTurns: 3 }),
+    handlers
+  );
+
+  assert.deepEqual(rollbackCalls, [["thread-1", 3]]);
+  assert.deepEqual(restartReasons, ["rollback_thread"]);
+  assert.equal(snapshots.at(-1).selectedThreadId, "thread-1");
+});
+
+test("handleClientMessage resends by rolling back before prompt submission", async () => {
+  const context = createContext({ authenticated: true, selectedThreadId: "thread-1" });
+  const resendCalls = [];
+  const restartReasons = [];
+  const { handlers, backend, snapshots } = createHandlers({
+    backend: createBackend(),
+    markDesktopRestartRequired: (reason) => restartReasons.push(reason),
+  });
+  backend.resendPrompt = async (threadId, text, rollbackNumTurns) => {
+    resendCalls.push([threadId, text, rollbackNumTurns]);
+    return createSnapshot({ selectedThreadId: threadId });
+  };
+
+  await handleClientMessage(
+    context,
+    JSON.stringify({ type: "resend_prompt", threadId: "thread-1", text: "hello again", rollbackNumTurns: 2 }),
+    handlers
+  );
+
+  assert.deepEqual(resendCalls, [["thread-1", "hello again", 2]]);
+  assert.deepEqual(restartReasons, ["resend_prompt"]);
+  assert.equal(snapshots.at(-1).selectedThreadId, "thread-1");
+});
+
+test("handleClientMessage creates thread before first draft prompt", async () => {
+  const context = createContext({ authenticated: true, selectedThreadId: "" });
+  const createCalls = [];
+  const sendCalls = [];
+  const { handlers, backend, snapshots } = createHandlers({ backend: createBackend() });
+  backend.createThread = async (cwd, options) => {
+    createCalls.push([cwd, options]);
+    return createSnapshot({ selectedThreadId: "thread-created" });
+  };
+  backend.sendPrompt = async (threadId, text) => {
+    sendCalls.push([threadId, text]);
+    return createSnapshot({ selectedThreadId: threadId });
+  };
+
+  await handleClientMessage(
+    context,
+    JSON.stringify({
+      type: "send_prompt",
+      text: "hello draft",
+      newThread: true,
+      cwd: "D:/Projects/codexapp",
+      model: "gpt-5",
+      reasoningEffort: "medium",
+      sandboxMode: "workspace-write",
+    }),
+    handlers
+  );
+
+  assert.equal(context.selectedThreadId, "thread-created");
+  assert.deepEqual(createCalls, [[
+    "D:/Projects/codexapp",
+    {
+      cwd: "D:/Projects/codexapp",
+      model: "gpt-5",
+      reasoningEffort: "medium",
+      sandboxMode: "workspace-write",
+    },
+  ]]);
+  assert.deepEqual(sendCalls, [["thread-created", "hello draft"]]);
+  assert.equal(snapshots.at(-1).selectedThreadId, "thread-created");
+});
+
+test("handleClientMessage clears selection after archive_thread", async () => {
+  const context = createContext({ authenticated: true, selectedThreadId: "thread-1" });
+  const { handlers, backend, snapshots } = createHandlers({ backend: createBackend() });
+  backend.archiveThread = async () => createSnapshot({
+    selectedThreadId: "thread-next",
+    messages: [{ id: "m1", role: "user", blocks: [] }],
+    cwd: "D:/Projects/Next",
+  });
+
+  await handleClientMessage(
+    context,
+    JSON.stringify({ type: "archive_thread", threadId: "thread-1" }),
+    handlers
+  );
+
+  assert.equal(context.selectedThreadId, "");
+  assert.equal(snapshots.at(-1).selectedThreadId, "");
+  assert.deepEqual(snapshots.at(-1).messages, []);
+  assert.equal(snapshots.at(-1).cwd, "");
 });

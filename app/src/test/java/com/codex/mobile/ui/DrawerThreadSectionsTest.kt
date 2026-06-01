@@ -114,6 +114,52 @@ class DrawerThreadSectionsTest {
     }
 
     @Test
+    fun searchPrioritizesProjectAndTitleMatchesBeforePreviewMatches() {
+        val sections = buildDrawerThreadSections(
+            threads = listOf(
+                summary(
+                    "current-preview-hit",
+                    updatedAt = 9_000L,
+                    title = "持续优化",
+                    preview = "继续测试 md2html 抽屉搜索",
+                    groupKind = ThreadGroupKind.PROJECT,
+                    groupLabel = "codexapp"
+                ),
+                summary(
+                    "target-project",
+                    updatedAt = 1_000L,
+                    title = "项目会话测试",
+                    preview = "Hello",
+                    groupKind = ThreadGroupKind.PROJECT,
+                    groupLabel = "md2html",
+                    cwd = "D:/Data/Documents/md2html"
+                )
+            ),
+            selectedThreadId = "current-preview-hit",
+            query = "md2html",
+            expandedProjectGroups = emptySet()
+        )
+
+        assertEquals(listOf("md2html", "codexapp"), sections.projectGroups.map { it.label })
+        assertEquals("target-project", sections.projectGroups.first().threads.single().id)
+    }
+
+    @Test
+    fun searchPrioritizesTitleMatchesWithinChatThreads() {
+        val sections = buildDrawerThreadSections(
+            threads = listOf(
+                summary("preview-hit", updatedAt = 9_000L, title = "Recent", preview = "mentions weather"),
+                summary("title-hit", updatedAt = 1_000L, title = "Weather report", preview = "older")
+            ),
+            selectedThreadId = "",
+            query = "weather",
+            expandedProjectGroups = emptySet()
+        )
+
+        assertEquals(listOf("title-hit", "preview-hit"), sections.chatThreads.map { it.id })
+    }
+
+    @Test
     fun keepsCurrentProjectExpandedEvenWhenNotInExpandedSet() {
         val sections = buildDrawerThreadSections(
             threads = listOf(

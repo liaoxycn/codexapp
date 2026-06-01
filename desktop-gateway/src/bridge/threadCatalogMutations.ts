@@ -7,21 +7,24 @@ import {
   dedupeSummaries,
   mapThreadToSummary,
 } from "./summaries.js";
-import { findNextActiveThreadId } from "./threadSelection.js";
 import type { ThreadCatalogActionDeps } from "./threadCatalogActions.js";
-import type { ClientSnapshot } from "../protocol.js";
+import type { ClientSnapshot, ThreadStartOptions } from "../protocol.js";
 
 export async function createCatalogThread(
   deps: ThreadCatalogActionDeps,
-  cwd?: string
+  cwd?: string,
+  options: ThreadStartOptions = {}
 ): Promise<ClientSnapshot> {
   const currentThreadId = deps.getCurrentThreadId();
   const selectedCwd = deps.threads.get(currentThreadId)?.thread?.cwd
     ?? deps.threads.get(currentThreadId)?.snapshot.cwd
     ?? process.cwd();
-  const targetCwd = cwd?.trim() || selectedCwd;
+  const targetCwd = options.cwd?.trim() || cwd?.trim() || selectedCwd;
 
-  const started = await deps.appServer.threadStart(targetCwd);
+  const started = await deps.appServer.threadStart(targetCwd, {
+    ...options,
+    cwd: targetCwd,
+  });
   const threadId = started.thread.id;
 
   deps.setCurrentThreadId(threadId);
@@ -37,6 +40,7 @@ export async function createCatalogThread(
     thread: started.thread,
     summaries: mergedSummaries,
     resume: started,
+    isLocalCatalogEntry: true,
   });
 
   deps.syncSelectedThread(threadId);
@@ -46,30 +50,62 @@ export async function createCatalogThread(
 
 export async function forkCatalogThread(
   deps: ThreadCatalogActionDeps,
-  threadId: string
+  threadId: string,
+  numTurns?: number
 ): Promise<ClientSnapshot> {
   const resolved = deps.resolveThreadId(threadId);
   const forked = await deps.appServer.threadFork(resolved);
-  const forkedThreadId = forked.thread.id;
+  let forkedThread = forked.thread;
+  const targetTurnCount = normalizeForkTurnCount(numTurns);
+  const sourceTurnCount = targetTurnCount == null
+    ? null
+    : await resolveSourceTurnCount(deps, resolved);
+  if (sourceTurnCount != null && targetTurnCount != null && targetTurnCount < sourceTurnCount) {
+    const rollbackCount = sourceTurnCount - targetTurnCount;
+    const rolledBack = await deps.appServer.threadRollback(forked.thread.id, rollbackCount);
+    forkedThread = rolledBack.thread;
+  }
+  const forkedThreadId = forkedThread.id;
 
   deps.setCurrentThreadId(forkedThreadId);
   deps.incrementSelectionVersion();
 
   const mergedSummaries = dedupeSummaries([
     ...buildRuntimeSummaries(deps.threads),
-    mapThreadToSummary(forked.thread),
+    mapThreadToSummary(forkedThread),
   ]);
 
   upsertThreadState({
     threads: deps.threads,
-    thread: forked.thread,
+    thread: forkedThread,
     summaries: mergedSummaries,
-    resume: forked,
+    resume: { ...forked, thread: forkedThread },
+    isLocalCatalogEntry: true,
   });
 
   deps.syncSelectedThread(forkedThreadId);
   deps.emitChanged();
   return deps.getSnapshot(forkedThreadId);
+}
+
+function normalizeForkTurnCount(numTurns: number | undefined): number | null {
+  if (!Number.isInteger(numTurns) || numTurns == null || numTurns <= 0) {
+    return null;
+  }
+  return numTurns;
+}
+
+async function resolveSourceTurnCount(
+  deps: ThreadCatalogActionDeps,
+  threadId: string
+): Promise<number | null> {
+  const cachedThread = deps.threads.get(threadId)?.thread;
+  if (cachedThread && cachedThread.turns.length > 0) {
+    return cachedThread.turns.length;
+  }
+
+  const sourceThread = await deps.appServer.threadRead(threadId, true);
+  return sourceThread.turns.length;
 }
 
 export async function renameCatalogThread(
@@ -97,19 +133,15 @@ export async function archiveCatalogThread(
   const resolved = deps.resolveThreadId(threadId);
 
   await deps.appServer.threadArchive(resolved);
+  deps.threads.delete(resolved);
   await deps.hydrateThreads();
 
-  const nextThreadId = findNextActiveThreadId(deps.threads);
-  deps.setCurrentThreadId(nextThreadId);
+  deps.setCurrentThreadId("");
   deps.incrementSelectionVersion();
 
-  if (nextThreadId) {
-    await deps.refreshThread(nextThreadId);
-  }
-
-  deps.syncSelectedThread(nextThreadId);
+  deps.syncSelectedThread("");
   deps.emitChanged();
-  return deps.getSnapshot(nextThreadId);
+  return deps.getSnapshot("");
 }
 
 export async function unarchiveCatalogThread(

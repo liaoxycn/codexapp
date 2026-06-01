@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -43,6 +44,7 @@ internal fun SectionHeader(
 internal fun DrawerHeaderAction(
     icon: ImageVector,
     contentDescription: String,
+    loading: Boolean = false,
     onClick: () -> Unit
 ) {
     Box(
@@ -51,15 +53,23 @@ internal fun DrawerHeaderAction(
             .clip(RoundedCornerShape(14.dp))
             .background(CodexTheme.colors.surfaceSubtle)
             .semantics { this.contentDescription = contentDescription }
-            .clickable(onClick = onClick)
+            .clickable(enabled = !loading, onClick = onClick)
             .padding(6.dp),
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = CodexTheme.colors.textPrimary,
-            modifier = Modifier.size(19.dp)
-        )
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                color = CodexTheme.colors.textPrimary,
+                strokeWidth = 2.dp
+            )
+        } else {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = CodexTheme.colors.textPrimary,
+                modifier = Modifier.size(19.dp)
+            )
+        }
     }
 }

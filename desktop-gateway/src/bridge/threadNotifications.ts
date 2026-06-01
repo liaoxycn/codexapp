@@ -425,16 +425,14 @@ export function handleOperationalNotice(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
 ): void {
-  const state = resolveNoticeTargetState(deps);
-  if (!state) {
-    return;
-  }
-
   const notice = formatOperationalNotice(notification);
   if (!notice) {
     return;
   }
-  replaceOrAppendMessage(state, systemStatus(notice.text, notice.id));
+  deps.pushOperationalNotice?.({
+    ...notice,
+    createdAt: Date.now(),
+  });
   deps.emitChanged();
 }
 

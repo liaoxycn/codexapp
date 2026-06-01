@@ -54,8 +54,9 @@ async function handleForkThread(
 ): Promise<void> {
   context.selectionVersion += 1;
   await handlers.runBackendAction(context, async () => {
-    const snapshot = await handlers.backend().forkThread(message.threadId);
+    const snapshot = await handlers.backend().forkThread(message.threadId, message.numTurns);
     context.selectedThreadId = snapshot.selectedThreadId;
+    handlers.markDesktopRestartRequired("fork_thread");
     return snapshot;
   });
 }
@@ -67,8 +68,14 @@ async function handleCreateThread(
 ): Promise<void> {
   context.selectionVersion += 1;
   await handlers.runBackendAction(context, async () => {
-    const snapshot = await handlers.backend().createThread(message.cwd);
+    const snapshot = await handlers.backend().createThread(message.cwd, {
+      cwd: message.cwd,
+      model: message.model,
+      reasoningEffort: message.reasoningEffort,
+      sandboxMode: message.sandboxMode,
+    });
     context.selectedThreadId = snapshot.selectedThreadId;
+    handlers.markDesktopRestartRequired("create_thread");
     return snapshot;
   });
 }
@@ -92,9 +99,11 @@ async function handleRenameThread(
   message: GatewayRenameThreadMessage,
   handlers: ClientMessageHandlers
 ): Promise<void> {
-  await handlers.runBackendAction(context, async () =>
-    handlers.backend().renameThread(message.threadId, message.name)
-  );
+  await handlers.runBackendAction(context, async () => {
+    const snapshot = await handlers.backend().renameThread(message.threadId, message.name);
+    handlers.markDesktopRestartRequired("rename_thread");
+    return snapshot;
+  });
 }
 
 async function handleArchiveThread(
@@ -105,8 +114,20 @@ async function handleArchiveThread(
   context.selectionVersion += 1;
   await handlers.runBackendAction(context, async () => {
     const snapshot = await handlers.backend().archiveThread(message.threadId);
-    context.selectedThreadId = snapshot.selectedThreadId;
-    return snapshot;
+    context.selectedThreadId = "";
+    handlers.markDesktopRestartRequired("archive_thread");
+    return {
+      ...snapshot,
+      selectedThreadId: "",
+      messages: [],
+      hasMoreHistory: false,
+      pendingApproval: null,
+      chips: [],
+      files: [],
+      cwd: "",
+      permissionSummary: "",
+      isGenerating: false,
+    };
   });
 }
 
@@ -119,6 +140,7 @@ async function handleUnarchiveThread(
   await handlers.runBackendAction(context, async () => {
     const snapshot = await handlers.backend().unarchiveThread(message.threadId);
     context.selectedThreadId = snapshot.selectedThreadId;
+    handlers.markDesktopRestartRequired("unarchive_thread");
     return snapshot;
   });
 }

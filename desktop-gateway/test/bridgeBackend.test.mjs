@@ -37,6 +37,19 @@ function startedThreadResponse(id, cwd, overrides = {}) {
   };
 }
 
+function fakeConfigOptions() {
+  return {
+    models: [{ label: "gpt-5", value: "gpt-5" }],
+    reasoningEfforts: [{ label: "high", value: "high" }],
+    sandboxModes: [{ label: "workspace-write", value: "workspace-write" }],
+    defaults: {
+      model: "gpt-5",
+      reasoningEffort: "high",
+      sandboxMode: "workspace-write",
+    },
+  };
+}
+
 test("visible thread summaries do not hide threads by fixed title", () => {
   const summaries = buildVisibleThreadSummaries([
     thread("live-1"),
@@ -157,6 +170,48 @@ test("bridge backend passes requested project cwd to app-server thread start", a
   assert.equal(created.groupLabel, "Project B");
 });
 
+test("bridge backend exposes selected thread session config from app-server", async () => {
+  const backend = new AppServerBridgeBackend();
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("configured-session-thread", cwd),
+  };
+
+  const snapshot = await backend.createThread("D:/Projects/SessionConfig");
+
+  assert.deepEqual(snapshot.sessionConfig, {
+    permissionMode: "workspace-write",
+    provider: "openai",
+    model: "gpt-5",
+    reasoningEffort: undefined,
+  });
+});
+
+test("bridge backend leaves unknown selected thread session config fields empty", async () => {
+  const backend = new AppServerBridgeBackend();
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("provider-only-thread", cwd, {
+      modelProvider: "local",
+    }),
+    threadList: async () => [thread("provider-only-thread", { cwd: "D:/Projects/SessionConfig", modelProvider: "local" })],
+    threadRead: async () => thread("provider-only-thread", { cwd: "D:/Projects/SessionConfig", modelProvider: "local" }),
+  };
+
+  await backend.createThread("D:/Projects/SessionConfig");
+  backend.threads.get("provider-only-thread").model = null;
+  backend.threads.get("provider-only-thread").modelProvider = null;
+  backend.threads.get("provider-only-thread").sandbox = null;
+  backend.threads.get("provider-only-thread").reasoningEffort = null;
+
+  const snapshot = await backend.refreshThreads("provider-only-thread");
+
+  assert.deepEqual(snapshot.sessionConfig, {
+    permissionMode: undefined,
+    provider: "local",
+    model: undefined,
+    reasoningEffort: undefined,
+  });
+});
+
 test("bridge backend keeps a newly started project selected until it appears in thread list", async () => {
   const backend = new AppServerBridgeBackend();
   backend.appServer = {
@@ -226,6 +281,26 @@ test("bridge backend keeps an empty newly created thread idle", async () => {
 
   assert.equal(afterStatusUpdate.isGenerating, false);
   assert.equal(afterStatusUpdate.threads.find((item) => item.id === "empty-project-thread")?.status, "idle");
+});
+
+test("bridge backend annotates messages with turn-scoped action counts", async () => {
+  const backend = new AppServerBridgeBackend();
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("turn-count-thread", cwd, {
+      turns: [
+        { id: "turn-1", status: "completed", items: [{ type: "userMessage", id: "user-1", content: [{ type: "text", text: "one" }] }] },
+        { id: "turn-2", status: "completed", items: [{ type: "agentMessage", id: "assistant-2", text: "two" }] },
+        { id: "turn-3", status: "completed", items: [{ type: "userMessage", id: "user-3", content: [{ type: "text", text: "three" }] }] },
+      ],
+    }),
+  };
+
+  const snapshot = await backend.createThread("D:/Projects/ForkProject");
+
+  assert.deepEqual(
+    snapshot.messages.map((message) => [message.id, message.forkNumTurns, message.rollbackNumTurns]),
+    [["user-1", undefined, 3], ["assistant-2", 2, undefined], ["user-3", undefined, 1]]
+  );
 });
 
 test("bridge backend starts compact request from prompt command", async () => {
@@ -312,6 +387,74 @@ test("bridge backend merges assistant delta from notification stream", async () 
   );
 });
 
+test("bridge backend keeps subscribed running status across stale refresh", async () => {
+  const backend = new AppServerBridgeBackend();
+  const staleThread = thread("long-running-thread", {
+    cwd: "D:/Projects/LongRun",
+    status: "idle",
+    turns: [
+      {
+        id: "turn-live",
+        status: "completed",
+        completedAt: 100,
+        items: [
+          { type: "agentMessage", id: "assistant-old", text: "old" },
+        ],
+      },
+    ],
+  });
+  backend.appServer = {
+    configOptions: async () => fakeConfigOptions(),
+    threadStart: async (cwd) => startedThreadResponse("long-running-thread", cwd, staleThread),
+    threadList: async () => [staleThread],
+    threadRead: async () => staleThread,
+  };
+
+  await backend.createThread("D:/Projects/LongRun");
+  await backend.handleNotification({
+    method: "turn/started",
+    params: { threadId: "long-running-thread", turn: { id: "turn-live", startedAt: 200 } },
+  });
+  await backend.handleNotification({
+    method: "item/agentMessage/delta",
+    params: { threadId: "long-running-thread", turnId: "turn-live", itemId: "assistant-live", delta: "working" },
+  });
+
+  const snapshot = await backend.refreshThreads("long-running-thread");
+
+  assert.equal(snapshot.isGenerating, true);
+  assert.equal(snapshot.threads.find((item) => item.id === "long-running-thread")?.status, "running");
+});
+
+test("bridge backend passes draft options to app-server thread start", async () => {
+  const backend = new AppServerBridgeBackend();
+  const calls = [];
+  backend.appServer = {
+    threadStart: async (cwd, options) => {
+      calls.push([cwd, options]);
+      return startedThreadResponse("configured-thread", cwd);
+    },
+  };
+
+  await backend.createThread("D:/Projects/Configured", {
+    model: "gpt-5",
+    reasoningEffort: "high",
+    approvalPolicy: "on-request",
+    sandboxMode: "workspace-write",
+  });
+
+  assert.deepEqual(calls, [[
+    "D:/Projects/Configured",
+    {
+      cwd: "D:/Projects/Configured",
+      model: "gpt-5",
+      reasoningEffort: "high",
+      approvalPolicy: "on-request",
+      sandboxMode: "workspace-write",
+    },
+  ]]);
+});
+
 test("bridge backend forks a thread and selects the fork", async () => {
   const backend = new AppServerBridgeBackend();
   const forkCalls = [];
@@ -332,6 +475,134 @@ test("bridge backend forks a thread and selects the fork", async () => {
   assert.equal(snapshot.selectedThreadId, "forked-thread");
   assert.equal(snapshot.cwd, "D:/Projects/ForkProject");
   assert.equal(snapshot.threads.some((item) => item.id === "forked-thread"), true);
+});
+
+test("bridge backend keeps a newly forked vscode thread visible before desktop index refreshes", async () => {
+  const backend = new AppServerBridgeBackend();
+  const source = thread("source-thread", {
+    cwd: "D:/Projects/ForkProject",
+    source: "vscode",
+  });
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("source-thread", cwd, source),
+    threadFork: async () => startedThreadResponse("forked-thread", "D:/Projects/ForkProject", {
+      ...source,
+      id: "forked-thread",
+      preview: "forked preview",
+    }),
+  };
+
+  await backend.createThread("D:/Projects/ForkProject");
+  const snapshot = await backend.forkThread("source-thread");
+
+  assert.equal(snapshot.selectedThreadId, "forked-thread");
+  assert.equal(snapshot.threads.some((item) => item.id === "forked-thread"), true);
+});
+
+test("bridge backend keeps a local fork visible across refresh before desktop index refreshes", async () => {
+  const backend = new AppServerBridgeBackend();
+  const source = thread("source-thread", {
+    cwd: "D:/Projects/ForkProject",
+    source: "vscode",
+  });
+  const other = thread("other-thread", {
+    cwd: "D:/Projects/Other",
+    source: "appServer",
+  });
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("source-thread", cwd, source),
+    threadFork: async () => startedThreadResponse("forked-thread", "D:/Projects/ForkProject", {
+      ...source,
+      id: "forked-thread",
+      preview: "forked preview",
+    }),
+    threadList: async () => [source, other],
+    threadRead: async (threadId) => (threadId === "other-thread" ? other : source),
+  };
+
+  await backend.createThread("D:/Projects/ForkProject");
+  await backend.forkThread("source-thread");
+  const snapshot = await backend.refreshThreads("other-thread");
+
+  assert.equal(snapshot.threads.some((item) => item.id === "forked-thread"), true);
+  assert.equal(snapshot.threads.some((item) => item.id === "other-thread"), true);
+});
+
+test("bridge backend forks from a specific turn by rolling back the fork", async () => {
+  const backend = new AppServerBridgeBackend();
+  const rollbackCalls = [];
+  const source = thread("source-thread", {
+    cwd: "D:/Projects/ForkProject",
+    turns: [
+      { id: "turn-1", status: "completed", items: [{ type: "userMessage", id: "user-1", content: [{ type: "text", text: "one" }] }] },
+      { id: "turn-2", status: "completed", items: [{ type: "userMessage", id: "user-2", content: [{ type: "text", text: "two" }] }] },
+      { id: "turn-3", status: "completed", items: [{ type: "userMessage", id: "user-3", content: [{ type: "text", text: "three" }] }] },
+    ],
+  });
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("source-thread", cwd, source),
+    threadFork: async () => startedThreadResponse("forked-thread", "D:/Projects/ForkProject", {
+      ...source,
+      id: "forked-thread",
+    }),
+    threadRollback: async (threadId, numTurns) => {
+      rollbackCalls.push([threadId, numTurns]);
+      return startedThreadResponse(threadId, "D:/Projects/ForkProject", {
+        ...source,
+        id: threadId,
+        turns: source.turns.slice(0, 2),
+      });
+    },
+  };
+
+  await backend.createThread("D:/Projects/ForkProject");
+  const snapshot = await backend.forkThread("source-thread", 2);
+
+  assert.deepEqual(rollbackCalls, [["forked-thread", 1]]);
+  assert.equal(snapshot.selectedThreadId, "forked-thread");
+  assert.deepEqual(snapshot.messages.map((message) => message.id), ["user-1", "user-2"]);
+});
+
+test("bridge backend reads source turns before turn-scoped fork when cache is partial", async () => {
+  const backend = new AppServerBridgeBackend();
+  const readCalls = [];
+  const rollbackCalls = [];
+  const source = thread("source-thread", {
+    cwd: "D:/Projects/ForkProject",
+    turns: [
+      { id: "turn-1", status: "completed", items: [{ type: "userMessage", id: "user-1", content: [{ type: "text", text: "one" }] }] },
+      { id: "turn-2", status: "completed", items: [{ type: "userMessage", id: "user-2", content: [{ type: "text", text: "two" }] }] },
+      { id: "turn-3", status: "completed", items: [{ type: "userMessage", id: "user-3", content: [{ type: "text", text: "three" }] }] },
+    ],
+  });
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("source-thread", cwd, source),
+    threadList: async () => [thread("source-thread", { cwd: "D:/Projects/ForkProject", turns: [] })],
+    threadRead: async (threadId, includeTurns) => {
+      readCalls.push([threadId, includeTurns]);
+      return source;
+    },
+    threadFork: async () => startedThreadResponse("forked-thread", "D:/Projects/ForkProject", {
+      ...source,
+      id: "forked-thread",
+    }),
+    threadRollback: async (threadId, numTurns) => {
+      rollbackCalls.push([threadId, numTurns]);
+      return {
+        thread: thread(threadId, {
+          cwd: "D:/Projects/ForkProject",
+          turns: source.turns.slice(0, 2),
+        }),
+      };
+    },
+  };
+
+  await backend.createThread("D:/Projects/ForkProject");
+  backend.threads.get("source-thread").thread.turns = [];
+  await backend.forkThread("source-thread", 2);
+
+  assert.deepEqual(readCalls, [["source-thread", true]]);
+  assert.deepEqual(rollbackCalls, [["forked-thread", 1]]);
 });
 
 test("bridge backend rolls back last turn from prompt command", async () => {
@@ -359,6 +630,37 @@ test("bridge backend rolls back last turn from prompt command", async () => {
   assert.equal(snapshot.messages.some((message) =>
     message.blocks.some((block) => block.kind === "status" && block.value === "已回滚最近 1 轮")
   ), true);
+});
+
+test("bridge backend resends prompt after rolling back to selected user turn", async () => {
+  const backend = new AppServerBridgeBackend();
+  const calls = [];
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("resend-thread", cwd),
+    threadRead: async (threadId) => thread(threadId, { cwd: "D:/Projects/ResendProject" }),
+    threadRollback: async (threadId, numTurns) => {
+      calls.push(["rollback", threadId, numTurns]);
+      return {
+        thread: thread(threadId, {
+          cwd: "D:/Projects/ResendProject",
+          turns: [{ id: "turn-1", status: "completed", items: [] }],
+        }),
+      };
+    },
+    turnStart: async (threadId, text) => {
+      calls.push(["turnStart", threadId, text]);
+      return "turn-resend";
+    },
+  };
+
+  await backend.createThread("D:/Projects/ResendProject");
+  const snapshot = await backend.resendPrompt("resend-thread", "edited prompt", 2);
+
+  assert.deepEqual(calls, [
+    ["rollback", "resend-thread", 2],
+    ["turnStart", "resend-thread", "edited prompt"],
+  ]);
+  assert.equal(snapshot.isGenerating, true);
 });
 
 test("bridge backend can stop a resumed in-progress turn", async () => {
@@ -452,7 +754,7 @@ test("bridge backend accumulates command output deltas from notification stream"
   );
 });
 
-test("bridge backend archives current thread and selects the next active thread", async () => {
+test("bridge backend archives current thread and returns to draft state", async () => {
   const backend = new AppServerBridgeBackend();
   const threadsById = {
     "thread-a": thread("thread-a", { cwd: "D:/Projects/A", updatedAt: 100 }),
@@ -468,10 +770,10 @@ test("bridge backend archives current thread and selects the next active thread"
     threadArchive: async (threadId) => {
       activeIds = activeIds.filter((id) => id !== threadId);
     },
-    threadList: async (archived = false) =>
-      archived
-        ? Object.values(threadsById).filter((entry) => !activeIds.includes(entry.id))
-        : activeIds.map((id) => threadsById[id]),
+    threadList: async (archived = false) => {
+      assert.equal(archived, false);
+      return activeIds.map((id) => threadsById[id]);
+    },
     threadRead: async (threadId) => threadsById[threadId],
   };
 
@@ -479,8 +781,10 @@ test("bridge backend archives current thread and selects the next active thread"
   await backend.createThread("D:/Projects/B");
   const snapshot = await backend.archiveThread("thread-b");
 
-  assert.equal(snapshot.selectedThreadId, "thread-a");
-  assert.equal(snapshot.cwd, "D:/Projects/A");
+  assert.equal(snapshot.selectedThreadId, "");
+  assert.equal(snapshot.cwd, "");
+  assert.deepEqual(snapshot.messages, []);
+  assert.deepEqual(snapshot.threads.map((item) => item.id), ["thread-a"]);
 });
 
 test("bridge backend selects a thread again after unarchive refresh", async () => {
@@ -511,15 +815,20 @@ test("bridge backend selects a thread again after unarchive refresh", async () =
   assert.equal(snapshot.cwd, "D:/Projects/B");
 });
 
-test("bridge backend includes archived threads in refreshed snapshots", async () => {
+test("bridge backend does not query or include archived threads in refreshed snapshots", async () => {
   const backend = new AppServerBridgeBackend();
   const threadsById = {
     "thread-a": thread("thread-a", { cwd: "D:/Projects/A", updatedAt: 100 }),
     "thread-archived": thread("thread-archived", { cwd: "D:/Projects/Old", updatedAt: 50 }),
   };
+  const threadListArchivedFlags = [];
   backend.appServer = {
+    configOptions: async () => fakeConfigOptions(),
     threadStart: async (cwd) => startedThreadResponse("thread-a", cwd),
-    threadList: async (archived = false) => archived ? [threadsById["thread-archived"]] : [threadsById["thread-a"]],
+    threadList: async (archived = false) => {
+      threadListArchivedFlags.push(archived);
+      return archived ? [threadsById["thread-archived"]] : [threadsById["thread-a"]];
+    },
     threadRead: async (threadId) => threadsById[threadId],
   };
 
@@ -528,8 +837,10 @@ test("bridge backend includes archived threads in refreshed snapshots", async ()
 
   assert.deepEqual(
     snapshot.threads.map((item) => [item.id, item.archived]),
-    [["thread-a", false], ["thread-archived", true]]
+    [["thread-a", false]]
   );
+  assert.deepEqual(threadListArchivedFlags, [false]);
+  assert.equal(snapshot.configOptions.defaults.model, "gpt-5");
 });
 
 test("bridge backend refreshThreads does not override a newer manual selection", async () => {
@@ -544,6 +855,7 @@ test("bridge backend refreshThreads does not override a newer manual selection",
     releaseThreadList = resolve;
   });
   backend.appServer = {
+    configOptions: async () => fakeConfigOptions(),
     threadStart: async (cwd) => startedThreadResponse(
       startIndex++ === 0 ? "thread-a" : "thread-b",
       cwd
@@ -556,6 +868,11 @@ test("bridge backend refreshThreads does not override a newer manual selection",
       return [threadsById["thread-a"], threadsById["thread-b"]];
     },
     threadRead: async (threadId) => threadsById[threadId],
+    threadResume: async (threadId) => startedThreadResponse(
+      threadId,
+      threadsById[threadId]?.cwd,
+      threadsById[threadId]
+    ),
     threadUnsubscribe: async () => {},
   };
 
@@ -574,6 +891,7 @@ test("bridge backend refreshThreads does not override a newer manual selection",
 test("bridge backend restores previous selection when resume fails", async () => {
   const backend = new AppServerBridgeBackend();
   backend.appServer = {
+    configOptions: async () => fakeConfigOptions(),
     threadStart: async (cwd) => startedThreadResponse("thread-a", cwd),
     threadList: async () => [
       thread("thread-a", { cwd: "D:/Projects/A" }),

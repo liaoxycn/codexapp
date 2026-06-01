@@ -1,6 +1,12 @@
 import { EventEmitter } from "node:events";
-import type { ClientSnapshot } from "../protocol.js";
 import {
+  emptyConfigOptions,
+  type ClientSnapshot,
+  type GatewayConfigOptionsPayload,
+  type GatewayOperationalNoticePayload,
+} from "../protocol.js";
+import {
+  buildRuntimeSummaries,
   markAllThreadsFailedState,
   syncSelectedThreadSnapshots,
   updateSummaryStatusForThread,
@@ -20,6 +26,8 @@ export class BridgeRuntimeStore {
   readonly threads = new Map<string, ThreadRuntimeState>();
   currentThreadId = "";
   selectionVersion = 0;
+  configOptions: GatewayConfigOptionsPayload = emptyConfigOptions();
+  private operationalNotices: GatewayOperationalNoticePayload[] = [];
 
   subscribe(listener: () => void): () => void {
     this.events.on("changed", listener);
@@ -35,14 +43,32 @@ export class BridgeRuntimeStore {
   }
 
   getSnapshot(selectedThreadId?: string): ClientSnapshot {
+    if (selectedThreadId === "") {
+      return structuredClone({
+        ...emptySnapshot(),
+        threads: buildRuntimeSummaries(this.threads),
+        selectedThreadId: "",
+        configOptions: this.configOptions,
+        operationalNotices: this.consumeOperationalNotices(),
+      });
+    }
+
     const threadId = this.resolveThreadId(selectedThreadId);
     const state = this.threads.get(threadId);
     if (!state) {
-      return emptySnapshot();
+      return {
+        ...emptySnapshot(),
+        configOptions: this.configOptions,
+        operationalNotices: this.consumeOperationalNotices(),
+      };
     }
 
     state.snapshot.selectedThreadId = threadId;
-    return structuredClone(state.snapshot);
+    return structuredClone({
+      ...state.snapshot,
+      configOptions: this.configOptions,
+      operationalNotices: this.consumeOperationalNotices(),
+    });
   }
 
   resolveThreadId(threadId?: string): string {
@@ -62,8 +88,15 @@ export class BridgeRuntimeStore {
     this.emitChanged();
   }
 
+  pushOperationalNotice(notice: GatewayOperationalNoticePayload): void {
+    this.operationalNotices = this.operationalNotices
+      .filter((entry) => entry.id !== notice.id)
+      .concat(notice)
+      .slice(-6);
+  }
+
   emitChanged(): void {
-    this.syncSelectedThread(this.currentThreadId || this.getDefaultThreadId());
+    this.syncSelectedThread(this.currentThreadId);
     this.events.emit("changed");
   }
 
@@ -74,5 +107,11 @@ export class BridgeRuntimeStore {
   incrementSelectionVersion(): number {
     this.selectionVersion += 1;
     return this.selectionVersion;
+  }
+
+  private consumeOperationalNotices(): GatewayOperationalNoticePayload[] {
+    const notices = this.operationalNotices;
+    this.operationalNotices = [];
+    return notices;
   }
 }

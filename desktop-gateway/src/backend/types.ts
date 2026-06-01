@@ -12,6 +12,12 @@ export interface ThreadRecord {
   slashCommands: string[];
   cwd: string;
   permissionSummary: string;
+  sessionConfig?: {
+    permissionMode?: string;
+    provider?: string;
+    model?: string;
+    reasoningEffort?: string;
+  };
   isGenerating: boolean;
   pendingTimer?: NodeJS.Timeout;
 }

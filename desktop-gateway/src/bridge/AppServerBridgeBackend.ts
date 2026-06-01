@@ -2,8 +2,9 @@ import type {
   JsonRpcNotification,
   JsonRpcServerRequest,
 } from "../appServerTypes.js";
+import process from "node:process";
 import { AppServerClient } from "../appServerClient.js";
-import type { ClientSnapshot } from "../protocol.js";
+import type { ClientSnapshot, GatewayConfigOptionsPayload, ThreadStartOptions } from "../protocol.js";
 import {
   handleBridgeBackendNotification,
   handleBridgeBackendServerRequest,
@@ -30,6 +31,7 @@ export class AppServerBridgeBackend {
 
   async start(): Promise<void> {
     await this.appServer.start();
+    await this.refreshConfigOptions();
     await this.controller.hydrateThreads();
 
     this.appServer.onNotification((notification) => {
@@ -65,12 +67,12 @@ export class AppServerBridgeBackend {
     return this.controller.selectThread(threadId);
   }
 
-  async createThread(cwd?: string): Promise<ClientSnapshot> {
-    return this.controller.createThread(cwd);
+  async createThread(cwd?: string, options: ThreadStartOptions = {}): Promise<ClientSnapshot> {
+    return this.controller.createThread(cwd, options);
   }
 
-  async forkThread(threadId: string): Promise<ClientSnapshot> {
-    return this.controller.forkThread(threadId);
+  async forkThread(threadId: string, numTurns?: number): Promise<ClientSnapshot> {
+    return this.controller.forkThread(threadId, numTurns);
   }
 
   async renameThread(threadId: string, name: string): Promise<ClientSnapshot> {
@@ -86,7 +88,9 @@ export class AppServerBridgeBackend {
   }
 
   async refreshThreads(selectedThreadId?: string): Promise<ClientSnapshot> {
-    return this.controller.refreshThreads(selectedThreadId);
+    const selectionVersionAtRequest = this.runtime.selectionVersion;
+    await this.refreshConfigOptions();
+    return this.controller.refreshThreads(selectedThreadId, selectionVersionAtRequest);
   }
 
   async loadOlderMessages(threadId: string): Promise<ClientSnapshot> {
@@ -95,6 +99,14 @@ export class AppServerBridgeBackend {
 
   async sendPrompt(threadId: string, text: string): Promise<ClientSnapshot> {
     return this.controller.sendPrompt(threadId, text);
+  }
+
+  async rollbackThread(threadId: string, numTurns: number): Promise<ClientSnapshot> {
+    return this.controller.rollbackThread(threadId, numTurns);
+  }
+
+  async resendPrompt(threadId: string, text: string, rollbackNumTurns: number): Promise<ClientSnapshot> {
+    return this.controller.resendPrompt(threadId, text, rollbackNumTurns);
   }
 
   async stopTurn(threadId: string): Promise<ClientSnapshot> {
@@ -111,5 +123,16 @@ export class AppServerBridgeBackend {
 
   private handleServerRequest(request: JsonRpcServerRequest): void {
     handleBridgeBackendServerRequest(request, this.controller.lifecycleDeps());
+  }
+
+  private async refreshConfigOptions(): Promise<void> {
+    try {
+      if (typeof this.appServer.configOptions !== "function") {
+        return;
+      }
+      this.runtime.configOptions = await this.appServer.configOptions(process.cwd());
+    } catch (error) {
+      console.error("[gateway] config options unavailable:", error instanceof Error ? error.message : error);
+    }
   }
 }

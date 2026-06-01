@@ -1,6 +1,7 @@
 package com.codex.mobile.ui.thread
 
 import com.codex.mobile.ui.message.MessageCard
+import com.codex.mobile.ui.message.toTurnMessageItems
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,10 +11,12 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.codex.mobile.model.ConnectionStatus
 import com.codex.mobile.model.HomeUiState
+import com.codex.mobile.model.NewThreadDraft
 
 @Composable
 internal fun ThreadMessageList(
@@ -23,19 +26,27 @@ internal fun ThreadMessageList(
     listState: LazyListState,
     contentPadding: PaddingValues,
     isLoadingOlder: Boolean,
-    onEditUserMessage: (String) -> Unit,
-    onResendUserMessage: (String) -> Unit,
-    onCopyMessage: (String) -> Unit,
+    onEditUserMessage: (String, Int) -> Unit,
+    onResendUserMessage: (String, Int) -> Unit,
+    onForkFromMessage: (Int) -> Unit,
+    onNewThreadDraftChange: (NewThreadDraft) -> Unit,
     onApprovePending: () -> Unit,
     onRejectPending: () -> Unit,
 ) {
+    val turnItems = state.messages.toTurnMessageItems(currentTurnRunning = state.isGenerating)
+    val centerDraft = state.messages.isEmpty() && state.isNewThreadDraft
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
+            .clipToBounds()
             .testTag("thread_message_list"),
         state = listState,
         contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(if (compactMode) 4.dp else 5.dp)
+        verticalArrangement = if (centerDraft) {
+            Arrangement.Center
+        } else {
+            Arrangement.spacedBy(if (compactMode) 4.dp else 5.dp)
+        }
     ) {
         if (state.hasMoreHistory) {
             item {
@@ -48,7 +59,14 @@ internal fun ThreadMessageList(
 
         if (state.messages.isEmpty()) {
             item {
-                if (state.isThreadSwitching) {
+                if (state.isNewThreadDraft) {
+                    NewThreadDraftCard(
+                        draft = state.newThreadDraft,
+                        configOptions = state.configOptions,
+                        compactMode = compactMode,
+                        onDraftChange = onNewThreadDraftChange
+                    )
+                } else if (state.isThreadSwitching) {
                     ThreadSwitchingCard(state.pendingThreadTitle)
                 } else {
                     EmptyThreadCard(
@@ -60,16 +78,18 @@ internal fun ThreadMessageList(
         }
 
         itemsIndexed(
-            items = state.messages,
-            key = { _, message -> message.id }
-        ) { index, message ->
+            items = turnItems,
+            key = { _, item -> item.message.id }
+        ) { index, item ->
             MessageCard(
-                message = message,
+                messages = turnItems.map { it.message },
+                message = item.message,
+                processMessages = item.processMessages,
                 compactMode = compactMode,
                 messageIndex = index,
                 onEditUserMessage = onEditUserMessage,
                 onResendUserMessage = onResendUserMessage,
-                onCopyMessage = onCopyMessage
+                onForkFromMessage = onForkFromMessage
             )
         }
 

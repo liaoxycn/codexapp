@@ -14,8 +14,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.codex.mobile.model.ConnectionStatus
 import com.codex.mobile.ui.common.TopBar
@@ -37,9 +35,8 @@ fun CodexApp(
     val selectedThreadChrome = resolveSelectedThreadChrome(
         threads = state.threads,
         selectedThreadId = state.selectedThreadId,
+        isNewThreadDraft = state.isNewThreadDraft,
     )
-    val clipboard = LocalClipboardManager.current
-
     BackHandler(enabled = true, onBack = controller.handleBackPress)
 
     if (controller.showGatewayDialog) {
@@ -59,12 +56,9 @@ fun CodexApp(
                 state = state,
                 onCreateThread = controller.createThread,
                 onCreateThreadInProject = controller.createThreadInProject,
-                onRefreshThreads = viewModel::refreshThreads,
+                onOpenConnection = controller.openGatewayDialog,
+                onRefreshThreads = viewModel::refreshThreadsAnimated,
                 onSelectThread = controller.selectThread,
-                onForkThread = { id ->
-                    viewModel.forkThread(id)
-                    controller.closeDrawer()
-                },
                 onRenameThread = { id, name ->
                     viewModel.renameThread(id, name)
                     controller.closeDrawer()
@@ -77,58 +71,62 @@ fun CodexApp(
                     viewModel.unarchiveThread(id)
                     controller.closeDrawer()
                 },
+                onRestartDesktop = viewModel::restartDesktop,
+                onDownloadUpdate = viewModel::downloadAppUpdate,
+                onInstallUpdate = viewModel::installAppUpdate,
             )
         }
     ) {
-        Scaffold(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(CodexTheme.colors.background),
-            topBar = {
-                Box(modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)) {
-                    TopBar(
-                        title = selectedThreadChrome.title,
-                        status = selectedThreadChrome.status,
-                        onOpenDrawer = controller.openDrawer,
-                        onCreateThread = viewModel::createThread,
-                        onOpenConnection = controller.openGatewayDialog,
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(CodexTheme.colors.background),
+                topBar = {
+                    Box(modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)) {
+                        TopBar(
+                            title = selectedThreadChrome.title,
+                            status = selectedThreadChrome.status,
+                            onOpenDrawer = controller.openDrawer,
+                        )
+                    }
+                },
+                bottomBar = {
+                    Composer(
+                        state = state,
+                        compactMode = controller.compactMode,
+                        activePanel = controller.composerPanel,
+                        onActivePanelChange = controller.onComposerPanelChange,
+                        onToggleDetails = viewModel::toggleComposerDetails,
+                        onCloseDetails = viewModel::closeComposerDetails,
+                        onChange = viewModel::updateComposer,
+                        onInsertText = viewModel::insertComposerText,
+                        onApplySlashCommand = viewModel::applySlashCommand,
+                        onClearComposer = viewModel::clearComposer,
+                        onSend = viewModel::send,
+                        onStop = viewModel::stopGenerating
                     )
-                }
-            },
-            bottomBar = {
-                Composer(
+                },
+                backgroundColor = CodexTheme.colors.background
+            ) { padding ->
+                ThreadScreen(
+                    modifier = Modifier.padding(padding),
                     state = state,
                     compactMode = controller.compactMode,
-                    activePanel = controller.composerPanel,
-                    onActivePanelChange = controller.onComposerPanelChange,
-                    onToggleCompact = controller.toggleCompactMode,
-                    onToggleDetails = viewModel::toggleComposerDetails,
-                    onCompactContext = viewModel::compactContext,
-                    onRollbackLastTurn = viewModel::rollbackLastTurn,
-                    onChange = viewModel::updateComposer,
-                    onInsertText = viewModel::insertComposerText,
-                    onApplySlashCommand = viewModel::applySlashCommand,
-                    onClearComposer = viewModel::clearComposer,
-                    onInsertShellTemplate = viewModel::insertShellTemplate,
-                    onSend = viewModel::send,
-                    onStop = viewModel::stopGenerating
+                    onOpenConnection = controller.openGatewayDialog,
+                    onRefreshCurrent = viewModel::refreshCurrentThreadAnimated,
+                    onLoadOlderMessages = viewModel::loadOlderMessages,
+                    onEditUserMessage = viewModel::editAndResendUserMessage,
+                    onResendUserMessage = viewModel::resendUserMessage,
+                    onForkFromMessage = { numTurns ->
+                        viewModel.forkThread(state.selectedThreadId, numTurns)
+                    },
+                    onNewThreadDraftChange = { draft -> viewModel.updateNewThreadDraft { draft } },
+                    onApprovePending = viewModel::approvePending,
+                    onRejectPending = viewModel::rejectPending
                 )
-            },
-            backgroundColor = CodexTheme.colors.background
-        ) { padding ->
-            ThreadScreen(
-                modifier = Modifier.padding(padding),
-                state = state,
-                compactMode = controller.compactMode,
-                onOpenConnection = controller.openGatewayDialog,
-                onRefreshCurrent = viewModel::refreshCurrentThreadAnimated,
-                onLoadOlderMessages = viewModel::loadOlderMessages,
-                onEditUserMessage = viewModel::replaceComposer,
-                onResendUserMessage = viewModel::resendUserMessage,
-                onCopyMessage = { text -> clipboard.setText(AnnotatedString(text)) },
-                onApprovePending = viewModel::approvePending,
-                onRejectPending = viewModel::rejectPending
-            )
+            }
+            OperationalNoticeOverlay(notices = state.operationalNotices)
         }
     }
 }

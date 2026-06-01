@@ -38,12 +38,23 @@ export interface AppServerThread {
   name: string | null;
   turns: AppServerTurn[];
   modelProvider: string;
+  source?: AppServerSessionSource;
+  threadSource?: "user" | "subagent" | "memory_consolidation" | null;
   gitInfo?: {
     sha?: string | null;
     branch?: string | null;
     originUrl?: string | null;
   } | null;
 }
+
+export type AppServerSessionSource =
+  | "cli"
+  | "vscode"
+  | "exec"
+  | "appServer"
+  | "unknown"
+  | { custom?: string }
+  | { subAgent?: unknown };
 
 export interface AppServerTurn {
   id: string;
@@ -200,6 +211,33 @@ export interface InitializeResult {
 export interface ThreadListResult {
   data: AppServerThread[];
   nextCursor: string | null;
+}
+
+export interface ModelListResult {
+  data: AppServerModel[];
+  nextCursor: string | null;
+}
+
+export interface AppServerModel {
+  id: string;
+  model: string;
+  displayName: string;
+  description?: string;
+  hidden?: boolean;
+  supportedReasoningEfforts?: Array<{
+    reasoningEffort: string;
+    description?: string;
+  }>;
+  defaultReasoningEffort?: string | null;
+  isDefault?: boolean;
+}
+
+export interface ConfigReadResult {
+  config: {
+    model?: string | null;
+    model_reasoning_effort?: string | null;
+    sandbox_mode?: "read-only" | "workspace-write" | "danger-full-access" | null;
+  };
 }
 
 export interface ThreadReadResult {

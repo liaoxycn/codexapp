@@ -3,7 +3,10 @@ package com.codex.mobile.ui
 import com.codex.mobile.data.SessionRepository
 import com.codex.mobile.model.ConnectionStatus
 import com.codex.mobile.model.GatewayConfig
+import com.codex.mobile.model.NewThreadDraft
 import com.codex.mobile.model.SessionRemoteState
+import com.codex.mobile.model.ThreadStatus
+import com.codex.mobile.model.ThreadSummary
 import com.codex.mobile.ui.state.ComposerSession
 import com.codex.mobile.ui.state.HomeRepositoryCoordinator
 import kotlinx.coroutines.CoroutineScope
@@ -77,11 +80,44 @@ class HomeRepositoryCoordinatorTest {
         }
     }
 
+    @Test
+    fun runningSnapshotsDoNotTriggerAppSideAutoRefresh() {
+        runBlocking {
+            val repository = FakeSessionRepository(
+                initial = SessionRemoteState(
+                    selectedThreadId = "thread-1",
+                    threads = listOf(
+                        ThreadSummary(
+                            id = "thread-1",
+                            title = "项目会话测试",
+                            preview = "hello",
+                            status = ThreadStatus.RUNNING
+                        )
+                    ),
+                    connectionStatus = ConnectionStatus.CONNECTED
+                )
+            )
+            val scope = CoroutineScope(coroutineContext + Job())
+            val coordinator = HomeRepositoryCoordinator(
+                repository = repository,
+                scope = scope,
+                composerSession = ComposerSession(initialThreadId = "thread-1")
+            )
+
+            coordinator.start()
+            repeat(3) { yield() }
+
+            assertEquals(0, repository.refreshCalls)
+            scope.coroutineContext[Job]?.cancel()
+        }
+    }
+
     private class FakeSessionRepository(
         initial: SessionRemoteState
     ) : SessionRepository {
         val snapshot = MutableStateFlow(initial)
         val connectCalls = mutableListOf<GatewayConfig>()
+        var refreshCalls = 0
 
         override val state: StateFlow<SessionRemoteState> = snapshot
 
@@ -91,11 +127,11 @@ class HomeRepositoryCoordinatorTest {
 
         override suspend fun disconnect() = Unit
 
-        override suspend fun createThread(cwd: String?) = Unit
+        override suspend fun createThread(cwd: String?, draft: NewThreadDraft?) = Unit
 
         override suspend fun selectThread(id: String) = Unit
 
-        override suspend fun forkThread(id: String) = Unit
+        override suspend fun forkThread(id: String, numTurns: Int?) = Unit
 
         override suspend fun renameThread(id: String, name: String) = Unit
 
@@ -103,18 +139,26 @@ class HomeRepositoryCoordinatorTest {
 
         override suspend fun unarchiveThread(id: String) = Unit
 
-        override suspend fun refreshThreads() = Unit
+        override suspend fun refreshThreads() {
+            refreshCalls += 1
+        }
 
         override suspend fun loadOlderMessages() = Unit
 
         override fun markManualRefreshing(refreshing: Boolean) = Unit
 
-        override suspend fun sendPrompt(prompt: String): Boolean = true
+        override suspend fun sendPrompt(prompt: String, newThreadDraft: NewThreadDraft?): Boolean = true
+
+        override suspend fun rollbackThread(numTurns: Int): Boolean = true
+
+        override suspend fun resendPrompt(prompt: String, rollbackNumTurns: Int): Boolean = true
 
         override suspend fun stopTurn() = Unit
 
         override suspend fun approvePending() = Unit
 
         override suspend fun rejectPending() = Unit
+
+        override suspend fun restartDesktop() = Unit
     }
 }

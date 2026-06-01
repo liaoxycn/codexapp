@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   normalizeAllCompactMessages,
   normalizeCompactMessages,
+  collectThreadMessages,
   mergeSnapshotMessages,
 } from "../dist/bridge/runtimeSnapshotMessages.js";
 
@@ -77,4 +78,69 @@ test("mergeSnapshotMessages drops live assistant placeholder after real assistan
   const merged = mergeSnapshotMessages(baseMessages, liveMessages);
 
   assert.deepEqual(merged, baseMessages);
+});
+
+test("collectThreadMessages marks only completed assistant text as final", () => {
+  const messages = collectThreadMessages({
+    id: "thread-1",
+    preview: "",
+    status: "active",
+    cwd: "D:/Projects/Test",
+    updatedAt: 1,
+    name: null,
+    modelProvider: "openai",
+    turns: [
+      {
+        id: "turn-running",
+        status: "running",
+        completedAt: null,
+        items: [{ type: "agentMessage", id: "assistant-running", text: "working" }],
+      },
+      {
+        id: "turn-done",
+        status: "completed",
+        completedAt: 2,
+        durationMs: 61000,
+        items: [{ type: "agentMessage", id: "assistant-final", text: "done" }],
+      },
+    ],
+  });
+
+  assert.equal(messages.find((message) => message.id === "assistant-running")?.isFinal, undefined);
+  assert.equal(messages.find((message) => message.id === "assistant-final")?.isFinal, true);
+  assert.equal(messages.find((message) => message.id === "assistant-final")?.durationMs, 61000);
+});
+
+test("collectThreadMessages computes running turn duration from startedAt", () => {
+  const realNow = Date.now;
+  Date.now = () => 125000;
+  try {
+    const messages = collectThreadMessages({
+      id: "thread-1",
+      preview: "",
+      status: "active",
+      cwd: "D:/Projects/Test",
+      updatedAt: 1,
+      name: null,
+      modelProvider: "openai",
+      turns: [
+        {
+          id: "turn-running",
+          status: "running",
+          startedAt: 120,
+          completedAt: null,
+          items: [
+            { type: "reasoning", id: "reasoning-running", summary: ["thinking"] },
+            { type: "agentMessage", id: "assistant-running", text: "working" },
+          ],
+        },
+      ],
+    });
+
+    assert.equal(messages.find((message) => message.id === "reasoning-running")?.durationMs, 5000);
+    assert.equal(messages.find((message) => message.id === "assistant-running")?.durationMs, 5000);
+    assert.equal(messages.find((message) => message.id === "assistant-running")?.isFinal, undefined);
+  } finally {
+    Date.now = realNow;
+  }
 });

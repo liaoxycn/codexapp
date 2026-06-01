@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import process from "node:process";
-import type { ClientSnapshot } from "../protocol.js";
+import { emptyConfigOptions, type ClientSnapshot, type ThreadStartOptions } from "../protocol.js";
 import { cloneMessage, shrinkWorkspacePath } from "./helpers.js";
 import { buildAssistantResponse } from "./mockResponses.js";
 import { createSeedThreads } from "./seedThreads.js";
@@ -45,16 +45,20 @@ export class InMemoryDesktopBackend {
       messages: thread.messages.map(cloneMessage),
       pendingApproval: thread.pendingApproval ?? null,
       chips: thread.chips.map((chip) => ({ ...chip })),
+      files: [],
       slashCommands: [...thread.slashCommands],
       cwd: thread.cwd,
       permissionSummary: thread.permissionSummary,
+      sessionConfig: thread.sessionConfig ?? {},
+      configOptions: emptyConfigOptions(),
+      operationalNotices: [],
       isGenerating: thread.isGenerating
     };
   }
 
-  createThread(cwd?: string): ClientSnapshot {
+  createThread(cwd?: string, options: ThreadStartOptions = {}): ClientSnapshot {
     const id = randomUUID();
-    const workspacePath = cwd?.trim() || this.workspacePath;
+    const workspacePath = options.cwd?.trim() || cwd?.trim() || this.workspacePath;
     this.threads.set(id, {
       summary: {
         id,
@@ -74,16 +78,24 @@ export class InMemoryDesktopBackend {
       pendingApproval: null,
       slashCommands: ["/compact  压缩上下文", "/rollback  回滚上轮", "! ls  运行 shell 命令"],
       cwd: workspacePath,
-      permissionSummary: "workspace-write",
+      permissionSummary: options.sandboxMode || "workspace-write",
+      sessionConfig: {
+        permissionMode: options.sandboxMode,
+        model: options.model,
+        reasoningEffort: options.reasoningEffort,
+      },
       isGenerating: false
     });
     this.events.emit("changed");
     return this.getSnapshot(id);
   }
 
-  forkThread(threadId: string): ClientSnapshot {
+  forkThread(threadId: string, numTurns?: number): ClientSnapshot {
     const source = this.ensureThread(threadId);
     const id = randomUUID();
+    const forkMessageCount = typeof numTurns === "number" && numTurns > 0
+      ? Math.min(source.messages.length, Math.max(0, Math.floor(numTurns) * 2))
+      : source.messages.length;
     this.threads.set(id, {
       ...source,
       summary: {
@@ -93,7 +105,7 @@ export class InMemoryDesktopBackend {
         status: "idle",
         archived: false
       },
-      messages: source.messages.map(cloneMessage),
+      messages: source.messages.slice(0, forkMessageCount).map(cloneMessage),
       chips: source.chips.map((chip) => ({ ...chip })),
       pendingApproval: null,
       slashCommands: [...source.slashCommands],
@@ -180,6 +192,26 @@ export class InMemoryDesktopBackend {
 
     this.events.emit("changed");
     return this.getSnapshot(threadId);
+  }
+
+  rollbackThread(threadId: string, numTurns: number): ClientSnapshot {
+    const thread = this.ensureThread(threadId);
+    if (thread.pendingTimer) {
+      clearTimeout(thread.pendingTimer);
+      thread.pendingTimer = undefined;
+    }
+    const rollbackCount = Number.isInteger(numTurns) && numTurns > 0 ? numTurns : 1;
+    thread.messages = thread.messages.slice(0, Math.max(0, thread.messages.length - rollbackCount * 2));
+    thread.isGenerating = false;
+    thread.pendingApproval = null;
+    thread.summary.status = "idle";
+    this.events.emit("changed");
+    return this.getSnapshot(threadId);
+  }
+
+  resendPrompt(threadId: string, text: string, rollbackNumTurns: number): ClientSnapshot {
+    this.rollbackThread(threadId, rollbackNumTurns);
+    return this.sendPrompt(threadId, text);
   }
 
   stopTurn(threadId: string): ClientSnapshot {

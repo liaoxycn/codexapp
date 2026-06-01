@@ -5,22 +5,41 @@ import type {
   ThreadResumeResult,
 } from "../appServerTypes.js";
 import { isThreadActivelyGenerating } from "../threadState.js";
-import type { ClientSnapshot, GatewayChipPayload, GatewayMessagePayload, GatewayThreadPayload } from "../protocol.js";
+import {
+  emptyConfigOptions,
+  type ClientSnapshot,
+  type GatewayChipPayload,
+  type GatewayMessagePayload,
+  type GatewaySessionConfigPayload,
+  type GatewayThreadPayload,
+} from "../protocol.js";
+import { listProjectFiles } from "./projectFiles.js";
 import type { PendingApproval, ThreadRuntimeState } from "./types.js";
 import { INITIAL_HISTORY_WINDOW } from "./types.js";
 export {
   buildVisibleThreadSummaries,
   dedupeSummaries,
   getThreadLastActivityAtMs,
+  isDesktopMainListThread,
   mapThreadToSummary,
   touchThreadActivity,
 } from "./threadSummaries.js";
+
+type SnapshotResumeMetadata = {
+  model: string | null;
+  modelProvider: string | null;
+  approvalPolicy: AppServerApprovalPolicy | null;
+  approvalsReviewer: ThreadResumeResult["approvalsReviewer"] | string | null;
+  sandbox: AppServerSandboxPolicy | null;
+  reasoningEffort: string | null;
+  instructionSources: string[];
+};
 
 export function mapThreadToSnapshot(
   thread: AppServerThread,
   threads: GatewayThreadPayload[],
   selectedThreadId: string,
-  resume: Pick<ThreadResumeResult, "model" | "approvalPolicy" | "approvalsReviewer" | "sandbox" | "reasoningEffort" | "instructionSources"> | null,
+  resume: SnapshotResumeMetadata | null,
   allMessages: GatewayMessagePayload[]
 ): ClientSnapshot {
   const threadIsGenerating = isThreadActivelyGenerating(thread);
@@ -31,9 +50,13 @@ export function mapThreadToSnapshot(
     hasMoreHistory: allMessages.length > INITIAL_HISTORY_WINDOW,
     pendingApproval: null,
     chips: buildChips(thread, resume),
+    files: listProjectFiles(thread.cwd),
     slashCommands: ["/compact  压缩上下文", "/rollback  回滚上轮", "! ls  运行 shell 命令"],
     cwd: thread.cwd,
     permissionSummary: buildPermissionSummary(resume?.approvalPolicy ?? null, resume?.sandbox ?? null),
+    sessionConfig: buildSessionConfig(thread, resume),
+    configOptions: emptyConfigOptions(),
+    operationalNotices: [],
     isGenerating: threadIsGenerating,
   };
 }
@@ -91,15 +114,16 @@ export function buildApprovalResponse(approval: PendingApproval, allow: boolean)
 
 export function toResumeMetadata(
   state: ThreadRuntimeState | undefined
-): Pick<ThreadResumeResult, "model" | "approvalPolicy" | "approvalsReviewer" | "sandbox" | "reasoningEffort" | "instructionSources"> | null {
+): SnapshotResumeMetadata | null {
   if (!state) {
     return null;
   }
   return {
-    model: state.model ?? state.thread?.modelProvider ?? "openai",
-    approvalPolicy: state.approvalPolicy ?? "never",
-    approvalsReviewer: (state.approvalsReviewer as ThreadResumeResult["approvalsReviewer"]) ?? "user",
-    sandbox: state.sandbox ?? { type: "dangerFullAccess" },
+    model: state.model ?? null,
+    modelProvider: state.modelProvider ?? state.thread?.modelProvider ?? null,
+    approvalPolicy: state.approvalPolicy ?? null,
+    approvalsReviewer: (state.approvalsReviewer as ThreadResumeResult["approvalsReviewer"]) ?? null,
+    sandbox: state.sandbox ?? null,
     reasoningEffort: state.reasoningEffort,
     instructionSources: state.instructionSources,
   };
@@ -112,6 +136,18 @@ export function buildPermissionSummary(
   const sandboxLabel = sandbox ? mapSandboxLabel(sandbox) : "sandbox:unknown";
   const approvalLabel = approvalPolicy ? mapApprovalLabel(approvalPolicy) : "approval:unknown";
   return `${sandboxLabel} · ${approvalLabel}`;
+}
+
+export function buildSessionConfig(
+  thread: AppServerThread,
+  resume: SnapshotResumeMetadata | null
+): GatewaySessionConfigPayload {
+  return {
+    permissionMode: resume?.sandbox ? mapSandboxLabel(resume.sandbox) : undefined,
+    provider: resume?.modelProvider || thread.modelProvider || undefined,
+    model: resume?.model || undefined,
+    reasoningEffort: resume?.reasoningEffort || undefined,
+  };
 }
 
 export function isThreadNotMaterializedError(error: unknown): boolean {
@@ -130,9 +166,13 @@ export function emptySnapshot(): ClientSnapshot {
     hasMoreHistory: false,
     pendingApproval: null,
     chips: [],
+    files: [],
     slashCommands: [],
     cwd: "",
     permissionSummary: "",
+    sessionConfig: {},
+    configOptions: emptyConfigOptions(),
+    operationalNotices: [],
     isGenerating: false,
   };
 }
@@ -146,10 +186,13 @@ export function trimMessagesToWindow(messages: GatewayMessagePayload[], historyW
 
 function buildChips(
   thread: AppServerThread,
-  resume: Pick<ThreadResumeResult, "model" | "reasoningEffort" | "instructionSources"> | null
+  resume: SnapshotResumeMetadata | null
 ): GatewayChipPayload[] {
   const chips: GatewayChipPayload[] = [];
-  chips.push({ label: resume?.model || thread.modelProvider || "openai", icon: "context" });
+  const modelChip = resume?.model || thread.modelProvider;
+  if (modelChip) {
+    chips.push({ label: modelChip, icon: "context" });
+  }
   if (resume?.reasoningEffort) {
     chips.push({ label: `reasoning:${resume.reasoningEffort}`, icon: "context" });
   }

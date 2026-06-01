@@ -3,6 +3,7 @@ package com.codex.mobile.data
 import com.codex.mobile.data.gateway.GatewayCommandSender
 import com.codex.mobile.model.ConnectionStatus
 import com.codex.mobile.model.GatewayConfig
+import com.codex.mobile.model.NewThreadDraft
 import com.codex.mobile.model.SessionRemoteState
 import com.codex.mobile.model.ThreadStatus
 import com.codex.mobile.model.ThreadSummary
@@ -105,6 +106,41 @@ class GatewayRepositoryCommandActionsTest {
     }
 
     @Test
+    fun sendPromptForNewDraftOmitsExistingThreadAndSendsDraftOptions() {
+        var state = SessionRemoteState(
+            connectionStatus = ConnectionStatus.CONNECTED,
+            selectedThreadId = "thread-1",
+            gatewayConfig = GatewayConfig(url = "ws://10.0.2.2:8765/mobile")
+        )
+        val sentMessages = mutableListOf<String>()
+        val actions = GatewayRepositoryCommandActions(
+            commandSender = GatewayCommandSender(json) { payload ->
+                sentMessages += payload
+                true
+            },
+            readState = { state },
+            updateState = { transform -> state = transform(state) },
+            logDebug = {}
+        )
+
+        val accepted = actions.sendPrompt(
+            "hello new",
+            NewThreadDraft(
+                cwd = "D:/Projects/App",
+                model = "gpt-5",
+                reasoningEffort = "high",
+                sandboxMode = "workspace-write"
+            )
+        )
+
+        assertTrue(accepted)
+        assertTrue(sentMessages.single().contains("\"newThread\":true"))
+        assertFalse(sentMessages.single().contains("\"threadId\":\"thread-1\""))
+        assertTrue(sentMessages.single().contains("\"cwd\":\"D:/Projects/App\""))
+        assertEquals(2, state.messages.size)
+    }
+
+    @Test
     fun threadManagementActionsSendExpectedMessagesWhenConnected() {
         var state = SessionRemoteState(connectionStatus = ConnectionStatus.CONNECTED)
         val sentMessages = mutableListOf<String>()
@@ -119,15 +155,18 @@ class GatewayRepositoryCommandActionsTest {
         )
 
         assertTrue(actions.renameThread("thread-1", "  Renamed  "))
-        assertTrue(actions.forkThread("thread-2"))
+        assertTrue(actions.forkThread("thread-2", 2))
         assertTrue(actions.archiveThread("thread-3"))
         assertTrue(actions.unarchiveThread("thread-4"))
+        assertTrue(actions.restartDesktop())
 
         assertTrue(sentMessages[0].contains("\"type\":\"rename_thread\""))
         assertTrue(sentMessages[0].contains("\"name\":\"Renamed\""))
         assertTrue(sentMessages[1].contains("\"type\":\"fork_thread\""))
+        assertTrue(sentMessages[1].contains("\"numTurns\":2"))
         assertTrue(sentMessages[2].contains("\"type\":\"archive_thread\""))
         assertTrue(sentMessages[3].contains("\"type\":\"unarchive_thread\""))
+        assertTrue(sentMessages[4].contains("\"type\":\"restart_desktop\""))
     }
 
     @Test

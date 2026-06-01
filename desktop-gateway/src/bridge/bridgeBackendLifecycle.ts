@@ -2,6 +2,7 @@ import type {
   JsonRpcNotification,
   JsonRpcServerRequest,
 } from "../appServerTypes.js";
+import type { GatewayOperationalNoticePayload } from "../protocol.js";
 import { handleBridgeNotification } from "./notifications.js";
 import { applyServerRequest } from "./serverRequests.js";
 import { applyPendingApprovalState } from "./approvalActions.js";
@@ -23,6 +24,7 @@ export interface BridgeBackendLifecycleDeps {
   hydrateThreads(): Promise<void>;
   refreshThread(threadId: string): Promise<void>;
   ensureActiveAssistantMessage(state: ThreadRuntimeState, turnId: string): void;
+  pushOperationalNotice?(notice: GatewayOperationalNoticePayload): void;
   updateSummaryStatus(threadId: string, status: ThreadLifecycleStatus): void;
 }
 
@@ -38,6 +40,7 @@ export async function handleBridgeBackendNotification(
       finalizeBridgeTurnState(threadId, turnStatus, deps),
     hydrateThreads: deps.hydrateThreads,
     ensureActiveAssistantMessage: deps.ensureActiveAssistantMessage,
+    pushOperationalNotice: deps.pushOperationalNotice,
     updateSummaryStatus: deps.updateSummaryStatus,
   });
 }

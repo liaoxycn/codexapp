@@ -15,7 +15,7 @@ import {
 
 type ThreadCatalogClient = Pick<
   AppServerClient,
-  "threadArchive" | "threadFork" | "threadSetName" | "threadStart" | "threadUnarchive"
+  "threadArchive" | "threadFork" | "threadRead" | "threadRollback" | "threadSetName" | "threadStart" | "threadUnarchive"
 >;
 
 export interface ThreadCatalogActionDeps {
@@ -46,12 +46,18 @@ export {
 
 export async function refreshCatalogThreads(
   deps: ThreadCatalogActionDeps,
-  selectedThreadId?: string
+  selectedThreadId?: string,
+  requestedSelectionVersion?: number
 ): Promise<ClientSnapshot> {
   const requested = deps.resolveThreadId(selectedThreadId);
-  const requestedVersion = deps.getSelectionVersion();
+  const requestedVersion = requestedSelectionVersion ?? deps.getSelectionVersion();
 
   await deps.hydrateThreads({ preserveCurrentThread: true });
+
+  if (deps.getSelectionVersion() !== requestedVersion) {
+    deps.emitChanged();
+    return deps.getSnapshot();
+  }
 
   if (isStaleSelectionRequest({
     currentThreadId: deps.getCurrentThreadId(),

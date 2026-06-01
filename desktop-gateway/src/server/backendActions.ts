@@ -36,9 +36,14 @@ export function buildSnapshotMessage(snapshot: ClientSnapshot): GatewaySnapshotM
     hasMoreHistory: snapshot.hasMoreHistory ?? false,
     pendingApproval: snapshot.pendingApproval ?? null,
     chips: snapshot.chips,
+    files: snapshot.files,
     slashCommands: snapshot.slashCommands,
     cwd: snapshot.cwd,
     permissionSummary: snapshot.permissionSummary,
+    sessionConfig: snapshot.sessionConfig,
+    configOptions: snapshot.configOptions,
+    operationalNotices: snapshot.operationalNotices ?? [],
+    desktopRestartRequired: snapshot.desktopRestartRequired ?? false,
     isGenerating: snapshot.isGenerating,
   };
 }
@@ -52,9 +57,14 @@ const PATCH_FIELDS: SnapshotPatchField[] = [
   "hasMoreHistory",
   "pendingApproval",
   "chips",
+  "files",
   "slashCommands",
   "cwd",
   "permissionSummary",
+  "sessionConfig",
+  "configOptions",
+  "operationalNotices",
+  "desktopRestartRequired",
   "isGenerating",
 ];
 

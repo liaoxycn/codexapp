@@ -30,7 +30,6 @@ test("threadList reads updated threads across pages", async () => {
         limit: 100,
         sortKey: "updated_at",
         sortDirection: "desc",
-        sourceKinds: ["cli", "vscode", "appServer", "unknown"],
         archived: false,
       },
     },
@@ -41,9 +40,49 @@ test("threadList reads updated threads across pages", async () => {
         limit: 100,
         sortKey: "updated_at",
         sortDirection: "desc",
-        sourceKinds: ["cli", "vscode", "appServer", "unknown"],
         archived: false,
       },
     },
   ]);
+});
+
+test("configOptions keeps app server request context", async () => {
+  const client = new AppServerClient();
+  const calls = [];
+  client.request = async function request(method, params) {
+    assert.equal(this, client);
+    calls.push({ method, params });
+    if (method === "config/read") {
+      return {
+        config: {
+          model: "gpt-5",
+          model_reasoning_effort: "medium",
+          sandbox_mode: "workspace-write",
+        },
+      };
+    }
+    return {
+      data: [
+        {
+          id: "gpt-5",
+          model: "gpt-5",
+          displayName: "GPT-5",
+          description: "default",
+          isDefault: true,
+          hidden: false,
+          supportedReasoningEfforts: [
+            { reasoningEffort: "medium", description: "balanced" },
+          ],
+          defaultReasoningEffort: "medium",
+        },
+      ],
+      nextCursor: null,
+    };
+  };
+
+  const options = await client.configOptions("D:/repo");
+
+  assert.equal(options.defaults.model, "gpt-5");
+  assert.equal(options.models[0].label, "GPT-5");
+  assert.deepEqual(calls.map((call) => call.method), ["config/read", "model/list"]);
 });

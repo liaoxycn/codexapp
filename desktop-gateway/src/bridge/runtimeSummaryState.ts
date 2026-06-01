@@ -8,6 +8,7 @@ import { systemStatus } from "./runtimeMessageStore.js";
 import {
   dedupeSummaries,
   emptySnapshot,
+  isDesktopMainListThread,
   mapThreadToSummary,
 } from "./summaries.js";
 import {
@@ -21,6 +22,7 @@ export function buildRuntimeSummaries(
 ): GatewayThreadPayload[] {
   const items = [...threads.values()]
     .filter((entry) => entry.thread != null || entry.snapshot.threads.length > 0)
+    .filter((entry) => entry.thread == null || entry.isLocalCatalogEntry || isDesktopMainListThread(entry.thread))
     .map((entry) =>
       entry.thread
         ? {
@@ -98,6 +100,7 @@ export function createPlaceholderThreadRuntimeState(
     summary,
     thread: null,
     lastActivityAtMs: summary.updatedAt ?? 0,
+    isLocalCatalogEntry: false,
     historyWindow: INITIAL_HISTORY_WINDOW,
     currentTurnId: null,
     activeAssistantMessageId: null,
@@ -108,6 +111,7 @@ export function createPlaceholderThreadRuntimeState(
     isFinalizing: false,
     isSubscribed: false,
     model: null,
+    modelProvider: null,
     instructionSources: [],
     approvalPolicy: null,
     approvalsReviewer: null,

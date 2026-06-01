@@ -12,18 +12,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.DropdownMenu
 import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +48,7 @@ import com.codex.mobile.ui.common.StatusDot
 import com.codex.mobile.ui.common.ThreadStatusText
 import com.codex.mobile.ui.common.threadStatusLabel
 import com.codex.mobile.ui.theme.CodexTheme
+import kotlinx.coroutines.delay
 
 @Composable
 internal fun ThreadRow(
@@ -54,11 +56,17 @@ internal fun ThreadRow(
     selected: Boolean,
     indentLevel: Int,
     onClick: () -> Unit,
-    onFork: () -> Unit,
     onRename: () -> Unit,
     onArchiveToggle: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    var pendingAction by remember(summary.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(pendingAction) {
+        if (pendingAction != null) {
+            delay(3500L)
+            pendingAction = null
+        }
+    }
     val startPadding = 10.dp + (indentLevel * 8).dp
     val updatedLabel = if (summary.updatedAt > 0L) formatThreadUpdatedAt(summary.updatedAt) else "无更新时间"
     val gitLabel = threadGitLabel(summary)
@@ -153,18 +161,27 @@ internal fun ThreadRow(
         }
         Box {
             IconButton(
-                onClick = { menuExpanded = true },
+                onClick = { if (pendingAction == null) menuExpanded = true },
+                enabled = pendingAction == null,
                 modifier = Modifier
                     .size(32.dp)
                     .semantics { contentDescription = "会话操作 ${summary.title}" }
                     .testTag("thread_row_more_${summary.id}")
             ) {
-                Icon(
-                    imageVector = Icons.Filled.MoreVert,
-                    contentDescription = null,
-                    tint = CodexTheme.colors.textSecondary,
-                    modifier = Modifier.size(18.dp)
-                )
+                if (pendingAction != null) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(17.dp),
+                        color = CodexTheme.colors.textSecondary,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.MoreVert,
+                        contentDescription = null,
+                        tint = CodexTheme.colors.textSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
             DropdownMenu(
                 expanded = menuExpanded,
@@ -173,21 +190,7 @@ internal fun ThreadRow(
                 DropdownMenuItem(
                     onClick = {
                         menuExpanded = false
-                        onFork()
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.CallSplit,
-                        contentDescription = null,
-                        tint = CodexTheme.colors.textSecondary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("分叉")
-                }
-                DropdownMenuItem(
-                    onClick = {
-                        menuExpanded = false
+                        pendingAction = "rename"
                         onRename()
                     }
                 ) {
@@ -203,6 +206,7 @@ internal fun ThreadRow(
                 DropdownMenuItem(
                     onClick = {
                         menuExpanded = false
+                        pendingAction = "archive"
                         onArchiveToggle()
                     }
                 ) {

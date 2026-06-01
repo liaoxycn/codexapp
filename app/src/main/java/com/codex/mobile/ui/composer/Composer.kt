@@ -1,6 +1,8 @@
 package com.codex.mobile.ui.composer
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,8 +10,12 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import com.codex.mobile.model.HomeUiState
 import com.codex.mobile.ui.theme.CodexTheme
@@ -20,26 +26,41 @@ internal fun Composer(
     compactMode: Boolean,
     activePanel: ComposerPanel,
     onActivePanelChange: (ComposerPanel) -> Unit,
-    onToggleCompact: () -> Unit,
     onToggleDetails: () -> Unit,
-    onCompactContext: () -> Unit,
-    onRollbackLastTurn: () -> Unit,
+    onCloseDetails: () -> Unit,
     onChange: (String) -> Unit,
     onInsertText: (String) -> Unit,
     onApplySlashCommand: (String) -> Unit,
     onClearComposer: () -> Unit,
-    onInsertShellTemplate: () -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit
 ) {
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val controller = rememberComposerController(
         state = state,
         activePanel = activePanel,
         onActivePanelChange = onActivePanelChange,
         onChange = onChange,
+        onInsertText = onInsertText,
         onApplySlashCommand = onApplySlashCommand,
         onSend = onSend,
     )
+
+    fun clearComposerFocus() {
+        focusManager.clearFocus(force = true)
+        keyboardController?.hide()
+    }
+
+    BackHandler(enabled = activePanel != ComposerPanel.NONE || state.showComposerDetails) {
+        if (activePanel != ComposerPanel.NONE) {
+            onActivePanelChange(ComposerPanel.NONE)
+            clearComposerFocus()
+        } else if (state.showComposerDetails) {
+            onCloseDetails()
+            clearComposerFocus()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -47,41 +68,47 @@ internal fun Composer(
             .background(CodexTheme.colors.surface)
             .imePadding()
             .windowInsetsPadding(WindowInsets.navigationBars)
-            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .padding(horizontal = 14.dp, vertical = 8.dp)
     ) {
-        ComposerDetailsSection(
-            state = state,
-            compactMode = compactMode,
-            activePanel = activePanel,
-            slashPanelVisible = controller.slashPanelVisible,
-            filteredCommands = controller.filteredCommands,
-            trailingToken = controller.trailingToken,
-            slashQuery = controller.slashQuery,
-            onSlashQueryChange = controller.onSlashQueryChange,
-            onFocusComposer = controller.focusComposer,
-            onActivePanelChange = onActivePanelChange,
-            onToggleCompact = onToggleCompact,
-            onCompactContext = onCompactContext,
-            onRollbackLastTurn = onRollbackLastTurn,
-            onClearComposer = onClearComposer,
-            onInsertShellTemplate = onInsertShellTemplate,
-            onInsertText = onInsertText,
-            onResetInlineSlashPanel = controller.resetInlineSlashPanel,
-            onSelectSlashCommand = controller.selectSlashCommand,
-        )
-        ComposerInputBar(
-            state = state,
-            compactMode = compactMode,
-            composerEnabled = controller.composerEnabled,
-            sendEnabled = controller.sendEnabled,
-            composerFieldValue = controller.composerFieldValue,
-            focusRequester = controller.focusRequester,
-            inputInteractionSource = controller.inputInteractionSource,
-            onFocusComposer = controller.focusComposer,
-            onComposerValueChange = controller.onComposerValueChange,
-            onToggleDetails = onToggleDetails,
-            onSendNow = controller.sendNow,
-            onStop = onStop,
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(26.dp))
+                .background(CodexTheme.colors.surface)
+                .border(1.dp, CodexTheme.colors.border.copy(alpha = 0.92f), RoundedCornerShape(26.dp))
+                .padding(horizontal = 8.dp, vertical = 7.dp)
+        ) {
+            ComposerDetailsSection(
+                state = state,
+                activePanel = activePanel,
+                slashPanelVisible = controller.slashPanelVisible,
+                filePanelVisible = controller.filePanelVisible,
+                filteredCommands = controller.filteredCommands,
+                trailingToken = controller.trailingToken,
+                slashQuery = controller.slashQuery,
+                fileQuery = controller.fileQuery,
+                onSlashQueryChange = controller.onSlashQueryChange,
+                onFileQueryChange = controller.onFileQueryChange,
+                onActivePanelChange = onActivePanelChange,
+                onClearComposer = onClearComposer,
+                onResetInlineSlashPanel = controller.resetInlineSlashPanel,
+                onSelectSlashCommand = controller.selectSlashCommand,
+                onSelectFile = controller.selectFile,
+            )
+            ComposerInputBar(
+                state = state,
+                compactMode = compactMode,
+                composerEnabled = controller.composerEnabled,
+                sendEnabled = controller.sendEnabled,
+                composerFieldValue = controller.composerFieldValue,
+                focusRequester = controller.focusRequester,
+                inputInteractionSource = controller.inputInteractionSource,
+                onFocusComposer = controller.focusComposer,
+                onComposerValueChange = controller.onComposerValueChange,
+                onToggleDetails = onToggleDetails,
+                onSendNow = controller.sendNow,
+                onStop = onStop,
+            )
+        }
     }
 }

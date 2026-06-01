@@ -3,6 +3,7 @@ package com.codex.mobile.data
 import android.util.Log
 import com.codex.mobile.data.gateway.GatewayCommandSender
 import com.codex.mobile.model.ConnectionStatus
+import com.codex.mobile.model.NewThreadDraft
 import com.codex.mobile.model.SessionRemoteState
 
 internal class GatewayRepositoryCommandActions(
@@ -12,13 +13,18 @@ internal class GatewayRepositoryCommandActions(
     tag: String = "CodexGateway",
     private val logDebug: (String) -> Unit = { message -> Log.d(tag, message) }
 ) {
-    fun createThread(cwd: String?): Boolean {
+    fun createThread(cwd: String?, draft: NewThreadDraft? = null): Boolean {
         return runConnectedAction(
             unavailableDetail = "未连接 gateway，无法新建会话",
             beforeSend = { updateState(SessionRemoteState::startCreatingThread) },
             sendFailureDetail = "新建会话失败，gateway 连接已断开"
         ) {
-            commandSender.createThread(cwd)
+            commandSender.createThread(
+                cwd = cwd,
+                model = draft?.model,
+                reasoningEffort = draft?.reasoningEffort,
+                sandboxMode = draft?.sandboxMode
+            )
         }
     }
 
@@ -44,10 +50,10 @@ internal class GatewayRepositoryCommandActions(
         }
     }
 
-    fun forkThread(id: String): Boolean {
+    fun forkThread(id: String, numTurns: Int? = null): Boolean {
         if (id.isBlank()) return false
         return runConnectedAction("未连接 gateway，无法分叉会话") {
-            commandSender.forkThread(id)
+            commandSender.forkThread(id, numTurns)
         }
     }
 
@@ -81,10 +87,10 @@ internal class GatewayRepositoryCommandActions(
         }
     }
 
-    fun sendPrompt(prompt: String): Boolean {
+    fun sendPrompt(prompt: String, newThreadDraft: NewThreadDraft? = null): Boolean {
         if (prompt.isBlank()) return false
         val snapshot = readState()
-        val targetThreadId = snapshot.selectedThreadId.ifBlank { null }
+        val targetThreadId = if (newThreadDraft == null) snapshot.selectedThreadId.ifBlank { null } else null
         if (snapshot.connectionStatus == ConnectionStatus.CONNECTING) {
             updateState { it.withConnectionDetail("正在同步会话，请稍后再发") }
             return false
@@ -93,13 +99,50 @@ internal class GatewayRepositoryCommandActions(
             markActionUnavailable("未连接 gateway，请先连接后再发送")
             return false
         }
-        val sent = commandSender.sendPrompt(prompt, targetThreadId)
+        val sent = commandSender.sendPrompt(
+            text = prompt,
+            threadId = targetThreadId,
+            newThread = newThreadDraft != null,
+            cwd = newThreadDraft?.cwd,
+            model = newThreadDraft?.model,
+            reasoningEffort = newThreadDraft?.reasoningEffort,
+            sandboxMode = newThreadDraft?.sandboxMode
+        )
         logDebug("send_prompt sent=$sent")
         if (!sent) {
             updateState { it.withSendFailure("发送失败，gateway 连接已断开") }
             return false
         }
         updateState { it.withOptimisticPrompt(prompt) }
+        return true
+    }
+
+    fun rollbackThread(numTurns: Int): Boolean {
+        val snapshot = readState()
+        val threadId = snapshot.selectedThreadId.ifBlank { return false }
+        return runConnectedAction("未连接 gateway，无法回滚会话") {
+            commandSender.rollbackThread(threadId, numTurns)
+        }
+    }
+
+    fun resendPrompt(prompt: String, rollbackNumTurns: Int): Boolean {
+        if (prompt.isBlank()) return false
+        val snapshot = readState()
+        val threadId = snapshot.selectedThreadId.ifBlank { return false }
+        if (snapshot.connectionStatus != ConnectionStatus.CONNECTED) {
+            markActionUnavailable("未连接 gateway，请先连接后再重发")
+            return false
+        }
+        val sent = commandSender.resendPrompt(
+            text = prompt.trim(),
+            threadId = threadId,
+            rollbackNumTurns = rollbackNumTurns
+        )
+        if (!sent) {
+            updateState { it.withSendFailure("重发失败，gateway 连接已断开") }
+            return false
+        }
+        updateState { it.withOptimisticPrompt(prompt.trim()) }
         return true
     }
 
@@ -119,6 +162,12 @@ internal class GatewayRepositoryCommandActions(
     fun rejectPending(): Boolean {
         return runConnectedAction("未连接 gateway，无法审批") {
             commandSender.rejectPending()
+        }
+    }
+
+    fun restartDesktop(): Boolean {
+        return runConnectedAction("未连接 gateway，无法重启桌面端") {
+            commandSender.restartDesktop()
         }
     }
 

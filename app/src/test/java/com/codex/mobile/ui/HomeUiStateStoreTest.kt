@@ -38,7 +38,7 @@ class HomeUiStateStoreTest {
 
             yield()
 
-            assertEquals("thread-1", store.state.value.selectedThreadId)
+            assertEquals("", store.state.value.selectedThreadId)
             assertEquals("hello codex", store.state.value.composerText)
             assertEquals(ConnectionStatus.CONNECTED, store.state.value.connectionStatus)
             assertEquals("已连接", store.state.value.connectionDetail)
@@ -69,7 +69,7 @@ class HomeUiStateStoreTest {
             store.closeComposerDetails()
             yield()
             assertFalse(store.state.value.showComposerDetails)
-            assertEquals("thread-1", store.state.value.selectedThreadId)
+            assertEquals("", store.state.value.selectedThreadId)
             collector.cancel()
             scope.coroutineContext[Job]?.cancel()
         }
@@ -92,6 +92,32 @@ class HomeUiStateStoreTest {
             yield()
 
             assertEquals(1L, store.state.value.composerFocusRequest)
+            collector.cancel()
+            scope.coroutineContext[Job]?.cancel()
+        }
+    }
+
+    @Test
+    fun exitAndStartNewThreadDraftSwitchVisibleSelection() {
+        runBlocking {
+            val remoteState = MutableStateFlow(SessionRemoteState(selectedThreadId = "thread-1"))
+            val composerText = MutableStateFlow("")
+            val scope = CoroutineScope(Dispatchers.Unconfined + Job())
+            val store = HomeUiStateStore(
+                remoteState = remoteState,
+                composerText = composerText,
+                scope = scope
+            )
+            val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) { store.state.collect {} }
+
+            store.exitNewThreadDraft()
+            yield()
+            assertEquals("thread-1", store.state.value.selectedThreadId)
+
+            store.startNewThreadDraft()
+            yield()
+            assertEquals("", store.state.value.selectedThreadId)
+            assertTrue(store.state.value.isNewThreadDraft)
             collector.cancel()
             scope.coroutineContext[Job]?.cancel()
         }

@@ -61,7 +61,24 @@ export function isThreadActivelyGenerating(thread: AppServerThread): boolean {
   });
 }
 
-function hasRecentUnmaterializedActivity(thread: AppServerThread, nowMs = Date.now()): boolean {
+function getThreadLatestActivityAtMs(thread: AppServerThread): number {
+  let latest = thread.updatedAt > 0 ? thread.updatedAt * 1000 : 0;
+  for (const turn of thread.turns) {
+    const startedAtMs = typeof turn.startedAt === "number" && turn.startedAt > 0 ? turn.startedAt * 1000 : 0;
+    const completedAtMs = typeof turn.completedAt === "number" && turn.completedAt > 0 ? turn.completedAt * 1000 : 0;
+    latest = Math.max(latest, startedAtMs, completedAtMs);
+  }
+  return latest;
+}
+
+function hasRecentUnmaterializedActivity(
+  thread: AppServerThread,
+  statusType: string,
+  nowMs = Date.now()
+): boolean {
+  if (statusType !== "notloaded") {
+    return false;
+  }
   if (thread.turns.length === 0) {
     return false;
   }
@@ -77,6 +94,20 @@ function hasRecentUnmaterializedActivity(thread: AppServerThread, nowMs = Date.n
   return latestTurnActivityMs + 1000 < updatedAtMs;
 }
 
+function hasActiveUnmaterializedTurn(thread: AppServerThread): boolean {
+  if (getThreadStatusType(thread.status) !== "active") {
+    return false;
+  }
+  if (thread.turns.length === 0) {
+    return false;
+  }
+  const latestTurn = thread.turns.at(-1);
+  if (!latestTurn || latestTurn.completedAt != null || isTerminalTurnStatus(latestTurn.status)) {
+    return false;
+  }
+  return ["inprogress", "running"].includes(latestTurn.status.toLowerCase());
+}
+
 export function resolveThreadSummaryStatus(
   thread: AppServerThread
 ): "running" | "idle" | "needs_approval" | "failed" {
@@ -90,7 +121,10 @@ export function resolveThreadSummaryStatus(
   if (type === "systemerror") {
     return "failed";
   }
-  if (hasRecentUnmaterializedActivity(thread)) {
+  if (hasRecentUnmaterializedActivity(thread, type)) {
+    return "running";
+  }
+  if (hasActiveUnmaterializedTurn(thread)) {
     return "running";
   }
   if (isThreadActivelyGenerating(thread)) {
@@ -139,10 +173,23 @@ export function shouldRetainThreadRuntimeOverlay(
     currentTurnId?: string | null;
     transientOperation?: string | null;
     pendingApproval?: { text?: string | null } | null;
+    lastActivityAtMs?: number;
   } | null
 ): boolean {
-  void existingRuntime;
-  return shouldRetainLiveThreadRuntime(thread);
+  if (shouldRetainLiveThreadRuntime(thread)) {
+    return true;
+  }
+  const hasLiveOverlay = Boolean(
+    existingRuntime?.isGenerating ||
+      existingRuntime?.currentTurnId ||
+      existingRuntime?.transientOperation ||
+      existingRuntime?.pendingApproval?.text
+  );
+  if (!hasLiveOverlay) {
+    return false;
+  }
+  const incomingActivityAtMs = getThreadLatestActivityAtMs(thread);
+  return incomingActivityAtMs > 0 && incomingActivityAtMs < (existingRuntime?.lastActivityAtMs ?? 0);
 }
 
 export function resolveLifecycleStatus(

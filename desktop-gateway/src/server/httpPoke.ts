@@ -13,7 +13,7 @@ export type DesktopPokePayload = {
 export async function handlePokeHttpRequest(
   request: IncomingMessage,
   response: ServerResponse,
-  focusDesktopWindowFn: (payload: DesktopPokePayload) => Promise<{ ok: boolean }>
+  restartDesktopFn: (payload: DesktopPokePayload) => Promise<{ ok: boolean }>
 ): Promise<void> {
   const url = new URL(request.url ?? "/", "http://localhost");
   if (request.method !== "POST" || url.pathname.replace(/\/+$/, "") !== "/poke") {
@@ -28,7 +28,7 @@ export async function handlePokeHttpRequest(
       ? JSON.parse(body) as DesktopPokePayload
       : {};
     console.log(`[gateway] poke received ${body}`);
-    const result = await focusDesktopWindowFn(payload);
+    const result = await restartDesktopFn(payload);
     response.statusCode = 200;
     response.setHeader("content-type", "application/json; charset=utf-8");
     response.end(JSON.stringify({ ok: result.ok }));
@@ -42,47 +42,33 @@ export async function handlePokeHttpRequest(
   }
 }
 
-export async function focusDesktopWindow(payload: DesktopPokePayload): Promise<{ ok: boolean }> {
+export async function restartCodexDesktop(payload: DesktopPokePayload): Promise<{ ok: boolean }> {
   if (process.platform !== "win32") {
     return { ok: false };
   }
 
   const script = `
 $ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName System.Windows.Forms
 $payload = $env:CODEX_MOBILE_POKE_PAYLOAD_JSON | ConvertFrom-Json
-$proc = Get-Process | Where-Object { $_.MainWindowTitle -eq 'Codex' -or $_.MainWindowTitle -like 'Codex*' } | Select-Object -First 1
-if (-not $proc) {
-  Write-Output (ConvertTo-Json @{ ok = $false; error = 'Codex window not found' })
+$candidates = Get-CimInstance Win32_Process -Filter "Name = 'Codex.exe'" | Where-Object {
+  $_.ExecutablePath -like '*\\WindowsApps\\OpenAI.Codex_*\\app\\Codex.exe' -and
+  ($_.CommandLine -notmatch '--type=')
+}
+$target = $candidates | Sort-Object CreationDate -Descending | Select-Object -First 1
+if (-not $target) {
+  Write-Output (ConvertTo-Json @{ ok = $false; error = 'Codex desktop process not found' })
   exit 0
 }
-$shell = New-Object -ComObject WScript.Shell
-try { $null = $shell.AppActivate($proc.Id) } catch {}
-try {
-  $sig = @"
-using System;
-using System.Runtime.InteropServices;
-public static class WinApi {
-    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
-    [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+$proc = Get-Process -Id $target.ProcessId -ErrorAction Stop
+$path = $target.ExecutablePath
+if (-not $path) {
+  Write-Output (ConvertTo-Json @{ ok = $false; error = 'Codex executable path not found'; pid = $target.ProcessId })
+  exit 0
 }
-"@
-  Add-Type -TypeDefinition $sig -ErrorAction SilentlyContinue | Out-Null
-  [WinApi]::ShowWindowAsync($proc.MainWindowHandle, 5) | Out-Null
-  [WinApi]::SetForegroundWindow($proc.MainWindowHandle) | Out-Null
-} catch {}
-Start-Sleep -Milliseconds 180
-$steps = @(
-  @{ Name = 'escape'; Keys = '{ESC}' },
-  @{ Name = 'reload'; Keys = '^r' },
-  @{ Name = 'hard_reload'; Keys = '^+r' },
-  @{ Name = 'f5'; Keys = '{F5}' }
-)
-foreach ($step in $steps) {
-  [System.Windows.Forms.SendKeys]::SendWait($step.Keys)
-  Start-Sleep -Milliseconds 180
-}
-Write-Output (ConvertTo-Json @{ ok = $true; pid = $proc.Id; title = $proc.MainWindowTitle; reason = $payload.reason; threadId = $payload.threadId })
+Stop-Process -Id $target.ProcessId -Force
+Start-Sleep -Milliseconds 500
+$started = Start-Process -FilePath $path -PassThru
+Write-Output (ConvertTo-Json @{ ok = $true; restarted = $true; oldPid = $target.ProcessId; pid = $started.Id; title = $proc.MainWindowTitle; path = $path; reason = $payload.reason; threadId = $payload.threadId })
 `;
 
   const result = spawnSync("powershell.exe", [

@@ -7,6 +7,7 @@ import com.codex.mobile.data.gateway.GatewayWebSocketClient
 import com.codex.mobile.data.gateway.emptyRemoteState
 import com.codex.mobile.data.gateway.normalizeGatewayUrl
 import com.codex.mobile.model.GatewayConfig
+import com.codex.mobile.model.NewThreadDraft
 import com.codex.mobile.model.SessionRemoteState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,6 +39,7 @@ class DefaultSessionRepository(
     private val connection = GatewayRepositoryConnection(
         gatewayClient = gatewayClient,
         commandSender = commandSender,
+        readState = { _state.value },
         updateState = { transform -> _state.update(transform) },
         onInboundRawMessage = ::handleInboundMessage
     )
@@ -59,16 +61,16 @@ class DefaultSessionRepository(
         connection.disconnect()
     }
 
-    override suspend fun createThread(cwd: String?) {
-        commandActions.createThread(cwd)
+    override suspend fun createThread(cwd: String?, draft: NewThreadDraft?) {
+        commandActions.createThread(cwd, draft)
     }
 
     override suspend fun selectThread(id: String) {
         commandActions.selectThread(id)
     }
 
-    override suspend fun forkThread(id: String) {
-        commandActions.forkThread(id)
+    override suspend fun forkThread(id: String, numTurns: Int?) {
+        commandActions.forkThread(id, numTurns)
     }
 
     override suspend fun renameThread(id: String, name: String) {
@@ -91,8 +93,16 @@ class DefaultSessionRepository(
         commandActions.loadOlderMessages()
     }
 
-    override suspend fun sendPrompt(prompt: String): Boolean {
-        return commandActions.sendPrompt(prompt)
+    override suspend fun sendPrompt(prompt: String, newThreadDraft: NewThreadDraft?): Boolean {
+        return commandActions.sendPrompt(prompt, newThreadDraft)
+    }
+
+    override suspend fun rollbackThread(numTurns: Int): Boolean {
+        return commandActions.rollbackThread(numTurns)
+    }
+
+    override suspend fun resendPrompt(prompt: String, rollbackNumTurns: Int): Boolean {
+        return commandActions.resendPrompt(prompt, rollbackNumTurns)
     }
 
     override suspend fun stopTurn() {
@@ -105,6 +115,10 @@ class DefaultSessionRepository(
 
     override suspend fun rejectPending() {
         commandActions.rejectPending()
+    }
+
+    override suspend fun restartDesktop() {
+        commandActions.restartDesktop()
     }
 
     private fun handleInboundMessage(raw: String) {

@@ -1,5 +1,6 @@
 import type { AppServerThread } from "../appServerTypes.js";
 import type { GatewayMessagePayload } from "../protocol.js";
+import { isTerminalTurnStatus } from "../threadStatus.js";
 import { mapItemToMessages } from "./messageMapping.js";
 import {
   isOptimisticUserMessage,
@@ -128,7 +129,50 @@ export function rebaseSnapshotMessagesFromThread(state: ThreadRuntimeState): voi
 }
 
 export function collectThreadMessages(thread: AppServerThread): GatewayMessagePayload[] {
-  return thread.turns.flatMap((turn) => turn.items).flatMap((item) => mapItemToMessages(item, thread.cwd));
+  const nowMs = Date.now();
+  return thread.turns.flatMap((turn, turnIndex) =>
+    turn.items.flatMap((item) => {
+      const turnCompleted = turn.completedAt != null || isTerminalTurnStatus(turn.status);
+      const durationMs = getTurnDurationMs(turn, nowMs);
+      return mapItemToMessages(item, thread.cwd).map((message) => {
+        const isAssistantText =
+          message.role === "assistant" &&
+          message.blocks.some((block) => block.kind === "text" && block.value.trim().length > 0);
+        return {
+          ...message,
+          ...(message.role === "assistant" ? { forkNumTurns: turnIndex + 1 } : {}),
+          ...(message.role === "assistant" && durationMs != null ? { durationMs } : {}),
+          ...(isAssistantText && turnCompleted ? { isFinal: true } : {}),
+          ...(message.role === "user" ? { rollbackNumTurns: thread.turns.length - turnIndex } : {}),
+        };
+      });
+    })
+  );
+}
+
+function getTurnDurationMs(
+  turn: AppServerThread["turns"][number],
+  nowMs: number
+): number | null {
+  if (typeof turn.durationMs === "number" && turn.durationMs > 0) {
+    return Math.round(turn.durationMs);
+  }
+
+  const startedAtMs = toMillisTimestamp(turn.startedAt);
+  if (startedAtMs == null) {
+    return null;
+  }
+
+  const completedAtMs = toMillisTimestamp(turn.completedAt);
+  const endMs = completedAtMs ?? nowMs;
+  return Math.max(1000, Math.round(endMs - startedAtMs));
+}
+
+function toMillisTimestamp(value?: number | null): number | null {
+  if (typeof value !== "number" || value <= 0) {
+    return null;
+  }
+  return value > 10_000_000_000 ? value : value * 1000;
 }
 
 function getCompactStatusValue(message: GatewayMessagePayload): string | null {

@@ -6,18 +6,27 @@ internal class GatewayCommandSender(
     private val json: Json,
     private val sendText: (String) -> Boolean
 ) {
-    fun sendHello(pairToken: String): Boolean {
+    fun sendHello(pairToken: String, selectedThreadId: String? = null): Boolean {
         return send(
             GatewayHelloMessage(
-                pairToken = pairToken.ifBlank { null }
+                pairToken = pairToken.ifBlank { null },
+                selectedThreadId = selectedThreadId?.takeIf { it.isNotBlank() }
             )
         )
     }
 
-    fun createThread(cwd: String?): Boolean {
+    fun createThread(
+        cwd: String?,
+        model: String? = null,
+        reasoningEffort: String? = null,
+        sandboxMode: String? = null
+    ): Boolean {
         return send(
             GatewayCreateThreadMessage(
-                cwd = cwd?.takeIf { it.isNotBlank() }
+                cwd = cwd?.takeIf { it.isNotBlank() },
+                model = model?.takeIf { it.isNotBlank() },
+                reasoningEffort = reasoningEffort?.takeIf { it.isNotBlank() },
+                sandboxMode = sandboxMode?.takeIf { it.isNotBlank() }
             )
         )
     }
@@ -28,8 +37,8 @@ internal class GatewayCommandSender(
         )
     }
 
-    fun forkThread(threadId: String): Boolean {
-        return send(GatewayForkThreadMessage(threadId = threadId))
+    fun forkThread(threadId: String, numTurns: Int? = null): Boolean {
+        return send(GatewayForkThreadMessage(threadId = threadId, numTurns = numTurns?.takeIf { it > 0 }))
     }
 
     fun renameThread(threadId: String, name: String): Boolean {
@@ -52,11 +61,43 @@ internal class GatewayCommandSender(
         return send(GatewayLoadOlderMessagesMessage())
     }
 
-    fun sendPrompt(text: String, threadId: String?): Boolean {
+    fun sendPrompt(
+        text: String,
+        threadId: String?,
+        newThread: Boolean = false,
+        cwd: String? = null,
+        model: String? = null,
+        reasoningEffort: String? = null,
+        sandboxMode: String? = null
+    ): Boolean {
         return send(
             GatewaySendPromptMessage(
                 text = text,
-                threadId = threadId
+                threadId = threadId,
+                newThread = newThread,
+                cwd = cwd?.takeIf { it.isNotBlank() },
+                model = model?.takeIf { it.isNotBlank() },
+                reasoningEffort = reasoningEffort?.takeIf { it.isNotBlank() },
+                sandboxMode = sandboxMode?.takeIf { it.isNotBlank() }
+            )
+        )
+    }
+
+    fun rollbackThread(threadId: String?, numTurns: Int): Boolean {
+        return send(
+            GatewayRollbackThreadMessage(
+                threadId = threadId?.takeIf { it.isNotBlank() },
+                numTurns = numTurns.coerceAtLeast(1)
+            )
+        )
+    }
+
+    fun resendPrompt(text: String, threadId: String?, rollbackNumTurns: Int): Boolean {
+        return send(
+            GatewayResendPromptMessage(
+                text = text,
+                threadId = threadId?.takeIf { it.isNotBlank() },
+                rollbackNumTurns = rollbackNumTurns.coerceAtLeast(1)
             )
         )
     }
@@ -71,6 +112,10 @@ internal class GatewayCommandSender(
 
     fun rejectPending(): Boolean {
         return send(GatewayRejectPendingMessage())
+    }
+
+    fun restartDesktop(): Boolean {
+        return send(GatewayRestartDesktopMessage())
     }
 
     private fun send(message: GatewayHelloMessage): Boolean {
@@ -113,6 +158,14 @@ internal class GatewayCommandSender(
         return sendText(json.encodeToString(GatewaySendPromptMessage.serializer(), message))
     }
 
+    private fun send(message: GatewayRollbackThreadMessage): Boolean {
+        return sendText(json.encodeToString(GatewayRollbackThreadMessage.serializer(), message))
+    }
+
+    private fun send(message: GatewayResendPromptMessage): Boolean {
+        return sendText(json.encodeToString(GatewayResendPromptMessage.serializer(), message))
+    }
+
     private fun send(message: GatewayStopTurnMessage): Boolean {
         return sendText(json.encodeToString(GatewayStopTurnMessage.serializer(), message))
     }
@@ -123,5 +176,9 @@ internal class GatewayCommandSender(
 
     private fun send(message: GatewayRejectPendingMessage): Boolean {
         return sendText(json.encodeToString(GatewayRejectPendingMessage.serializer(), message))
+    }
+
+    private fun send(message: GatewayRestartDesktopMessage): Boolean {
+        return sendText(json.encodeToString(GatewayRestartDesktopMessage.serializer(), message))
     }
 }

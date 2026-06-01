@@ -6,22 +6,31 @@ import com.codex.mobile.model.ThreadMessage
 
 @Composable
 internal fun MessageCard(
+    messages: List<ThreadMessage>,
     message: ThreadMessage,
+    processMessages: List<ThreadMessage>,
     compactMode: Boolean,
     messageIndex: Int,
-    onEditUserMessage: (String) -> Unit,
-    onResendUserMessage: (String) -> Unit,
-    onCopyMessage: (String) -> Unit
+    onEditUserMessage: (String, Int) -> Unit,
+    onResendUserMessage: (String, Int) -> Unit,
+    onForkFromMessage: (Int) -> Unit
 ) {
     when (message.role) {
         MessageRole.USER -> UserMessage(
             message = message,
             compactMode = compactMode,
+            showActions = messages.isUserTurnActionMessage(messageIndex),
             onEditAndResend = onEditUserMessage,
-            onResend = onResendUserMessage,
-            onCopy = onCopyMessage
+            onResend = onResendUserMessage
         )
-        MessageRole.ASSISTANT -> AssistantMessage(message, compactMode, messageIndex, onCopyMessage)
-        MessageRole.SYSTEM -> SystemMessage(message, compactMode, onCopyMessage)
+        MessageRole.ASSISTANT -> AssistantMessage(
+            message = message,
+            processMessages = processMessages,
+            compactMode = compactMode,
+            messageIndex = messageIndex,
+            showActions = messages.isFinalAssistantTurnMessage(messageIndex),
+            onForkFromMessage = onForkFromMessage
+        )
+        MessageRole.SYSTEM -> SystemMessage(message, compactMode)
     }
 }

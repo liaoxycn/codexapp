@@ -37,6 +37,7 @@ internal fun rememberThreadPullRefreshController(
     var lastPullSampleAt by rememberSaveable(selectedThreadId) { mutableStateOf(0L) }
     var pullHintVisibleUntil by rememberSaveable(selectedThreadId) { mutableStateOf(0L) }
     var pullGestureTick by rememberSaveable(selectedThreadId) { mutableIntStateOf(0) }
+    var refreshTriggered by rememberSaveable(selectedThreadId) { mutableStateOf(false) }
     val pullThreshold = remember(pullVelocity) {
         val speedBoost = (pullVelocity / 900f).coerceIn(0f, 0.35f)
         (160f * (1f - speedBoost)).coerceIn(110f, 160f)
@@ -80,20 +81,41 @@ internal fun rememberThreadPullRefreshController(
                     lastPullSampleAt = now
                     pullDistance = (pullDistance - available.y).coerceAtMost(260f)
                     pullGestureTick += 1
+                    if (shouldTriggerPullRefresh(
+                            isAtBottom = isAtBottom,
+                            isGenerating = isGenerating,
+                            isManualRefreshing = isManualRefreshing,
+                            pullDistance = pullDistance,
+                            pullThreshold = pullThreshold,
+                            refreshTriggered = refreshTriggered
+                        )
+                    ) {
+                        refreshTriggered = true
+                        pullHintVisibleUntil = SystemClock.uptimeMillis() + 700L
+                        onRefreshCurrent()
+                        pullDistance = 0f
+                        pullVelocity = 0f
+                    }
                 } else if (available.y > 0f && pullDistance > 0f) {
                     pullDistance = 0f
                     pullVelocity = 0f
+                    refreshTriggered = false
                     pullGestureTick += 1
                 }
                 return Offset.Zero
             }
 
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                if (isAtBottom &&
-                    !isGenerating &&
-                    !isManualRefreshing &&
-                    pullDistance >= pullThreshold
+                if (shouldTriggerPullRefresh(
+                        isAtBottom = isAtBottom,
+                        isGenerating = isGenerating,
+                        isManualRefreshing = isManualRefreshing,
+                        pullDistance = pullDistance,
+                        pullThreshold = pullThreshold,
+                        refreshTriggered = refreshTriggered
+                    )
                 ) {
+                    refreshTriggered = true
                     pullHintVisibleUntil = SystemClock.uptimeMillis() + 700L
                     onRefreshCurrent()
                     pullDistance = 0f
@@ -103,6 +125,13 @@ internal fun rememberThreadPullRefreshController(
                 pullVelocity = 0f
                 return Velocity.Zero
             }
+        }
+    }
+
+    LaunchedEffect(refreshTriggered, selectedThreadId) {
+        if (refreshTriggered) {
+            delay(900L)
+            refreshTriggered = false
         }
     }
 
@@ -125,4 +154,19 @@ internal fun rememberThreadPullRefreshController(
         pullProgress = pullProgress,
         showPullHint = showPullHint,
     )
+}
+
+internal fun shouldTriggerPullRefresh(
+    isAtBottom: Boolean,
+    isGenerating: Boolean,
+    isManualRefreshing: Boolean,
+    pullDistance: Float,
+    pullThreshold: Float,
+    refreshTriggered: Boolean
+): Boolean {
+    return isAtBottom &&
+        !isGenerating &&
+        !isManualRefreshing &&
+        !refreshTriggered &&
+        pullDistance >= pullThreshold
 }

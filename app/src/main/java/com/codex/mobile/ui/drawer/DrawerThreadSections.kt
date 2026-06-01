@@ -28,18 +28,21 @@ internal fun buildDrawerThreadSections(
         thread.matchesDrawerQuery(normalizedQuery)
     }
     val activeThreads = matchingThreads.filterNot(ThreadSummary::archived)
-    val archivedThreads = matchingThreads.filter(ThreadSummary::archived).sortedWith(threadListSortOrder())
+    val listSortOrder = drawerThreadSortOrder(normalizedQuery)
+    val archivedThreads = matchingThreads.filter(ThreadSummary::archived).sortedWith(listSortOrder)
     val selectedThread = threads.firstOrNull { it.id == selectedThreadId }
     val currentProjectGroupLabel = selectedThread
         ?.takeIf { it.groupKind == ThreadGroupKind.PROJECT && it.groupLabel.isNotBlank() }
         ?.groupLabel
     val projectThreads = activeThreads.filter { it.groupKind == ThreadGroupKind.PROJECT && it.groupLabel.isNotBlank() }
-    val chatThreads = activeThreads.filter { it.groupKind != ThreadGroupKind.PROJECT || it.groupLabel.isBlank() }
+    val chatThreads = activeThreads
+        .filter { it.groupKind != ThreadGroupKind.PROJECT || it.groupLabel.isBlank() }
+        .sortedWith(listSortOrder)
     val groupedProjectThreads = projectThreads
-        .sortedWith(threadListSortOrder())
+        .sortedWith(listSortOrder)
         .groupBy(ThreadSummary::groupLabel)
         .filterValues(List<ThreadSummary>::isNotEmpty)
-    val orderedProjectGroups = orderProjectGroups(groupedProjectThreads)
+    val orderedProjectGroups = orderProjectGroups(groupedProjectThreads, normalizedQuery)
     return DrawerThreadSections(
         projectGroups = orderedProjectGroups.map { label ->
             val groupedThreads = groupedProjectThreads[label].orEmpty()
@@ -57,10 +60,13 @@ internal fun buildDrawerThreadSections(
 }
 
 internal fun orderProjectGroups(
-    groupedProjectThreads: Map<String, List<ThreadSummary>>
+    groupedProjectThreads: Map<String, List<ThreadSummary>>,
+    query: String = ""
 ): List<String> {
     return groupedProjectThreads.keys.sortedWith(
         compareByDescending<String> { label ->
+            groupedProjectThreads[label].orEmpty().maxOfOrNull { it.drawerQueryRank(query) } ?: 0
+        }.thenByDescending { label ->
             groupedProjectThreads[label].orEmpty().maxOfOrNull(ThreadSummary::updatedAt) ?: 0L
         }.thenBy { it }
     )
@@ -77,4 +83,28 @@ private fun ThreadSummary.matchesDrawerQuery(query: String): Boolean {
     return query.isBlank() ||
         listOf(title, preview, groupLabel, cwd, gitBranch, gitSha)
             .any { it.contains(query, ignoreCase = true) }
+}
+
+private fun drawerThreadSortOrder(query: String): Comparator<ThreadSummary> {
+    if (query.isBlank()) {
+        return threadListSortOrder()
+    }
+    return compareByDescending<ThreadSummary> { it.drawerQueryRank(query) }
+        .thenByDescending { it.updatedAt }
+        .thenByDescending { it.id }
+}
+
+private fun ThreadSummary.drawerQueryRank(query: String): Int {
+    if (query.isBlank()) {
+        return 0
+    }
+    return when {
+        title.contains(query, ignoreCase = true) -> 6
+        groupLabel.contains(query, ignoreCase = true) -> 5
+        cwd.contains(query, ignoreCase = true) -> 4
+        gitBranch.contains(query, ignoreCase = true) -> 3
+        gitSha.contains(query, ignoreCase = true) -> 2
+        preview.contains(query, ignoreCase = true) -> 1
+        else -> 0
+    }
 }

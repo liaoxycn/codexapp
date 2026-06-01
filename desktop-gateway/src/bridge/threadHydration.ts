@@ -12,6 +12,7 @@ import {
   dedupeSummaries,
   isThreadNotMaterializedError,
 } from "./summaries.js";
+import { isDesktopMainListThread } from "./threadSummaries.js";
 import type { ThreadRuntimeState } from "./types.js";
 
 type HydrationClient = Pick<AppServerClient, "threadList" | "threadRead">;
@@ -30,11 +31,15 @@ export async function hydrateThreadCatalog({
   threads,
   currentThreadId,
 }: HydrateThreadCatalogParams): Promise<string> {
-  const activeList = await appServer.threadList(false);
-  const archivedList = await appServer.threadList(true);
+  const listedThreads = await appServer.threadList(false);
+  const listedArchivedThreadIds = new Set(
+    listedThreads.filter(isArchivedThreadPayload).map((thread) => thread.id)
+  );
+  const activeList = listedThreads.filter(
+    (thread) => !isArchivedThreadPayload(thread) && isDesktopMainListThread(thread)
+  );
   const activeThreadIds = new Set(activeList.map((thread) => thread.id));
-  const archivedThreadIds = new Set(archivedList.map((thread) => thread.id));
-  const catalogThreadIds = new Set([...activeThreadIds, ...archivedThreadIds]);
+  const catalogThreadIds = new Set(activeThreadIds);
 
   for (const threadId of [...threads.keys()]) {
     if (catalogThreadIds.has(threadId)) {
@@ -43,28 +48,22 @@ export async function hydrateThreadCatalog({
 
     const existing = threads.get(threadId);
     const preservePendingCurrent =
-      threadId === currentThreadId &&
       !activeThreadIds.has(threadId) &&
-      (existing?.thread != null || existing?.isSubscribed === true);
+      !listedArchivedThreadIds.has(threadId) &&
+      (existing?.isLocalCatalogEntry === true ||
+        (threadId === currentThreadId && (existing?.thread != null || existing?.isSubscribed === true)));
     if (!preservePendingCurrent) {
       threads.delete(threadId);
     }
   }
 
   const detailedThreads = await readThreadDetailsForSummaries(appServer, activeList);
-  const detailedArchivedThreads = await readThreadDetailsForSummaries(appServer, archivedList);
-  const detailedArchivedOnlyThreads = detailedArchivedThreads.filter((thread) => !activeThreadIds.has(thread.id));
   const retainedSummaries = [...threads.values()]
-    .filter((entry) => !catalogThreadIds.has(entry.summary.id))
+    .filter((entry) => !entry.summary.archived && !catalogThreadIds.has(entry.summary.id))
     .map((entry) => entry.summary);
   const summaries = dedupeSummaries([
     ...retainedSummaries,
     ...buildVisibleThreadSummaries(detailedThreads),
-    ...buildVisibleThreadSummaries(detailedArchivedOnlyThreads).map((summary) => ({
-      ...summary,
-      archived: true,
-      status: "idle" as const,
-    })),
   ]);
 
   if (summaries.length === 0) {
@@ -79,13 +78,14 @@ export async function hydrateThreadCatalog({
   for (const thread of detailedThreads) {
     upsertThreadState({ threads, thread, summaries, syncSelection: false });
   }
-  for (const thread of detailedArchivedOnlyThreads) {
-    upsertThreadState({ threads, thread, summaries, archived: true, syncSelection: false });
-  }
 
   materializeMissingSummaryStates(threads, summaries, candidateId);
   syncSelectedThreadSnapshots(threads, candidateId);
   return candidateId;
+}
+
+function isArchivedThreadPayload(thread: AppServerThread): boolean {
+  return (thread as AppServerThread & { archived?: unknown }).archived === true;
 }
 
 async function readThreadDetailsForSummaries(

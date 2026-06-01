@@ -1,10 +1,15 @@
 package com.codex.mobile.ui
 
 import androidx.compose.material.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -12,13 +17,19 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import com.codex.mobile.model.ComposerChip
 import com.codex.mobile.model.ComposerChipIcon
+import com.codex.mobile.model.ComposerFile
 import com.codex.mobile.model.ConnectionStatus
 import com.codex.mobile.model.GatewayConfig
+import com.codex.mobile.model.GatewayConfigOption
+import com.codex.mobile.model.GatewayConfigOptions
 import com.codex.mobile.model.HomeUiState
 import com.codex.mobile.model.MessageBlock
 import com.codex.mobile.model.MessageRole
+import com.codex.mobile.model.NewThreadDraft
 import com.codex.mobile.model.ThreadMessage
 import com.codex.mobile.model.ThreadGroupKind
 import com.codex.mobile.model.ThreadStatus
@@ -51,9 +62,10 @@ class ThreadScreenVisibilityTest {
                     onOpenConnection = {},
                     onRefreshCurrent = {},
                     onLoadOlderMessages = {},
-                    onEditUserMessage = {},
-                    onResendUserMessage = {},
-                    onCopyMessage = {},
+                    onEditUserMessage = { _, _ -> },
+                    onResendUserMessage = { _, _ -> },
+                    onForkFromMessage = {},
+                    onNewThreadDraftChange = {},
                     onApprovePending = {},
                     onRejectPending = {}
                 )
@@ -64,6 +76,53 @@ class ThreadScreenVisibilityTest {
         rule.onNodeWithTag("thread_message_list").performScrollToIndex(0)
         rule.waitForIdle()
         rule.onNodeWithTag("jump_to_bottom_button").assertIsDisplayed()
+    }
+
+    @Test
+    fun jumpToBottomDoesNotOccupyUserMessageActionRail() {
+        val state = sampleState(
+            hasMoreHistory = false,
+            isLoadingOlder = false,
+            messageCount = 24
+        ).copy(
+            messages = sampleState(
+                hasMoreHistory = false,
+                isLoadingOlder = false,
+                messageCount = 24
+            ).messages.mapIndexed { index, message ->
+                if (message.role == MessageRole.USER) {
+                    message.copy(rollbackNumTurns = index + 1)
+                } else {
+                    message
+                }
+            }
+        )
+        rule.setContent {
+            MaterialTheme {
+                ThreadScreen(
+                    state = state,
+                    compactMode = false,
+                    onOpenConnection = {},
+                    onRefreshCurrent = {},
+                    onLoadOlderMessages = {},
+                    onEditUserMessage = { _, _ -> },
+                    onResendUserMessage = { _, _ -> },
+                    onForkFromMessage = {},
+                    onNewThreadDraftChange = {},
+                    onApprovePending = {},
+                    onRejectPending = {}
+                )
+            }
+        }
+
+        rule.waitForIdle()
+        rule.onNodeWithTag("thread_message_list").performScrollToIndex(0)
+        rule.waitForIdle()
+
+        val jumpBounds = rule.onNodeWithTag("jump_to_bottom_button").getUnclippedBoundsInRoot()
+        val actionBounds = rule.onNodeWithTag("user_message_more_m23").getUnclippedBoundsInRoot()
+
+        assertTrue(jumpBounds.right < actionBounds.left)
     }
 
     @Test
@@ -80,9 +139,10 @@ class ThreadScreenVisibilityTest {
                     onOpenConnection = {},
                     onRefreshCurrent = {},
                     onLoadOlderMessages = {},
-                    onEditUserMessage = {},
-                    onResendUserMessage = {},
-                    onCopyMessage = {},
+                    onEditUserMessage = { _, _ -> },
+                    onResendUserMessage = { _, _ -> },
+                    onForkFromMessage = {},
+                    onNewThreadDraftChange = {},
                     onApprovePending = {},
                     onRejectPending = {}
                 )
@@ -108,9 +168,10 @@ class ThreadScreenVisibilityTest {
                     onOpenConnection = {},
                     onRefreshCurrent = {},
                     onLoadOlderMessages = {},
-                    onEditUserMessage = {},
-                    onResendUserMessage = {},
-                    onCopyMessage = {},
+                    onEditUserMessage = { _, _ -> },
+                    onResendUserMessage = { _, _ -> },
+                    onForkFromMessage = {},
+                    onNewThreadDraftChange = {},
                     onApprovePending = {},
                     onRejectPending = {}
                 )
@@ -127,7 +188,7 @@ class ThreadScreenVisibilityTest {
     }
 
     @Test
-    fun loadsOlderMessagesWhenScrolledToTop() {
+    fun loadsOlderMessagesWhenPulledDownAtTop() {
         var loadCalls = 0
         rule.setContent {
             MaterialTheme {
@@ -141,9 +202,10 @@ class ThreadScreenVisibilityTest {
                     onOpenConnection = {},
                     onRefreshCurrent = {},
                     onLoadOlderMessages = { loadCalls += 1 },
-                    onEditUserMessage = {},
-                    onResendUserMessage = {},
-                    onCopyMessage = {},
+                    onEditUserMessage = { _, _ -> },
+                    onResendUserMessage = { _, _ -> },
+                    onForkFromMessage = {},
+                    onNewThreadDraftChange = {},
                     onApprovePending = {},
                     onRejectPending = {}
                 )
@@ -151,6 +213,10 @@ class ThreadScreenVisibilityTest {
         }
 
         rule.onNodeWithTag("thread_message_list").performScrollToIndex(0)
+        rule.waitForIdle()
+        rule.onNodeWithTag("thread_message_list").performTouchInput {
+            swipeDown()
+        }
         rule.waitUntil(timeoutMillis = 3_000) { loadCalls > 0 }
     }
 
@@ -181,9 +247,10 @@ class ThreadScreenVisibilityTest {
                     onOpenConnection = {},
                     onRefreshCurrent = {},
                     onLoadOlderMessages = {},
-                    onEditUserMessage = {},
-                    onResendUserMessage = {},
-                    onCopyMessage = {},
+                    onEditUserMessage = { _, _ -> },
+                    onResendUserMessage = { _, _ -> },
+                    onForkFromMessage = {},
+                    onNewThreadDraftChange = {},
                     onApprovePending = {},
                     onRejectPending = {}
                 )
@@ -215,9 +282,10 @@ class ThreadScreenVisibilityTest {
                     onOpenConnection = {},
                     onRefreshCurrent = {},
                     onLoadOlderMessages = {},
-                    onEditUserMessage = {},
-                    onResendUserMessage = {},
-                    onCopyMessage = {},
+                    onEditUserMessage = { _, _ -> },
+                    onResendUserMessage = { _, _ -> },
+                    onForkFromMessage = {},
+                    onNewThreadDraftChange = {},
                     onApprovePending = { approveCalls += 1 },
                     onRejectPending = { rejectCalls += 1 }
                 )
@@ -236,7 +304,6 @@ class ThreadScreenVisibilityTest {
     fun userMessageMenuSupportsEditAndResend() {
         var editedText: String? = null
         var resentText: String? = null
-        var copiedText: String? = null
         rule.setContent {
             MaterialTheme {
                 ThreadScreen(
@@ -249,7 +316,8 @@ class ThreadScreenVisibilityTest {
                             ThreadMessage(
                                 id = "user-editable",
                                 role = MessageRole.USER,
-                                blocks = listOf(MessageBlock.Text("please inspect build failure"))
+                                blocks = listOf(MessageBlock.Text("please inspect build failure")),
+                                rollbackNumTurns = 1
                             )
                         )
                     ),
@@ -257,9 +325,10 @@ class ThreadScreenVisibilityTest {
                     onOpenConnection = {},
                     onRefreshCurrent = {},
                     onLoadOlderMessages = {},
-                    onEditUserMessage = { editedText = it },
-                    onResendUserMessage = { resentText = it },
-                    onCopyMessage = { copiedText = it },
+                    onEditUserMessage = { text, _ -> editedText = text },
+                    onResendUserMessage = { text, _ -> resentText = text },
+                    onForkFromMessage = {},
+                    onNewThreadDraftChange = {},
                     onApprovePending = {},
                     onRejectPending = {}
                 )
@@ -267,12 +336,13 @@ class ThreadScreenVisibilityTest {
         }
 
         rule.onNodeWithTag("user_message_more_user-editable").performClick()
-        rule.onNodeWithText("复制").performClick()
-        assertEquals("please inspect build failure", copiedText)
+        assertTrue(runCatching { rule.onNodeWithText("复制").assertExists() }.isFailure)
 
         rule.onNodeWithTag("user_message_more_user-editable").performClick()
         rule.onNodeWithText("编辑后重发").performClick()
         assertEquals("please inspect build failure", editedText)
+        rule.mainClock.advanceTimeBy(4_000L)
+        rule.waitForIdle()
 
         rule.onNodeWithTag("user_message_more_user-editable").performClick()
         rule.onNodeWithText("重发").performClick()
@@ -280,8 +350,173 @@ class ThreadScreenVisibilityTest {
     }
 
     @Test
-    fun assistantMessageCanBeCopied() {
-        var copiedText: String? = null
+    fun assistantMessageFooterForksFromTurn() {
+        var forkNumTurns: Int? = null
+        rule.setContent {
+            MaterialTheme {
+                ThreadScreen(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(
+                        messages = listOf(
+                            ThreadMessage(
+                                id = "assistant-fork",
+                                role = MessageRole.ASSISTANT,
+                                blocks = listOf(MessageBlock.Text("branch from this reply")),
+                                forkNumTurns = 2,
+                                isFinal = true
+                            )
+                        )
+                    ),
+                    compactMode = false,
+                    onOpenConnection = {},
+                    onRefreshCurrent = {},
+                    onLoadOlderMessages = {},
+                    onEditUserMessage = { _, _ -> },
+                    onResendUserMessage = { _, _ -> },
+                    onForkFromMessage = { forkNumTurns = it },
+                    onNewThreadDraftChange = {},
+                    onApprovePending = {},
+                    onRejectPending = {}
+                )
+            }
+        }
+
+        rule.onNodeWithTag("assistant_turn_fork_assistant-fork").performClick()
+
+        assertEquals(2, forkNumTurns)
+    }
+
+    @Test
+    fun onlyFinalAssistantMessageInTurnShowsForkAction() {
+        rule.setContent {
+            MaterialTheme {
+                ThreadScreen(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(
+                        messages = listOf(
+                            ThreadMessage(
+                                id = "assistant-1",
+                                role = MessageRole.ASSISTANT,
+                                blocks = listOf(MessageBlock.Text("first assistant chunk")),
+                                forkNumTurns = 1,
+                                isFinal = true
+                            ),
+                            ThreadMessage(
+                                id = "assistant-2",
+                                role = MessageRole.ASSISTANT,
+                                blocks = listOf(MessageBlock.Text("final assistant reply")),
+                                forkNumTurns = 2,
+                                isFinal = true
+                            )
+                        )
+                    ),
+                    compactMode = false,
+                    onOpenConnection = {},
+                    onRefreshCurrent = {},
+                    onLoadOlderMessages = {},
+                    onEditUserMessage = { _, _ -> },
+                    onResendUserMessage = { _, _ -> },
+                    onForkFromMessage = {},
+                    onNewThreadDraftChange = {},
+                    onApprovePending = {},
+                    onRejectPending = {}
+                )
+            }
+        }
+
+        rule.waitForIdle()
+        assertTrue(runCatching { rule.onNodeWithTag("assistant_turn_fork_assistant-1").assertExists() }.isFailure)
+        rule.onNodeWithTag("assistant_turn_fork_assistant-2").assertExists()
+    }
+
+    @Test
+    fun userMessageMenuDoesNotForkFromTurn() {
+        rule.setContent {
+            MaterialTheme {
+                ThreadScreen(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(
+                        messages = listOf(
+                            ThreadMessage(
+                                id = "user-no-fork",
+                                role = MessageRole.USER,
+                                blocks = listOf(MessageBlock.Text("user prompt")),
+                                forkNumTurns = 2
+                            )
+                        )
+                    ),
+                    compactMode = false,
+                    onOpenConnection = {},
+                    onRefreshCurrent = {},
+                    onLoadOlderMessages = {},
+                    onEditUserMessage = { _, _ -> },
+                    onResendUserMessage = { _, _ -> },
+                    onForkFromMessage = {},
+                    onNewThreadDraftChange = {},
+                    onApprovePending = {},
+                    onRejectPending = {}
+                )
+            }
+        }
+
+        assertTrue(runCatching { rule.onNodeWithTag("user_message_more_user-no-fork").assertExists() }.isFailure)
+    }
+
+    @Test
+    fun onlyFinalUserMessageInTurnShowsEditAction() {
+        rule.setContent {
+            MaterialTheme {
+                ThreadScreen(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(
+                        messages = listOf(
+                            ThreadMessage(
+                                id = "user-1",
+                                role = MessageRole.USER,
+                                blocks = listOf(MessageBlock.Text("first user chunk")),
+                                rollbackNumTurns = 1
+                            ),
+                            ThreadMessage(
+                                id = "user-2",
+                                role = MessageRole.USER,
+                                blocks = listOf(MessageBlock.Text("final user prompt")),
+                                rollbackNumTurns = 2
+                            )
+                        )
+                    ),
+                    compactMode = false,
+                    onOpenConnection = {},
+                    onRefreshCurrent = {},
+                    onLoadOlderMessages = {},
+                    onEditUserMessage = { _, _ -> },
+                    onResendUserMessage = { _, _ -> },
+                    onForkFromMessage = {},
+                    onNewThreadDraftChange = {},
+                    onApprovePending = {},
+                    onRejectPending = {}
+                )
+            }
+        }
+
+        rule.waitForIdle()
+        assertTrue(runCatching { rule.onNodeWithTag("user_message_more_user-1").assertExists() }.isFailure)
+        rule.onNodeWithTag("user_message_more_user-2").assertExists()
+    }
+
+    @Test
+    fun assistantMessageDoesNotShowCopyButton() {
         rule.setContent {
             MaterialTheme {
                 ThreadScreen(
@@ -302,23 +537,21 @@ class ThreadScreenVisibilityTest {
                     onOpenConnection = {},
                     onRefreshCurrent = {},
                     onLoadOlderMessages = {},
-                    onEditUserMessage = {},
-                    onResendUserMessage = {},
-                    onCopyMessage = { copiedText = it },
+                    onEditUserMessage = { _, _ -> },
+                    onResendUserMessage = { _, _ -> },
+                    onForkFromMessage = {},
+                    onNewThreadDraftChange = {},
                     onApprovePending = {},
                     onRejectPending = {}
                 )
             }
         }
 
-        rule.onNodeWithTag("assistant_message_copy_assistant-copy").performClick()
-
-        assertEquals("copy this answer", copiedText)
+        assertTrue(runCatching { rule.onNodeWithTag("assistant_message_copy_assistant-copy").assertExists() }.isFailure)
     }
 
     @Test
-    fun composerFileChipInsertsMentionPath() {
-        var insertedText: String? = null
+    fun composerDetailsDoNotExposeFileChips() {
         rule.setContent {
             CodexTheme {
                 Composer(
@@ -333,38 +566,35 @@ class ThreadScreenVisibilityTest {
                                 label = "app/Main.kt",
                                 icon = ComposerChipIcon.FILE,
                                 path = "D:/Projects/app/Main.kt"
+                            ),
+                            ComposerChip(
+                                label = ".codex/AGENTS.md",
+                                icon = ComposerChipIcon.FILE,
+                                path = "D:/Projects/app/.codex/AGENTS.md"
                             )
                         )
                     ),
                     compactMode = false,
                     activePanel = ComposerPanel.NONE,
                     onActivePanelChange = {},
-                    onToggleCompact = {},
                     onToggleDetails = {},
-                    onCompactContext = {},
-                    onRollbackLastTurn = {},
+                    onCloseDetails = {},
                     onChange = {},
-                    onInsertText = { insertedText = it },
+                    onInsertText = {},
                     onApplySlashCommand = {},
                     onClearComposer = {},
-                    onInsertShellTemplate = {},
                     onSend = {},
                     onStop = {}
                 )
             }
         }
 
-        rule.onNodeWithContentDescription("app/Main.kt").performClick()
-
-        assertEquals("@{D:/Projects/app/Main.kt}", insertedText)
+        rule.onNodeWithContentDescription("app/Main.kt").assertDoesNotExist()
+        rule.onNodeWithContentDescription(".codex/AGENTS.md").assertDoesNotExist()
     }
 
     @Test
-    fun composerDetailsExposeFrequentActions() {
-        var compactToggles = 0
-        var compactCalls = 0
-        var rollbackCalls = 0
-        var shellCalls = 0
+    fun composerDetailsOnlyExposeAllowedQuickActions() {
         rule.setContent {
             CodexTheme {
                 Composer(
@@ -376,30 +606,211 @@ class ThreadScreenVisibilityTest {
                     compactMode = false,
                     activePanel = ComposerPanel.NONE,
                     onActivePanelChange = {},
-                    onToggleCompact = { compactToggles += 1 },
                     onToggleDetails = {},
-                    onCompactContext = { compactCalls += 1 },
-                    onRollbackLastTurn = { rollbackCalls += 1 },
+                    onCloseDetails = {},
                     onChange = {},
                     onInsertText = {},
                     onApplySlashCommand = {},
                     onClearComposer = {},
-                    onInsertShellTemplate = { shellCalls += 1 },
                     onSend = {},
                     onStop = {}
                 )
             }
         }
 
-        rule.onNodeWithContentDescription("紧凑").performClick()
-        rule.onNodeWithContentDescription("压缩").performClick()
-        rule.onNodeWithContentDescription("回滚").performClick()
-        rule.onNodeWithContentDescription("Shell").performClick()
+        rule.onNodeWithContentDescription("紧凑").assertDoesNotExist()
+        rule.onNodeWithContentDescription("常规").assertDoesNotExist()
+        rule.onNodeWithContentDescription("压缩").assertDoesNotExist()
+        rule.onNodeWithContentDescription("回滚").assertDoesNotExist()
+        rule.onNodeWithContentDescription("清空").assertIsDisplayed()
+        rule.onNodeWithContentDescription("/命令").assertIsDisplayed()
+        rule.onNodeWithContentDescription("文件").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Shell").assertDoesNotExist()
+    }
 
-        assertEquals(1, compactToggles)
-        assertEquals(1, compactCalls)
-        assertEquals(1, rollbackCalls)
-        assertEquals(1, shellCalls)
+    @Test
+    fun composerDetailsHidesDefaultProjectPlaceholder() {
+        rule.setContent {
+            CodexTheme {
+                Composer(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(
+                        showComposerDetails = true,
+                        chips = listOf(ComposerChip("默认项目", ComposerChipIcon.FILE)),
+                        isNewThreadDraft = true
+                    ),
+                    compactMode = false,
+                    activePanel = ComposerPanel.NONE,
+                    onActivePanelChange = {},
+                    onToggleDetails = {},
+                    onCloseDetails = {},
+                    onChange = {},
+                    onInsertText = {},
+                    onApplySlashCommand = {},
+                    onClearComposer = {},
+                    onSend = {},
+                    onStop = {}
+                )
+            }
+        }
+
+        rule.onNodeWithContentDescription("默认项目").assertDoesNotExist()
+    }
+
+    @Test
+    fun newThreadDraftUsesDropdownsWithoutProjectSelector() {
+        var updatedDraft: NewThreadDraft? = null
+        val draft = NewThreadDraft(
+            cwd = "D:/Projects/Project A",
+            model = "model-a",
+            reasoningEffort = "low"
+        )
+        val configOptions = GatewayConfigOptions(
+            models = listOf(
+                GatewayConfigOption(label = "Model A", value = "model-a"),
+                GatewayConfigOption(label = "Model B", value = "model-b")
+            ),
+            reasoningEfforts = listOf(
+                GatewayConfigOption(label = "low", value = "low"),
+                GatewayConfigOption(label = "high", value = "high")
+            )
+        )
+
+        rule.setContent {
+            MaterialTheme {
+                ThreadScreen(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(
+                        isNewThreadDraft = true,
+                        newThreadDraft = draft,
+                        configOptions = configOptions
+                    ),
+                    compactMode = false,
+                    onOpenConnection = {},
+                    onRefreshCurrent = {},
+                    onLoadOlderMessages = {},
+                    onEditUserMessage = { _, _ -> },
+                    onResendUserMessage = { _, _ -> },
+                    onForkFromMessage = {},
+                    onNewThreadDraftChange = { updatedDraft = it },
+                    onApprovePending = {},
+                    onRejectPending = {}
+                )
+            }
+        }
+
+        rule.onNodeWithText("项目").assertDoesNotExist()
+        rule.onNodeWithContentDescription("模型：Model A").performClick()
+        rule.onNodeWithContentDescription("选择模型：Model B").performClick()
+        assertEquals("model-b", updatedDraft?.model)
+
+        rule.onNodeWithContentDescription("推理：low").performClick()
+        rule.onNodeWithContentDescription("选择推理：high").performClick()
+        assertEquals("high", updatedDraft?.reasoningEffort)
+    }
+
+    @Test
+    fun openingSlashPanelDoesNotInsertACommand() {
+        var changeCalls = 0
+        var appliedCommand: String? = null
+        rule.setContent {
+            var composerText by remember { mutableStateOf("") }
+            var activePanel by remember { mutableStateOf(ComposerPanel.NONE) }
+            CodexTheme {
+                Composer(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(
+                        showComposerDetails = true,
+                        composerText = composerText,
+                        slashCommands = listOf(
+                            "/compact  压缩上下文",
+                            "/rollback  回滚上轮",
+                            "! ls  运行 shell 命令"
+                        )
+                    ),
+                    compactMode = false,
+                    activePanel = activePanel,
+                    onActivePanelChange = { activePanel = it },
+                    onToggleDetails = {},
+                    onCloseDetails = {},
+                    onChange = {
+                        changeCalls += 1
+                        composerText = it
+                    },
+                    onInsertText = {},
+                    onApplySlashCommand = { appliedCommand = it },
+                    onClearComposer = { composerText = "" },
+                    onSend = {},
+                    onStop = {}
+                )
+            }
+        }
+
+        rule.onNodeWithContentDescription("/命令").performClick()
+        rule.waitForIdle()
+
+        rule.onNodeWithText("/compact").assertIsDisplayed()
+        assertEquals(0, changeCalls)
+        assertEquals(null, appliedCommand)
+    }
+
+    @Test
+    fun fileQuickActionSearchesProjectFilesAndInsertsMention() {
+        var inserted: String? = null
+        rule.setContent {
+            var activePanel by remember { mutableStateOf(ComposerPanel.NONE) }
+            CodexTheme {
+                Composer(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(
+                        showComposerDetails = true,
+                        cwd = "D:/Projects/Project A",
+                        files = listOf(
+                            ComposerFile(
+                                label = "src/CodexApp.kt",
+                                path = "D:/Projects/Project A/src/CodexApp.kt"
+                            ),
+                            ComposerFile(
+                                label = "README.md",
+                                path = "D:/Projects/Project A/README.md"
+                            )
+                        )
+                    ),
+                    compactMode = false,
+                    activePanel = activePanel,
+                    onActivePanelChange = { activePanel = it },
+                    onToggleDetails = {},
+                    onCloseDetails = {},
+                    onChange = {},
+                    onInsertText = { inserted = it },
+                    onApplySlashCommand = {},
+                    onClearComposer = {},
+                    onSend = {},
+                    onStop = {}
+                )
+            }
+        }
+
+        rule.onNodeWithContentDescription("文件").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag("file_picker_search_field").assertExists()
+        rule.onNodeWithText("CodexApp.kt").assertIsDisplayed()
+        rule.onNodeWithTag("file_picker_search_field").performTextInput("Codex")
+        rule.onNodeWithText("CodexApp.kt").performClick()
+
+        assertEquals("@{D:/Projects/Project A/src/CodexApp.kt}", inserted)
     }
 
     @Test
@@ -418,15 +829,12 @@ class ThreadScreenVisibilityTest {
                     compactMode = false,
                     activePanel = ComposerPanel.NONE,
                     onActivePanelChange = {},
-                    onToggleCompact = {},
                     onToggleDetails = {},
-                    onCompactContext = {},
-                    onRollbackLastTurn = {},
+                    onCloseDetails = {},
                     onChange = {},
                     onInsertText = {},
                     onApplySlashCommand = {},
                     onClearComposer = {},
-                    onInsertShellTemplate = {},
                     onSend = {},
                     onStop = {}
                 )
@@ -446,12 +854,13 @@ class ThreadScreenVisibilityTest {
                     state = sampleDrawerState(),
                     onCreateThread = {},
                     onCreateThreadInProject = { createdCwd = it },
+                    onOpenConnection = {},
                     onRefreshThreads = {},
                     onSelectThread = {},
-                    onForkThread = {},
                     onRenameThread = { _, _ -> },
                     onArchiveThread = {},
-                    onUnarchiveThread = {}
+                    onUnarchiveThread = {},
+                    onRestartDesktop = {}
                 )
             }
         }
@@ -464,6 +873,31 @@ class ThreadScreenVisibilityTest {
     }
 
     @Test
+    fun drawerHeaderOpensGatewaySettings() {
+        var openConnectionCalls = 0
+        rule.setContent {
+            CodexTheme {
+                DrawerContent(
+                    state = sampleDrawerState(),
+                    onCreateThread = {},
+                    onCreateThreadInProject = {},
+                    onOpenConnection = { openConnectionCalls += 1 },
+                    onRefreshThreads = {},
+                    onSelectThread = {},
+                    onRenameThread = { _, _ -> },
+                    onArchiveThread = {},
+                    onUnarchiveThread = {},
+                    onRestartDesktop = {}
+                )
+            }
+        }
+
+        rule.onNodeWithContentDescription("连接设置").performClick()
+
+        assertEquals(1, openConnectionCalls)
+    }
+
+    @Test
     fun drawerThreadMenuRenamesThread() {
         var renameCall: Pair<String, String>? = null
         rule.setContent {
@@ -472,12 +906,13 @@ class ThreadScreenVisibilityTest {
                     state = sampleDrawerState(),
                     onCreateThread = {},
                     onCreateThreadInProject = {},
+                    onOpenConnection = {},
                     onRefreshThreads = {},
                     onSelectThread = {},
-                    onForkThread = {},
                     onRenameThread = { id, name -> renameCall = id to name },
                     onArchiveThread = {},
-                    onUnarchiveThread = {}
+                    onUnarchiveThread = {},
+                    onRestartDesktop = {}
                 )
             }
         }
@@ -492,28 +927,27 @@ class ThreadScreenVisibilityTest {
     }
 
     @Test
-    fun drawerThreadMenuForksThread() {
-        var forkedThreadId: String? = null
+    fun drawerThreadMenuDoesNotForkThread() {
         rule.setContent {
             CodexTheme {
                 DrawerContent(
                     state = sampleDrawerState(),
                     onCreateThread = {},
                     onCreateThreadInProject = {},
+                    onOpenConnection = {},
                     onRefreshThreads = {},
                     onSelectThread = {},
-                    onForkThread = { forkedThreadId = it },
                     onRenameThread = { _, _ -> },
                     onArchiveThread = {},
-                    onUnarchiveThread = {}
+                    onUnarchiveThread = {},
+                    onRestartDesktop = {}
                 )
             }
         }
 
         rule.onNodeWithTag("thread_row_more_chat-1").performClick()
-        rule.onNodeWithText("分叉").performClick()
 
-        assertEquals("chat-1", forkedThreadId)
+        assertTrue(runCatching { rule.onNodeWithText("分叉").assertExists() }.isFailure)
     }
 
     @Test
@@ -525,12 +959,13 @@ class ThreadScreenVisibilityTest {
                     state = sampleDrawerState(),
                     onCreateThread = {},
                     onCreateThreadInProject = {},
+                    onOpenConnection = {},
                     onRefreshThreads = {},
                     onSelectThread = {},
-                    onForkThread = {},
                     onRenameThread = { _, _ -> },
                     onArchiveThread = { archivedThreadId = it },
-                    onUnarchiveThread = {}
+                    onUnarchiveThread = {},
+                    onRestartDesktop = {}
                 )
             }
         }
@@ -559,12 +994,13 @@ class ThreadScreenVisibilityTest {
                     ),
                     onCreateThread = {},
                     onCreateThreadInProject = {},
+                    onOpenConnection = {},
                     onRefreshThreads = {},
                     onSelectThread = {},
-                    onForkThread = {},
                     onRenameThread = { _, _ -> },
                     onArchiveThread = {},
-                    onUnarchiveThread = { unarchivedThreadId = it }
+                    onUnarchiveThread = { unarchivedThreadId = it },
+                    onRestartDesktop = {}
                 )
             }
         }
@@ -608,6 +1044,7 @@ class ThreadScreenVisibilityTest {
         isManualRefreshing = false,
         showComposerDetails = false,
         chips = listOf(ComposerChip("chip", ComposerChipIcon.FILE)),
+        files = emptyList(),
         slashCommands = emptyList(),
         pendingApproval = null,
         cwd = "",
@@ -615,7 +1052,9 @@ class ThreadScreenVisibilityTest {
         connectionStatus = ConnectionStatus.CONNECTED,
         connectionDetail = "",
         gatewayConfig = GatewayConfig(),
-        isDemoMode = true
+        isDemoMode = true,
+        isNewThreadDraft = false,
+        newThreadDraft = NewThreadDraft()
     )
 
     private fun sampleDrawerState() = HomeUiState(
@@ -650,6 +1089,7 @@ class ThreadScreenVisibilityTest {
         isManualRefreshing = false,
         showComposerDetails = false,
         chips = emptyList(),
+        files = emptyList(),
         slashCommands = emptyList(),
         pendingApproval = null,
         cwd = "D:/Projects/Project A",
@@ -657,6 +1097,8 @@ class ThreadScreenVisibilityTest {
         connectionStatus = ConnectionStatus.CONNECTED,
         connectionDetail = "",
         gatewayConfig = GatewayConfig(),
-        isDemoMode = false
+        isDemoMode = false,
+        isNewThreadDraft = false,
+        newThreadDraft = NewThreadDraft()
     )
 }

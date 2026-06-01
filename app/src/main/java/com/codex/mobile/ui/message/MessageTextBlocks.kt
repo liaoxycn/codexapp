@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
@@ -39,6 +41,7 @@ internal fun ReasoningBlock(
     compactMode: Boolean
 ) {
     val displayText = text.trimEnd()
+    val isThinking = displayText.isBlank() || displayText == "正在思考" || displayText == "思考中"
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -56,8 +59,16 @@ internal fun ReasoningBlock(
                 .clearAndSetSemantics { contentDescription = if (expanded) "收起思考详情" else "展开思考详情" }
                 .padding(horizontal = 2.dp, vertical = 3.dp)
         ) {
+            if (isThinking && !expanded) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(if (compactMode) 10.dp else 11.dp),
+                    color = CodexTheme.colors.textTertiary,
+                    strokeWidth = 1.6.dp
+                )
+                Spacer(Modifier.width(6.dp))
+            }
             Text(
-                text = if (expanded) "思考详情" else "思考中",
+                text = if (expanded) "思考详情" else "正在思考",
                 color = CodexTheme.colors.textSecondary,
                 fontSize = if (compactMode) 10.sp else 11.sp,
                 fontWeight = FontWeight.Medium
@@ -70,13 +81,15 @@ internal fun ReasoningBlock(
                 modifier = Modifier.size(14.dp)
             )
         }
-        if (expanded) {
-            Text(
-                text = displayText,
-                color = CodexTheme.colors.textPrimary,
-                fontSize = if (compactMode) 11.sp else 12.sp,
-                lineHeight = if (compactMode) 15.sp else 17.sp
-            )
+        if (expanded && !isThinking) {
+            SelectionContainer {
+                Text(
+                    text = displayText,
+                    color = CodexTheme.colors.textPrimary,
+                    fontSize = if (compactMode) 11.sp else 12.sp,
+                    lineHeight = if (compactMode) 15.sp else 17.sp
+                )
+            }
         }
     }
 }
@@ -89,20 +102,26 @@ internal fun ExpandableText(
     textColor: Color,
     fontSize: TextUnit,
     lineHeight: TextUnit,
-    maxCollapsedLines: Int
+    maxCollapsedLines: Int,
+    collapseEnabled: Boolean = true
 ) {
     val displayText = text.trimEnd()
+    val isThinking = displayText.isBlank() || displayText == "正在思考" || displayText == "思考中"
     val lines = remember(displayText) { parseMarkdownLines(displayText) }
-    val shouldCollapse = lines.size > maxCollapsedLines || displayText.length > 140
+    val shouldCollapse = collapseEnabled && (lines.size > maxCollapsedLines || displayText.length > 140)
     val visibleLines = if (shouldCollapse && !expanded) lines.take(maxCollapsedLines) else lines
     Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-        visibleLines.forEach { line ->
-            MarkdownLineItem(
-                line = line,
-                textColor = textColor,
-                fontSize = fontSize,
-                lineHeight = lineHeight
-            )
+        SelectionContainer {
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                visibleLines.forEach { line ->
+                    MarkdownLineItem(
+                        line = line,
+                        textColor = textColor,
+                        fontSize = fontSize,
+                        lineHeight = lineHeight
+                    )
+                }
+            }
         }
         if (shouldCollapse) {
             ExpandCollapseTextButton(

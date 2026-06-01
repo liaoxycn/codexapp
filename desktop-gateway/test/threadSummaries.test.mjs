@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildVisibleThreadSummaries,
   dedupeSummaries,
   mapThreadToSummary,
   touchThreadActivity,
@@ -20,7 +21,7 @@ function thread(id, overrides = {}) {
   };
 }
 
-test("mapThreadToSummary uses latest message text as subtitle and cwd leaf as group", () => {
+test("mapThreadToSummary uses latest message text as subtitle and cwd leaf as project group", () => {
   const summary = mapThreadToSummary(thread("thread-1", {
     preview: "preview text",
     turns: [
@@ -38,6 +39,72 @@ test("mapThreadToSummary uses latest message text as subtitle and cwd leaf as gr
   assert.equal(summary.subtitle, "final answer");
   assert.equal(summary.groupKind, "project");
   assert.equal(summary.groupLabel, "TestApp");
+});
+
+test("mapThreadToSummary keeps desktop synthetic chat cwd in chat group", () => {
+  const byLeaf = mapThreadToSummary(thread("weather-chat", {
+    preview: "查看深圳天气",
+    cwd: "C:/Users/lxy/Documents/Codex/2026-05-30/new-chat",
+  }));
+  const byDateFolder = mapThreadToSummary(thread("dated-chat", {
+    preview: "普通聊天",
+    cwd: "C:/Users/lxy/Documents/Codex/2026-05-30/session-123",
+  }));
+  const projectNamedNewProject = mapThreadToSummary(thread("real-project", {
+    preview: "调研 Codex 网页客户端可行性",
+    cwd: "D:/Data/Documents/New project",
+  }));
+
+  assert.equal(byLeaf.groupKind, "chat");
+  assert.equal(byLeaf.groupLabel, "普通会话");
+  assert.equal(byDateFolder.groupKind, "chat");
+  assert.equal(projectNamedNewProject.groupKind, "project");
+  assert.equal(projectNamedNewProject.groupLabel, "New project");
+});
+
+test("visible thread summaries match Desktop main list visibility", () => {
+  const summaries = buildVisibleThreadSummaries(
+    [
+      thread("desktop-project", {
+        name: "项目会话测试",
+        cwd: "D:/Data/Documents/md2html",
+        source: "vscode",
+      }),
+      thread("desktop-chat", {
+        name: "查看深圳天气",
+        cwd: "C:/Users/lxy/Documents/Codex/2026-05-30/new-chat",
+        source: "vscode",
+      }),
+      thread("mobile-thread", {
+        name: "手机新建",
+        source: "appServer",
+      }),
+      thread("imported-openmanus", {
+        cwd: "D:/Projects/home/OpenManus",
+        source: "vscode",
+      }),
+      thread("unindexed-trtr", {
+        cwd: "D:/Projects/home/trtr",
+        source: "vscode",
+      }),
+      thread("cli-thread", { source: "cli" }),
+      thread("placeholder", {
+        name: "<environment_context>",
+        source: "vscode",
+      }),
+    ],
+    {
+      desktopVisibility: {
+        visibleThreadIds: new Set(["desktop-project", "desktop-chat", "placeholder"]),
+        importedThreadIds: new Set(["imported-openmanus"]),
+      },
+    }
+  );
+
+  assert.deepEqual(
+    summaries.map((item) => item.id),
+    ["desktop-project", "desktop-chat", "mobile-thread"]
+  );
 });
 
 test("mapThreadToSummary includes branch and short git sha when present", () => {
@@ -74,9 +141,27 @@ test("touchThreadActivity updates summary and snapshot thread timestamps", () =>
     },
   };
 
+  touchThreadActivity(state, 2_500_000_000_000);
+
+  assert.equal(state.lastActivityAtMs, 2_500_000_000_000);
+  assert.equal(state.summary.updatedAt, 2_500_000_000_000);
+  assert.deepEqual(state.snapshot.threads.map((item) => item.updatedAt), [2_500_000_000_000, 500]);
+});
+
+test("touchThreadActivity normalizes app-server seconds to milliseconds", () => {
+  const state = {
+    summary: { id: "thread-1", updatedAt: 1000 },
+    lastActivityAtMs: 1000,
+    snapshot: {
+      threads: [
+        { id: "thread-1", updatedAt: 1000 },
+      ],
+    },
+  };
+
   touchThreadActivity(state, 2500);
 
-  assert.equal(state.lastActivityAtMs, 2500);
-  assert.equal(state.summary.updatedAt, 2500);
-  assert.deepEqual(state.snapshot.threads.map((item) => item.updatedAt), [2500, 500]);
+  assert.equal(state.lastActivityAtMs, 2_500_000);
+  assert.equal(state.summary.updatedAt, 2_500_000);
+  assert.equal(state.snapshot.threads[0].updatedAt, 2_500_000);
 });

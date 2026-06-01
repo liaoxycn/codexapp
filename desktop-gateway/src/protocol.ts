@@ -9,15 +9,19 @@ export type GatewayIncomingMessage =
   | GatewayRefreshThreadsMessage
   | GatewayLoadOlderMessagesMessage
   | GatewaySendPromptMessage
+  | GatewayRollbackThreadMessage
+  | GatewayResendPromptMessage
   | GatewayStopTurnMessage
   | GatewayApprovePendingMessage
-  | GatewayRejectPendingMessage;
+  | GatewayRejectPendingMessage
+  | GatewayRestartDesktopMessage;
 
 export interface GatewayHelloMessage {
   type: "hello";
   client?: string;
   version?: string;
   pairToken?: string | null;
+  selectedThreadId?: string | null;
   capabilities?: string[];
 }
 
@@ -29,11 +33,15 @@ export interface GatewaySelectThreadMessage {
 export interface GatewayCreateThreadMessage {
   type: "create_thread";
   cwd?: string;
+  model?: string;
+  reasoningEffort?: string;
+  sandboxMode?: string;
 }
 
 export interface GatewayForkThreadMessage {
   type: "fork_thread";
   threadId: string;
+  numTurns?: number;
 }
 
 export interface GatewayRenameThreadMessage {
@@ -65,6 +73,24 @@ export interface GatewaySendPromptMessage {
   type: "send_prompt";
   text: string;
   threadId?: string;
+  newThread?: boolean;
+  cwd?: string;
+  model?: string;
+  reasoningEffort?: string;
+  sandboxMode?: string;
+}
+
+export interface GatewayRollbackThreadMessage {
+  type: "rollback_thread";
+  threadId?: string;
+  numTurns: number;
+}
+
+export interface GatewayResendPromptMessage {
+  type: "resend_prompt";
+  text: string;
+  threadId?: string;
+  rollbackNumTurns: number;
 }
 
 export interface GatewayStopTurnMessage {
@@ -77,6 +103,10 @@ export interface GatewayApprovePendingMessage {
 
 export interface GatewayRejectPendingMessage {
   type: "reject_pending";
+}
+
+export interface GatewayRestartDesktopMessage {
+  type: "restart_desktop";
 }
 
 export interface GatewayStatusMessage {
@@ -94,9 +124,14 @@ export interface GatewaySnapshotMessage {
   hasMoreHistory?: boolean;
   pendingApproval?: string | null;
   chips: GatewayChipPayload[];
+  files: GatewayFilePayload[];
   slashCommands: string[];
   cwd?: string;
   permissionSummary?: string;
+  sessionConfig?: GatewaySessionConfigPayload;
+  configOptions: GatewayConfigOptionsPayload;
+  operationalNotices?: GatewayOperationalNoticePayload[];
+  desktopRestartRequired?: boolean;
   isGenerating: boolean;
 }
 
@@ -111,10 +146,45 @@ export interface GatewaySnapshotPatchMessage {
   hasMoreHistory?: boolean;
   pendingApproval?: string | null;
   chips?: GatewayChipPayload[];
+  files?: GatewayFilePayload[];
   slashCommands?: string[];
   cwd?: string;
   permissionSummary?: string | null;
+  sessionConfig?: GatewaySessionConfigPayload;
+  configOptions?: GatewayConfigOptionsPayload;
+  operationalNotices?: GatewayOperationalNoticePayload[];
+  desktopRestartRequired?: boolean;
   isGenerating?: boolean;
+}
+
+export interface GatewayOperationalNoticePayload {
+  id: string;
+  text: string;
+  createdAt: number;
+}
+
+export interface GatewayConfigOptionPayload {
+  label: string;
+  value: string;
+  description?: string;
+}
+
+export interface GatewayConfigOptionsPayload {
+  models: GatewayConfigOptionPayload[];
+  reasoningEfforts: GatewayConfigOptionPayload[];
+  sandboxModes: GatewayConfigOptionPayload[];
+  defaults: {
+    model?: string;
+    reasoningEffort?: string;
+    sandboxMode?: string;
+  };
+}
+
+export interface GatewaySessionConfigPayload {
+  permissionMode?: string;
+  provider?: string;
+  model?: string;
+  reasoningEffort?: string;
 }
 
 export interface GatewayThreadPayload {
@@ -136,6 +206,10 @@ export interface GatewayMessagePayload {
   id: string;
   role: "user" | "assistant" | "system";
   blocks: GatewayBlockPayload[];
+  forkNumTurns?: number;
+  rollbackNumTurns?: number;
+  durationMs?: number;
+  isFinal?: boolean;
 }
 
 export interface GatewayBlockPayload {
@@ -160,6 +234,11 @@ export interface GatewayChipPayload {
   path?: string;
 }
 
+export interface GatewayFilePayload {
+  label: string;
+  path: string;
+}
+
 export interface ClientSnapshot {
   threads: GatewayThreadPayload[];
   selectedThreadId: string;
@@ -167,8 +246,29 @@ export interface ClientSnapshot {
   hasMoreHistory?: boolean;
   pendingApproval?: string | null;
   chips: GatewayChipPayload[];
+  files: GatewayFilePayload[];
   slashCommands: string[];
   cwd: string;
   permissionSummary: string;
+  sessionConfig: GatewaySessionConfigPayload;
+  configOptions: GatewayConfigOptionsPayload;
+  operationalNotices?: GatewayOperationalNoticePayload[];
+  desktopRestartRequired?: boolean;
   isGenerating: boolean;
+}
+
+export interface ThreadStartOptions {
+  cwd?: string;
+  model?: string;
+  reasoningEffort?: string;
+  sandboxMode?: string;
+}
+
+export function emptyConfigOptions(): GatewayConfigOptionsPayload {
+  return {
+    models: [],
+    reasoningEfforts: [],
+    sandboxModes: [],
+    defaults: {},
+  };
 }

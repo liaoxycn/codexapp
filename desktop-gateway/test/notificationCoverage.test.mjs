@@ -17,6 +17,7 @@ function createState() {
 
 function createDeps(state) {
   const statuses = [];
+  const operationalNotices = [];
   let emitCount = 0;
   return {
     deps: {
@@ -28,6 +29,9 @@ function createDeps(state) {
       finalizeTurnState: async () => {},
       hydrateThreads: async () => {},
       ensureActiveAssistantMessage: () => {},
+      pushOperationalNotice: (notice) => {
+        operationalNotices.push(notice);
+      },
       updateSummaryStatus: (_threadId, status) => {
         statuses.push(status);
       },
@@ -36,6 +40,7 @@ function createDeps(state) {
       return emitCount;
     },
     statuses,
+    operationalNotices,
   };
 }
 
@@ -454,7 +459,7 @@ test("handleBridgeNotification surfaces realtime thread notifications", async ()
   );
 });
 
-test("handleBridgeNotification surfaces operational global notices", async () => {
+test("handleBridgeNotification does not inject global operational notices into thread messages", async () => {
   const state = createState();
   state.snapshot.selectedThreadId = "thread-1";
   const context = createDeps(state);
@@ -541,8 +546,9 @@ test("handleBridgeNotification surfaces operational global notices", async () =>
   );
 
   assert.equal(context.emitCount, 10);
+  assert.deepEqual(state.snapshot.messages, []);
   assert.deepEqual(
-    state.snapshot.messages.map((message) => message.blocks[0].value),
+    context.operationalNotices.map((notice) => notice.text),
     [
       "MCP 授权 github: 失败\ndenied",
       "MCP 服务 playwright: 已就绪",
@@ -558,7 +564,7 @@ test("handleBridgeNotification surfaces operational global notices", async () =>
   );
 });
 
-test("handleBridgeNotification surfaces connection scoped operational updates", async () => {
+test("handleBridgeNotification does not inject connection scoped operational updates into thread messages", async () => {
   const state = createState();
   state.snapshot.selectedThreadId = "thread-1";
   const context = createDeps(state);
@@ -621,11 +627,13 @@ test("handleBridgeNotification surfaces connection scoped operational updates", 
   );
 
   assert.equal(context.emitCount, 4);
+  assert.deepEqual(state.snapshot.messages, []);
   assert.deepEqual(
-    state.snapshot.messages.map((message) => message.blocks[0].value),
+    context.operationalNotices.map((notice) => notice.text),
     [
       "应用列表已更新: 2 个",
       "文件变更: 2 项\nD:/repo/a.ts\nD:/repo/b.ts",
+      "文件搜索: main · 1 个结果",
       "文件搜索已完成",
     ]
   );

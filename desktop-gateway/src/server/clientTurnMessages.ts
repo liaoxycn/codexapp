@@ -2,6 +2,8 @@ import type {
   GatewayApprovePendingMessage,
   GatewayIncomingMessage,
   GatewayRejectPendingMessage,
+  GatewayResendPromptMessage,
+  GatewayRollbackThreadMessage,
   GatewaySendPromptMessage,
   GatewayStopTurnMessage,
 } from "../protocol.js";
@@ -17,6 +19,12 @@ export async function handleTurnClientMessage(
     case "send_prompt":
       await handleSendPrompt(context, message, handlers);
       return true;
+    case "rollback_thread":
+      await handleRollbackThread(context, message, handlers);
+      return true;
+    case "resend_prompt":
+      await handleResendPrompt(context, message, handlers);
+      return true;
     case "stop_turn":
       await handleStopTurn(context, message, handlers);
       return true;
@@ -31,13 +39,54 @@ export async function handleTurnClientMessage(
   }
 }
 
+async function handleRollbackThread(
+  context: ClientContext,
+  message: GatewayRollbackThreadMessage,
+  handlers: ClientMessageHandlers
+): Promise<void> {
+  await handlers.runBackendAction(context, async () => {
+    const requestedThreadId = message.threadId?.trim() || context.selectedThreadId;
+    const snapshot = await handlers.backend().rollbackThread(requestedThreadId, message.numTurns);
+    context.selectedThreadId = snapshot.selectedThreadId || requestedThreadId;
+    handlers.markDesktopRestartRequired("rollback_thread");
+    return snapshot;
+  });
+}
+
+async function handleResendPrompt(
+  context: ClientContext,
+  message: GatewayResendPromptMessage,
+  handlers: ClientMessageHandlers
+): Promise<void> {
+  await handlers.runBackendAction(context, async () => {
+    const requestedThreadId = message.threadId?.trim() || context.selectedThreadId;
+    const snapshot = await handlers.backend().resendPrompt(
+      requestedThreadId,
+      message.text,
+      message.rollbackNumTurns
+    );
+    context.selectedThreadId = snapshot.selectedThreadId || requestedThreadId;
+    handlers.markDesktopRestartRequired("resend_prompt");
+    return snapshot;
+  });
+}
+
 async function handleSendPrompt(
   context: ClientContext,
   message: GatewaySendPromptMessage,
   handlers: ClientMessageHandlers
 ): Promise<void> {
   await handlers.runBackendAction(context, async () => {
-    const requestedThreadId = message.threadId?.trim() || context.selectedThreadId;
+    let requestedThreadId = message.threadId?.trim() || context.selectedThreadId;
+    if (message.newThread || !requestedThreadId) {
+      const created = await handlers.backend().createThread(message.cwd, {
+        cwd: message.cwd,
+        model: message.model,
+        reasoningEffort: message.reasoningEffort,
+        sandboxMode: message.sandboxMode,
+      });
+      requestedThreadId = created.selectedThreadId;
+    }
     if (requestedThreadId && requestedThreadId !== context.selectedThreadId) {
       context.selectionVersion += 1;
       context.selectedThreadId = requestedThreadId;
@@ -45,7 +94,7 @@ async function handleSendPrompt(
     const snapshot = await handlers.backend().sendPrompt(requestedThreadId, message.text);
     context.selectedThreadId = snapshot.selectedThreadId || requestedThreadId;
     console.log(`[gateway] send_prompt backend ok thread=${context.selectedThreadId}`);
-    void handlers.pokeDesktop(context.selectedThreadId, "send_prompt");
+    handlers.markDesktopRestartRequired("send_prompt");
     return snapshot;
   });
 }

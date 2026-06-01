@@ -49,6 +49,7 @@ function runtimeState(id, overrides = {}) {
       hasMoreHistory: false,
       pendingApproval: overrides.pendingApproval?.text ?? null,
       chips: [],
+    files: [],
       slashCommands: [],
       cwd: "",
       permissionSummary: "",

@@ -19,7 +19,8 @@ export type ClientMessageHandlers = {
     action: () => ClientSnapshot | Promise<ClientSnapshot>
   ) => Promise<void>;
   refreshSelectedThread: (context: ClientContext, source: RefreshSource) => Promise<void>;
-  pokeDesktop: (threadId: string, reason: string) => Promise<void>;
+  markDesktopRestartRequired: (reason: string) => void;
+  restartDesktop: () => Promise<void>;
 };
 
 export async function handleClientMessage(
@@ -56,6 +57,14 @@ export async function handleClientMessage(
   if (await handleTurnClientMessage(context, message, handlers)) {
     return;
   }
+
+  if (message.type === "restart_desktop") {
+    await handlers.runBackendAction(context, async () => {
+      await handlers.restartDesktop();
+      return handlers.backend().getSnapshot(context.selectedThreadId);
+    });
+    return;
+  }
 }
 
 function handleHello(
@@ -76,6 +85,10 @@ function handleHello(
 
   context.authenticated = true;
   context.supportsSnapshotPatch = message.capabilities?.includes("snapshot_patch") ?? false;
+  const requestedThreadId = message.selectedThreadId?.trim();
+  if (requestedThreadId && handlers.backend().hasThread(requestedThreadId)) {
+    context.selectedThreadId = requestedThreadId;
+  }
   console.log(`[gateway] paired client=${message.client ?? "android"} version=${message.version ?? "-"}`);
   handlers.sendStatus(context.socket, {
     type: "status",

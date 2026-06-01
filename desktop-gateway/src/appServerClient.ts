@@ -8,6 +8,8 @@ import type {
   ThreadResumeResult,
   ThreadStartResponse,
 } from "./appServerTypes.js";
+import type { GatewayConfigOptionsPayload, ThreadStartOptions } from "./protocol.js";
+import { readGatewayConfigOptions } from "./appServerConfigRpc.js";
 import { startAppServerSession } from "./appServerLifecycle.js";
 import { AppServerTransport } from "./appServerTransport.js";
 import {
@@ -68,6 +70,10 @@ export class AppServerClient {
     return await listThreads(this.request.bind(this), archived);
   }
 
+  async configOptions(cwd: string): Promise<GatewayConfigOptionsPayload> {
+    return await readGatewayConfigOptions(this.request.bind(this), cwd);
+  }
+
   async threadRead(threadId: string, includeTurns = true): Promise<AppServerThread> {
     return await readThread(this.request.bind(this), threadId, includeTurns);
   }
@@ -76,8 +82,8 @@ export class AppServerClient {
     return await resumeThread(this.request.bind(this), threadId);
   }
 
-  async threadStart(cwd?: string | null): Promise<ThreadStartResponse> {
-    return await startThread(this.request.bind(this), cwd);
+  async threadStart(cwd?: string | null, options: ThreadStartOptions = {}): Promise<ThreadStartResponse> {
+    return await startThread(this.request.bind(this), cwd, options);
   }
 
   async threadFork(threadId: string): Promise<ThreadForkResponse> {

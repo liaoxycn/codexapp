@@ -29,6 +29,7 @@ function createState() {
       hasMoreHistory: false,
       pendingApproval: null,
       chips: [],
+    files: [],
       slashCommands: [],
       cwd: "D:/Projects/Test",
       permissionSummary: "",

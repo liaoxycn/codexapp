@@ -1,6 +1,8 @@
 package com.codex.mobile.ui.composer
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -8,80 +10,60 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.Divider
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
-import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.codex.mobile.model.ComposerFile
 import com.codex.mobile.model.HomeUiState
+import com.codex.mobile.model.SessionConfig
 import com.codex.mobile.ui.theme.CodexTheme
 
 @Composable
 internal fun ComposerDetailsSection(
     state: HomeUiState,
-    compactMode: Boolean,
     activePanel: ComposerPanel,
     slashPanelVisible: Boolean,
+    filePanelVisible: Boolean,
     filteredCommands: List<String>,
     trailingToken: String,
     slashQuery: String,
+    fileQuery: String,
     onSlashQueryChange: (String) -> Unit,
-    onFocusComposer: () -> Unit,
+    onFileQueryChange: (String) -> Unit,
     onActivePanelChange: (ComposerPanel) -> Unit,
-    onToggleCompact: () -> Unit,
-    onCompactContext: () -> Unit,
-    onRollbackLastTurn: () -> Unit,
     onClearComposer: () -> Unit,
-    onInsertShellTemplate: () -> Unit,
-    onInsertText: (String) -> Unit,
     onResetInlineSlashPanel: () -> Unit,
     onSelectSlashCommand: (String) -> Unit,
+    onSelectFile: (ComposerFile) -> Unit,
 ) {
-    val fileChips = state.chips.filter { it.icon == com.codex.mobile.model.ComposerChipIcon.FILE }
-
     AnimatedVisibility(visible = state.showComposerDetails) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(3.dp),
-            modifier = Modifier.padding(top = 3.dp, bottom = 3.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(start = 2.dp, end = 2.dp, bottom = 8.dp)
         ) {
-            Divider(color = CodexTheme.colors.border, thickness = 1.dp)
             Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(CodexTheme.colors.surfaceSubtle)
+                    .border(1.dp, CodexTheme.colors.border.copy(alpha = 0.7f), RoundedCornerShape(18.dp))
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 5.dp, vertical = 5.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 MiniAction("清空", Icons.Filled.Delete) {
                     onActivePanelChange(ComposerPanel.NONE)
                     onResetInlineSlashPanel()
                     onClearComposer()
-                }
-                MiniAction(if (compactMode) "常规" else "紧凑", Icons.Filled.Edit) {
-                    onToggleCompact()
-                }
-                MiniAction("压缩", Icons.Filled.Archive) {
-                    onActivePanelChange(ComposerPanel.NONE)
-                    onResetInlineSlashPanel()
-                    onCompactContext()
-                }
-                MiniAction("回滚", Icons.Filled.Refresh) {
-                    onActivePanelChange(ComposerPanel.NONE)
-                    onResetInlineSlashPanel()
-                    onRollbackLastTurn()
-                }
-                MiniAction("Shell", Icons.Filled.Edit) {
-                    onActivePanelChange(ComposerPanel.NONE)
-                    onResetInlineSlashPanel()
-                    onInsertShellTemplate()
-                    onFocusComposer()
                 }
                 MiniAction("/命令", Icons.Filled.Search) {
                     val opening = activePanel != ComposerPanel.SLASH
@@ -91,48 +73,35 @@ internal fun ComposerDetailsSection(
                         onSlashQueryChange(
                             if (trailingToken.startsWith("/") || trailingToken.startsWith("!")) trailingToken else ""
                         )
-                        onFocusComposer()
+                    }
+                }
+                MiniAction("文件", Icons.Filled.Description) {
+                    val opening = activePanel != ComposerPanel.FILE
+                    onResetInlineSlashPanel()
+                    onActivePanelChange(if (opening) ComposerPanel.FILE else ComposerPanel.NONE)
+                    if (opening) {
+                        onFileQueryChange("")
                     }
                 }
             }
-            if (fileChips.isNotEmpty()) {
+            val configItems = rememberSessionConfigItems(state.sessionConfig)
+            if (configItems.isNotEmpty()) {
                 Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    fileChips.forEach { chip ->
-                        MiniAction(chip.label, Icons.AutoMirrored.Filled.InsertDriveFile) {
-                            onInsertText("@{${chip.path ?: chip.label}}")
-                            onFocusComposer()
-                        }
-                    }
-                }
-            }
-            if (state.cwd.isNotBlank() || state.permissionSummary.isNotBlank()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (state.cwd.isNotBlank()) {
-                        Text(
-                            text = state.cwd,
-                            color = CodexTheme.colors.textSecondary,
-                            fontSize = if (compactMode) 10.sp else 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    if (state.permissionSummary.isNotBlank()) {
-                        Text(
-                            text = state.permissionSummary,
-                            color = CodexTheme.colors.textTertiary,
-                            fontSize = if (compactMode) 10.sp else 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    Text(
+                        text = configItems.joinToString("  ·  "),
+                        color = CodexTheme.colors.textSecondary,
+                        fontSize = ComposerMetaTextSize,
+                        lineHeight = ComposerMetaLineHeight,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
             AnimatedVisibility(visible = slashPanelVisible) {
@@ -145,10 +114,25 @@ internal fun ComposerDetailsSection(
                     }
                 )
             }
+            AnimatedVisibility(visible = filePanelVisible) {
+                FilePickerPanel(
+                    query = fileQuery,
+                    files = state.files,
+                    hasProject = state.cwd.isNotBlank(),
+                    projectCwd = state.cwd,
+                    onQueryChange = onFileQueryChange,
+                    onSelect = onSelectFile
+                )
+            }
         }
     }
+}
 
-    if (state.showComposerDetails) {
-        Divider(color = CodexTheme.colors.border, thickness = 1.dp)
-    }
+private fun rememberSessionConfigItems(config: SessionConfig): List<String> {
+    return listOfNotNull(
+        config.permissionMode.takeIf(String::isNotBlank),
+        config.provider.takeIf(String::isNotBlank),
+        config.model.takeIf(String::isNotBlank),
+        config.reasoningEffort.takeIf(String::isNotBlank)
+    )
 }

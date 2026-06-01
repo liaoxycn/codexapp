@@ -10,6 +10,7 @@ codexapp/
 │  │  │  ├─ ThreadModels.kt              线程摘要、分组、状态
 │  │  │  ├─ MessageModels.kt             消息、消息块、角色
 │  │  │  ├─ ComposerModels.kt            输入区 chip 模型
+│  │  │  ├─ AppUpdateState.kt            App 更新检查/下载/安装状态
 │  │  │  ├─ ConnectionModels.kt          连接状态、gateway 配置
 │  │  │  ├─ SessionRemoteState.kt        仓储远端状态
 │  │  │  └─ HomeUiState.kt               Home 页面渲染状态
@@ -88,6 +89,7 @@ codexapp/
 │  │     │  ├─ ComposerInputBar.kt       主输入条装配
 │  │     │  ├─ ComposerInputField.kt     文本输入框、placeholder、IME 发送行为
 │  │     │  ├─ ComposerInputActions.kt   工具展开按钮、发送/停止动作按钮
+│  │     │  ├─ FilePickerPanel.kt        项目内文件树选择与搜索面板
 │  │     │  └─ SlashCommandPanel.kt      slash 命令搜索面板与命令行项
 │  │     ├─ state/                       Home 状态映射、输入文本纯函数、重连/live refresh 策略
 │  │     │  ├─ HomeViewModel.kt          Home 页面公开事件入口，桥接 repository 与 UI state
@@ -107,6 +109,8 @@ codexapp/
 │  │     │  ├─ TopBar.kt                 顶部栏与 header icon button
 │  │     │  └─ ThreadStatusIndicators.kt 线程状态点、状态文本、状态标签/颜色
 │  │     └─ theme/                       Compose 主题
+│  │  ├─ update/                         GitHub release 更新检查、APK 下载、系统安装器拉起
+│  ├─ src/main/res/xml/file_paths.xml    APK 更新安装 FileProvider 路径
 │  └─ build/                             Android 构建输出，默认不提交
 ├─ desktop-gateway/                      桌面转发层，连接 Android App 与本机 codex app-server
 │  ├─ src/
@@ -171,6 +175,13 @@ codexapp/
 │  ├─ scripts/                           gateway 辅助脚本，包含 exe 构建与协议自测
 │  └─ node_modules/                      npm 依赖，默认不提交
 ├─ scripts/                              本地构建、部署、自测 Node 脚本
+│  ├─ dev-run.mjs                        重启 gateway、编译、安装并打开 App 的主自测入口
+│  ├─ build-apk.mjs                      本地 release APK 构建、zipalign、debug keystore 签名
+│  ├─ build-upload.mjs                   构建 APK 后上传 WebDAV
+│  ├─ upload-apk.mjs                     WebDAV 上传实现
+│  ├─ run-gateway-dev.mjs                gateway 开发模式启动辅助
+│  ├─ poke-desktop.mjs                   本地触发 `/poke`/Desktop 唤起逻辑的验证脚本
+│  ├─ script-utils.mjs                   脚本共享工具
 │  └─ logs/                              脚本本地运行日志，默认不提交
 ├─ docs/                                 项目文档、规范、wiki、调研资料入口
 │  ├─ MOBILE_GATEWAY_PROTOCOL.md         Android App 与 desktop-gateway 对接协议、payload 与高频流程测试清单

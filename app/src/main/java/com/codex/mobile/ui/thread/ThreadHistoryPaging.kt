@@ -3,50 +3,42 @@ package com.codex.mobile.ui.thread
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import com.codex.mobile.model.HomeUiState
 
+internal data class ThreadHistoryPagingController(
+    val nestedScrollConnection: NestedScrollConnection
+)
+
 @Composable
-internal fun HandleThreadHistoryPaging(
+internal fun rememberThreadHistoryPagingController(
     state: HomeUiState,
     listState: LazyListState,
     metrics: ThreadListMetrics,
     isAtTop: Boolean,
     onLoadOlderMessages: () -> Unit,
-) {
+): ThreadHistoryPagingController {
     var topLoadArmed by rememberSaveable(state.selectedThreadId) { mutableStateOf(false) }
+    var topPullDistance by rememberSaveable(state.selectedThreadId) { mutableFloatStateOf(0f) }
     var topLoadAnchorId by rememberSaveable(state.selectedThreadId) { mutableStateOf<String?>(null) }
     var topLoadAnchorOffset by rememberSaveable(state.selectedThreadId) { mutableIntStateOf(0) }
+    val topPullThreshold = 120f
 
-    LaunchedEffect(
-        state.selectedThreadId,
-        isAtTop,
-        state.hasMoreHistory,
-        state.isLoadingOlder,
-        state.isThreadSwitching,
-        state.messages.size,
-        listState.isScrollInProgress
-    ) {
-        if (!state.hasMoreHistory || state.isThreadSwitching || state.messages.isEmpty()) {
-            topLoadArmed = false
-            topLoadAnchorId = null
-            return@LaunchedEffect
-        }
-        if (!isAtTop) {
-            topLoadArmed = true
-            return@LaunchedEffect
-        }
-        if (!(isAtTop &&
-                topLoadArmed &&
-                !state.isLoadingOlder &&
-                !listState.isScrollInProgress)
-        ) {
-            return@LaunchedEffect
-        }
+    fun resetTopPull() {
+        topPullDistance = 0f
+        topLoadArmed = false
+    }
+
+    fun captureHistoryAnchor() {
         val anchorInfo = listState.layoutInfo.visibleItemsInfo.firstOrNull { info ->
             info.index >= metrics.messageItemStartIndex &&
                 info.index < metrics.messageItemStartIndex + state.messages.size
@@ -56,12 +48,59 @@ internal fun HandleThreadHistoryPaging(
             if (messageIndex in state.messages.indices) {
                 topLoadAnchorId = state.messages[messageIndex].id
                 topLoadAnchorOffset = anchorInfo.offset
+                return
             }
-        } else {
-            topLoadAnchorId = null
         }
-        topLoadArmed = false
-        onLoadOlderMessages()
+        topLoadAnchorId = null
+    }
+
+    val nestedScrollConnection = remember(
+        state.selectedThreadId,
+        isAtTop,
+        state.hasMoreHistory,
+        state.isLoadingOlder,
+        state.isThreadSwitching,
+        state.messages.size,
+        topPullThreshold
+    ) {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (!state.hasMoreHistory || state.isThreadSwitching || state.messages.isEmpty() || state.isLoadingOlder) {
+                    resetTopPull()
+                    return Offset.Zero
+                }
+                if (!isAtTop) {
+                    resetTopPull()
+                    return Offset.Zero
+                }
+                if (available.y > 0f) {
+                    topPullDistance = (topPullDistance + available.y).coerceAtMost(220f)
+                    topLoadArmed = true
+                    if (shouldTriggerHistoryLoad(
+                            isAtTop = isAtTop,
+                            hasMoreHistory = state.hasMoreHistory,
+                            isLoadingOlder = state.isLoadingOlder,
+                            isThreadSwitching = state.isThreadSwitching,
+                            hasMessages = state.messages.isNotEmpty(),
+                            pullDistance = topPullDistance,
+                            pullThreshold = topPullThreshold,
+                            loadArmed = topLoadArmed
+                        )
+                    ) {
+                        captureHistoryAnchor()
+                        resetTopPull()
+                        onLoadOlderMessages()
+                    }
+                } else if (available.y < 0f && topPullDistance > 0f) {
+                    resetTopPull()
+                }
+                return Offset.Zero
+            }
+        }
     }
 
     LaunchedEffect(state.isLoadingOlder, state.messages.size, state.hasMoreHistory, state.selectedThreadId) {
@@ -77,6 +116,8 @@ internal fun HandleThreadHistoryPaging(
         }
         topLoadAnchorId = null
     }
+
+    return ThreadHistoryPagingController(nestedScrollConnection = nestedScrollConnection)
 }
 
 internal fun restoredHistoryAnchorIndex(
@@ -90,4 +131,23 @@ internal fun restoredHistoryAnchorIndex(
     }
     val restoredStartIndex = if (hasMoreHistory) 1 else 0
     return restoredStartIndex + anchorIndex
+}
+
+internal fun shouldTriggerHistoryLoad(
+    isAtTop: Boolean,
+    hasMoreHistory: Boolean,
+    isLoadingOlder: Boolean,
+    isThreadSwitching: Boolean,
+    hasMessages: Boolean,
+    pullDistance: Float,
+    pullThreshold: Float,
+    loadArmed: Boolean
+): Boolean {
+    return isAtTop &&
+        hasMoreHistory &&
+        !isLoadingOlder &&
+        !isThreadSwitching &&
+        hasMessages &&
+        loadArmed &&
+        pullDistance >= pullThreshold
 }

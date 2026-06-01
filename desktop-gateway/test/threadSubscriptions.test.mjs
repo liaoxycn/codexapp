@@ -74,6 +74,7 @@ function existingState(id, overrides = {}) {
       hasMoreHistory: false,
       pendingApproval: null,
       chips: [],
+    files: [],
       slashCommands: [],
       cwd: "C:/work",
       permissionSummary: "workspace-write · never",

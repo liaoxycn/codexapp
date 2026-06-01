@@ -21,7 +21,6 @@ internal fun DrawerThreadList(
     sections: DrawerThreadSections,
     onCreateThreadInProject: (String) -> Unit,
     onSelectThread: (String) -> Unit,
-    onForkThread: (String) -> Unit,
     onRenameThread: (ThreadSummary) -> Unit,
     onArchiveThread: (String) -> Unit,
     onUnarchiveThread: (String) -> Unit,
@@ -62,7 +61,6 @@ internal fun DrawerThreadList(
                             selected = thread.id == selectedThreadId,
                             indentLevel = 1,
                             onClick = { onSelectThread(thread.id) },
-                            onFork = { onForkThread(thread.id) },
                             onRename = { onRenameThread(thread) },
                             onArchiveToggle = {
                                 if (thread.archived) onUnarchiveThread(thread.id) else onArchiveThread(thread.id)
@@ -90,7 +88,6 @@ internal fun DrawerThreadList(
                     selected = thread.id == selectedThreadId,
                     indentLevel = 0,
                     onClick = { onSelectThread(thread.id) },
-                    onFork = { onForkThread(thread.id) },
                     onRename = { onRenameThread(thread) },
                     onArchiveToggle = {
                         if (thread.archived) onUnarchiveThread(thread.id) else onArchiveThread(thread.id)
@@ -116,7 +113,6 @@ internal fun DrawerThreadList(
                     selected = thread.id == selectedThreadId,
                     indentLevel = 0,
                     onClick = { onSelectThread(thread.id) },
-                    onFork = { onForkThread(thread.id) },
                     onRename = { onRenameThread(thread) },
                     onArchiveToggle = { onUnarchiveThread(thread.id) }
                 )

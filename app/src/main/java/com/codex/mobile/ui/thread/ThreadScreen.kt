@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.codex.mobile.model.HomeUiState
+import com.codex.mobile.model.NewThreadDraft
 import com.codex.mobile.ui.theme.CodexTheme
 import kotlinx.coroutines.launch
 
@@ -39,9 +40,10 @@ internal fun ThreadScreen(
     onOpenConnection: () -> Unit,
     onRefreshCurrent: () -> Unit,
     onLoadOlderMessages: () -> Unit,
-    onEditUserMessage: (String) -> Unit,
-    onResendUserMessage: (String) -> Unit,
-    onCopyMessage: (String) -> Unit,
+    onEditUserMessage: (String, Int) -> Unit,
+    onResendUserMessage: (String, Int) -> Unit,
+    onForkFromMessage: (Int) -> Unit,
+    onNewThreadDraftChange: (NewThreadDraft) -> Unit,
     onApprovePending: () -> Unit,
     onRejectPending: () -> Unit
 ) {
@@ -72,7 +74,8 @@ internal fun ThreadScreen(
             isLoadingOlder = controller.isLoadingOlder,
             onEditUserMessage = onEditUserMessage,
             onResendUserMessage = onResendUserMessage,
-            onCopyMessage = onCopyMessage,
+            onForkFromMessage = onForkFromMessage,
+            onNewThreadDraftChange = onNewThreadDraftChange,
             onApprovePending = onApprovePending,
             onRejectPending = onRejectPending,
         )
@@ -101,8 +104,8 @@ internal fun ThreadScreen(
         AnimatedVisibility(
             visible = controller.metrics.showJumpToBottom,
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 6.dp, bottom = controller.metrics.composerPadding + 18.dp),
+                .align(Alignment.BottomCenter)
+                .padding(bottom = controller.metrics.composerPadding + 18.dp),
             enter = fadeIn(),
             exit = fadeOut()
         ) {

@@ -15,9 +15,13 @@ function createSnapshot(overrides = {}) {
     hasMoreHistory: undefined,
     pendingApproval: undefined,
     chips: [],
+    files: [],
     slashCommands: [],
     cwd: "D:/Projects/Test",
     permissionSummary: null,
+    sessionConfig: {},
+    configOptions: { models: [], reasoningEfforts: [], sandboxModes: [], defaults: {} },
+    desktopRestartRequired: false,
     isGenerating: false,
     ...overrides,
   };
@@ -58,6 +62,8 @@ test("buildSnapshotMessage fills gateway defaults for optional fields", () => {
   assert.equal(message.type, "snapshot");
   assert.equal(message.hasMoreHistory, false);
   assert.equal(message.pendingApproval, null);
+  assert.deepEqual(message.sessionConfig, {});
+  assert.equal(message.desktopRestartRequired, false);
 });
 
 test("sendSnapshot serializes snapshot payload for client socket", () => {
@@ -90,6 +96,50 @@ test("buildSnapshotPatchMessage includes only changed snapshot fields", () => {
   assert.equal(patch.messages.length, 1);
   assert.equal(patch.isGenerating, true);
   assert.equal("threads" in patch, false);
+});
+
+test("buildSnapshotPatchMessage includes changed project file list", () => {
+  const previous = buildSnapshotMessage(createSnapshot());
+  const next = buildSnapshotMessage(createSnapshot({
+    files: [{ label: "src/App.ts", path: "D:/Projects/Test/src/App.ts" }],
+  }));
+
+  const patch = buildSnapshotPatchMessage(previous, next, 1, 2);
+
+  assert.deepEqual(patch.changed, ["files"]);
+  assert.deepEqual(patch.files, [{ label: "src/App.ts", path: "D:/Projects/Test/src/App.ts" }]);
+});
+
+test("buildSnapshotPatchMessage includes changed desktop restart prompt state", () => {
+  const previous = buildSnapshotMessage(createSnapshot());
+  const next = buildSnapshotMessage(createSnapshot({ desktopRestartRequired: true }));
+
+  const patch = buildSnapshotPatchMessage(previous, next, 1, 2);
+
+  assert.deepEqual(patch.changed, ["desktopRestartRequired"]);
+  assert.equal(patch.desktopRestartRequired, true);
+});
+
+test("buildSnapshotPatchMessage includes changed session config", () => {
+  const previous = buildSnapshotMessage(createSnapshot());
+  const next = buildSnapshotMessage(createSnapshot({
+    sessionConfig: {
+      permissionMode: "workspace-write",
+      provider: "openai",
+      model: "gpt-5",
+      reasoningEffort: "high",
+    },
+  }));
+
+  const patch = buildSnapshotPatchMessage(previous, next, 1, 2);
+
+  assert.deepEqual(patch.changed, ["sessionConfig"]);
+  assert.deepEqual(patch.sessionConfig, {
+    permissionMode: "workspace-write",
+    provider: "openai",
+    model: "gpt-5",
+    reasoningEffort: "high",
+  });
 });
 
 test("sendSnapshot sends patch after a negotiated baseline snapshot", () => {

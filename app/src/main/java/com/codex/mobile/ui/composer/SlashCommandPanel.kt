@@ -20,6 +20,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -31,6 +34,7 @@ import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.codex.mobile.ui.theme.CodexTheme
@@ -44,10 +48,16 @@ internal fun SlashCommandPanel(
 ) {
     Column(
         modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(CodexTheme.colors.surface)
+            .border(1.dp, CodexTheme.colors.border.copy(alpha = 0.82f), RoundedCornerShape(18.dp))
+            .padding(8.dp)
             .heightIn(max = 180.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)
     ) {
+        PanelHeader(title = "命令", subtitle = "选择要插入的 Codex 操作")
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -70,8 +80,8 @@ internal fun SlashCommandPanel(
                 singleLine = true,
                 textStyle = TextStyle(
                     color = CodexTheme.colors.textPrimary,
-                    fontSize = 13.sp,
-                    lineHeight = 17.sp,
+                    fontSize = ComposerTextSize,
+                    lineHeight = ComposerTextLineHeight,
                     platformStyle = PlatformTextStyle(includeFontPadding = false)
                 ),
                 modifier = Modifier.fillMaxWidth(),
@@ -83,7 +93,12 @@ internal fun SlashCommandPanel(
                         contentAlignment = Alignment.CenterStart
                     ) {
                         if (query.isBlank()) {
-                            Text("搜索命令", color = CodexTheme.colors.textTertiary, fontSize = 13.sp, lineHeight = 17.sp)
+                            Text(
+                                "搜索命令",
+                                color = CodexTheme.colors.textTertiary,
+                                fontSize = ComposerTextSize,
+                                lineHeight = ComposerTextLineHeight
+                            )
                         }
                         innerTextField()
                     }
@@ -91,12 +106,14 @@ internal fun SlashCommandPanel(
             )
         }
         if (commands.isEmpty()) {
-            SlashCommandRow(command = "没有匹配的命令", supporting = "修改搜索词")
+            SlashCommandRow(command = "没有匹配的命令", supporting = "修改搜索词", icon = Icons.Filled.Search)
         } else {
             commands.forEach { command ->
+                val commandText = command.substringBefore("  ").trim()
                 SlashCommandRow(
-                    command = command.substringBefore("  ").trim(),
+                    command = commandText,
                     supporting = command.substringAfter("  ", ""),
+                    icon = iconForSlashCommand(commandText),
                     onClick = { onSelect(command) }
                 )
             }
@@ -108,23 +125,31 @@ internal fun SlashCommandPanel(
 private fun SlashCommandRow(
     command: String,
     supporting: String = "",
+    icon: ImageVector,
     onClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(CodexTheme.colors.surfaceSubtle)
             .clickable(enabled = onClick != null) { onClick?.invoke() }
-            .defaultMinSize(minHeight = 44.dp)
+            .defaultMinSize(minHeight = 46.dp)
             .padding(horizontal = 12.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = CodexTheme.colors.textSecondary,
+            modifier = Modifier.size(17.dp)
+        )
+        Spacer(Modifier.width(10.dp))
         Text(
             text = command,
             color = CodexTheme.colors.textPrimary,
-            fontSize = 13.sp,
-            lineHeight = 17.sp,
+            fontSize = ComposerTextSize,
+            lineHeight = ComposerTextLineHeight,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -134,11 +159,48 @@ private fun SlashCommandRow(
             Text(
                 text = supporting,
                 color = CodexTheme.colors.textSecondary,
-                fontSize = 11.sp,
-                lineHeight = 15.sp,
+                fontSize = ComposerTextSize,
+                lineHeight = ComposerTextLineHeight,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
+    }
+}
+
+@Composable
+internal fun PanelHeader(title: String, subtitle: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 1.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            color = CodexTheme.colors.textPrimary,
+            fontSize = 12.sp,
+            lineHeight = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = subtitle,
+            color = CodexTheme.colors.textTertiary,
+            fontSize = 10.sp,
+            lineHeight = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+private fun iconForSlashCommand(command: String): ImageVector {
+    val token = command.substringBefore(" ").trim()
+    return when {
+        token == "/compact" -> Icons.Filled.Archive
+        token == "/rollback" -> Icons.Filled.Refresh
+        token.startsWith("!") -> Icons.Filled.Edit
+        else -> Icons.Filled.Search
     }
 }

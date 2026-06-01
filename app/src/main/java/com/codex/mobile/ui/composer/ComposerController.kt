@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.TextFieldValue
+import com.codex.mobile.model.ComposerFile
 import com.codex.mobile.model.HomeUiState
 
 internal data class ComposerController(
@@ -15,14 +16,18 @@ internal data class ComposerController(
     val sendEnabled: Boolean,
     val trailingToken: String,
     val slashPanelVisible: Boolean,
+    val filePanelVisible: Boolean,
     val filteredCommands: List<String>,
     val slashQuery: String,
+    val fileQuery: String,
     val composerFieldValue: TextFieldValue,
     val focusRequester: FocusRequester,
     val inputInteractionSource: MutableInteractionSource,
     val onSlashQueryChange: (String) -> Unit,
+    val onFileQueryChange: (String) -> Unit,
     val focusComposer: () -> Unit,
     val resetInlineSlashPanel: () -> Unit,
+    val selectFile: (ComposerFile) -> Unit,
     val selectSlashCommand: (String) -> Unit,
     val onComposerValueChange: (TextFieldValue) -> Unit,
     val sendNow: () -> Unit,
@@ -34,6 +39,7 @@ internal fun rememberComposerController(
     activePanel: ComposerPanel,
     onActivePanelChange: (ComposerPanel) -> Unit,
     onChange: (String) -> Unit,
+    onInsertText: (String) -> Unit,
     onApplySlashCommand: (String) -> Unit,
     onSend: () -> Unit,
 ): ComposerController {
@@ -48,6 +54,7 @@ internal fun rememberComposerController(
         suppressInlineSlashPanel = localState.suppressInlineSlashPanel,
         trailingToken = trailingToken
     )
+    val filePanelVisible = activePanel == ComposerPanel.FILE
     val filteredCommands = filterSlashCommands(state.slashCommands, localState.slashQuery)
     val composerEnabled = composerControllerEnabled(state.isThreadSwitching)
     val sendEnabled = composerControllerSendEnabled(
@@ -78,16 +85,25 @@ internal fun rememberComposerController(
         sendEnabled = sendEnabled,
         trailingToken = trailingToken,
         slashPanelVisible = slashPanelVisible,
+        filePanelVisible = filePanelVisible,
         filteredCommands = filteredCommands,
         slashQuery = localState.slashQuery,
+        fileQuery = localState.fileQuery,
         composerFieldValue = localState.composerFieldValue,
         focusRequester = localState.focusRequester,
         inputInteractionSource = localState.inputInteractionSource,
         onSlashQueryChange = localState.updateSlashQuery,
+        onFileQueryChange = localState.updateFileQuery,
         focusComposer = { focusComposer() },
         resetInlineSlashPanel = {
             localState.updateSlashQuery("")
             localState.updateSuppressInlineSlashPanel(false)
+        },
+        selectFile = { file ->
+            onInsertText(composerFileMention(file.path))
+            onActivePanelChange(ComposerPanel.NONE)
+            localState.updateFileQuery("")
+            focusComposer()
         },
         selectSlashCommand = { command ->
             localState.updateSuppressInlineSlashPanel(false)

@@ -2,6 +2,7 @@ package com.codex.mobile.ui.message
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
@@ -26,14 +27,18 @@ internal fun MarkdownText(
     val visibleLines = if (shouldCollapse && !expanded) lines.take(maxCollapsedLines) else lines
 
     Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-        visibleLines.forEach { line ->
-            MarkdownLineItem(
-                line = line,
-                textColor = textColor,
-                fontSize = fontSize,
-                lineHeight = lineHeight,
-                wrapContent = wrapContent
-            )
+        SelectionContainer {
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                visibleLines.forEach { line ->
+                    MarkdownLineItem(
+                        line = line,
+                        textColor = textColor,
+                        fontSize = fontSize,
+                        lineHeight = lineHeight,
+                        wrapContent = wrapContent
+                    )
+                }
+            }
         }
         if (shouldCollapse) {
             ExpandCollapseTextButton(

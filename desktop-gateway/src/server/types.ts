@@ -1,5 +1,5 @@
 import type { WebSocket } from "ws";
-import type { ClientSnapshot, GatewaySnapshotMessage } from "../protocol.js";
+import type { ClientSnapshot, GatewaySnapshotMessage, ThreadStartOptions } from "../protocol.js";
 
 export interface GatewayServerOptions {
   host: string;
@@ -29,8 +29,8 @@ export type Backend = {
   hasThread(threadId: string): boolean;
   getDefaultThreadId(): string;
   getSnapshot(selectedThreadId?: string): ClientSnapshot;
-  createThread(cwd?: string): ClientSnapshot | Promise<ClientSnapshot>;
-  forkThread(threadId: string): ClientSnapshot | Promise<ClientSnapshot>;
+  createThread(cwd?: string, options?: ThreadStartOptions): ClientSnapshot | Promise<ClientSnapshot>;
+  forkThread(threadId: string, numTurns?: number): ClientSnapshot | Promise<ClientSnapshot>;
   selectThread(threadId: string): ClientSnapshot | Promise<ClientSnapshot>;
   renameThread(threadId: string, name: string): ClientSnapshot | Promise<ClientSnapshot>;
   archiveThread(threadId: string): ClientSnapshot | Promise<ClientSnapshot>;
@@ -38,6 +38,8 @@ export type Backend = {
   refreshThreads(selectedThreadId?: string): ClientSnapshot | Promise<ClientSnapshot>;
   loadOlderMessages(threadId: string): ClientSnapshot | Promise<ClientSnapshot>;
   sendPrompt(threadId: string, text: string): ClientSnapshot | Promise<ClientSnapshot>;
+  rollbackThread(threadId: string, numTurns: number): ClientSnapshot | Promise<ClientSnapshot>;
+  resendPrompt(threadId: string, text: string, rollbackNumTurns: number): ClientSnapshot | Promise<ClientSnapshot>;
   stopTurn(threadId: string): ClientSnapshot | Promise<ClientSnapshot>;
   approveCurrent(threadId: string, allow: boolean): ClientSnapshot | Promise<ClientSnapshot>;
 };

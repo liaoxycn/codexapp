@@ -7,10 +7,10 @@ import type {
   ThreadResumeResult,
   ThreadStartResponse,
 } from "./appServerTypes.js";
+import type { ThreadStartOptions } from "./protocol.js";
 
 const THREAD_LIST_PAGE_SIZE = 100;
 const THREAD_LIST_MAX_PAGES = 10;
-const THREAD_LIST_SOURCE_KINDS = ["cli", "vscode", "appServer", "unknown"];
 
 type RequestFn = <TParams extends object, TResult = unknown>(
   method: string,
@@ -29,7 +29,6 @@ export async function listThreads(
       limit: THREAD_LIST_PAGE_SIZE,
       sortKey: "updated_at",
       sortDirection: "desc",
-      sourceKinds: THREAD_LIST_SOURCE_KINDS,
       archived,
     })) as ThreadListResult;
     threads.push(...result.data);
@@ -64,11 +63,22 @@ export async function resumeThread(
 
 export async function startThread(
   request: RequestFn,
-  cwd?: string | null
+  cwd?: string | null,
+  options: ThreadStartOptions = {}
 ): Promise<ThreadStartResponse> {
-  return (await request("thread/start", {
-    cwd: cwd ?? null,
-  })) as ThreadStartResponse;
+  const params: Record<string, unknown> = {
+    cwd: options.cwd ?? cwd ?? null,
+  };
+  if (options.model) {
+    params.model = options.model;
+  }
+  if (options.reasoningEffort) {
+    params.reasoningEffort = options.reasoningEffort;
+  }
+  if (options.sandboxMode) {
+    params.sandbox = options.sandboxMode;
+  }
+  return (await request("thread/start", params)) as ThreadStartResponse;
 }
 
 export async function forkThread(
