@@ -29,6 +29,7 @@ import {
   handleThreadStatusChanged,
   handleTurnCompleted,
   handleTurnStarted,
+  handleHookRunUpdated,
 } from "./threadNotifications.js";
 
 export interface BridgeNotificationDeps {
@@ -54,6 +55,10 @@ export async function handleBridgeNotification(
       return;
     case "turn/completed":
       await handleTurnCompleted(notification, deps);
+      return;
+    case "hook/started":
+    case "hook/completed":
+      handleHookRunUpdated(notification, deps);
       return;
     case "item/agentMessage/delta":
       handleAgentMessageDelta(notification, deps);

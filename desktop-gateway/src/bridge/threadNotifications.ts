@@ -114,6 +114,31 @@ export async function handleTurnCompleted(
   await deps.finalizeTurnState(threadId, turn.status);
 }
 
+export function handleHookRunUpdated(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const { threadId, run } = notification.params as {
+    threadId: string;
+    turnId?: string | null;
+    run?: HookRunSummary | null;
+  };
+  const state = deps.threads.get(threadId);
+  if (!state || !run?.id) {
+    return;
+  }
+
+  const label = [asString(run.eventName, "hook"), asString(run.handlerType)].filter(Boolean).join(" ");
+  const status = asString(run.status, notification.method === "hook/started" ? "running" : "completed");
+  const detail = [
+    `Hook ${label}: ${formatHookStatus(status)}`,
+    asString(run.statusMessage).trim(),
+    ...formatHookEntries(run.entries),
+  ].filter(Boolean).join("\n");
+  replaceOrAppendMessage(state, systemStatus(detail, `hook-run-${run.id}`));
+  deps.emitChanged();
+}
+
 export function handleServerRequestResolved(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
@@ -413,6 +438,45 @@ interface TokenUsageBreakdown {
   reasoningOutputTokens?: number | null;
 }
 
+interface HookRunSummary {
+  id?: string | null;
+  eventName?: string | null;
+  handlerType?: string | null;
+  status?: string | null;
+  statusMessage?: string | null;
+  entries?: Array<{ kind?: string | null; text?: string | null }> | null;
+}
+
 function formatTokenCount(value: unknown): string {
   return Number.isFinite(value) ? Number(value).toLocaleString("en-US") : "0";
+}
+
+function formatHookStatus(status: string): string {
+  switch (status) {
+    case "running":
+      return "运行中";
+    case "completed":
+      return "已完成";
+    case "failed":
+      return "失败";
+    case "blocked":
+      return "已阻止";
+    case "stopped":
+      return "已停止";
+    default:
+      return status || "已更新";
+  }
+}
+
+function formatHookEntries(entries: HookRunSummary["entries"]): string[] {
+  return (entries ?? [])
+    .map((entry) => {
+      const text = asString(entry.text).trim();
+      if (!text) {
+        return "";
+      }
+      const kind = asString(entry.kind).trim();
+      return kind ? `${kind}: ${text}` : text;
+    })
+    .filter(Boolean);
 }

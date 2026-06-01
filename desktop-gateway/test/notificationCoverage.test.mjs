@@ -254,6 +254,54 @@ test("handleBridgeNotification surfaces thread token usage updates", async () =>
   );
 });
 
+test("handleBridgeNotification surfaces hook run updates", async () => {
+  const state = createState();
+  const context = createDeps(state);
+
+  await handleBridgeNotification(
+    {
+      method: "hook/started",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        run: {
+          id: "hook-1",
+          eventName: "preToolUse",
+          handlerType: "command",
+          status: "running",
+          statusMessage: "检查权限",
+          entries: [],
+        },
+      },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "hook/completed",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        run: {
+          id: "hook-1",
+          eventName: "preToolUse",
+          handlerType: "command",
+          status: "completed",
+          statusMessage: "允许执行",
+          entries: [{ kind: "feedback", text: "ok" }],
+        },
+      },
+    },
+    context.deps
+  );
+
+  assert.equal(context.emitCount, 2);
+  assert.deepEqual(
+    state.snapshot.messages.map((message) => message.blocks[0].value),
+    ["Hook preToolUse command: 已完成\n允许执行\nfeedback: ok"]
+  );
+});
+
 test("handleBridgeNotification refreshes catalog for thread lifecycle notifications", async () => {
   const state = createState();
   const context = createDeps(state);
