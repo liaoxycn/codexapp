@@ -543,6 +543,13 @@ function formatOperationalNotice(notification: JsonRpcNotification): { id: strin
         text: `额度状态 ${limitName}: ${usedPercent}${reachedType ? `\n${reachedType}` : ""}`,
       };
     }
+    case "app/list/updated": {
+      const apps = Array.isArray(params.data) ? params.data : [];
+      return {
+        id: "app-list-updated",
+        text: `应用列表已更新: ${apps.length} 个`,
+      };
+    }
     case "remoteControl/status/changed": {
       const status = asString(params.status, "unknown");
       const environmentId = asString(params.environmentId).trim();
@@ -556,6 +563,32 @@ function formatOperationalNotice(notification: JsonRpcNotification): { id: strin
         id: "external-agent-config-import",
         text: "外部代理配置已导入",
       };
+    case "fs/changed": {
+      const changedPaths = Array.isArray(params.changedPaths)
+        ? params.changedPaths.filter((entry): entry is string => typeof entry === "string")
+        : [];
+      const watchId = asString(params.watchId, "watch");
+      return {
+        id: `fs-changed-${watchId}`,
+        text: [`文件变更: ${changedPaths.length} 项`, ...changedPaths.slice(0, 3)].join("\n"),
+      };
+    }
+    case "fuzzyFileSearch/sessionUpdated": {
+      const query = asString(params.query);
+      const files = Array.isArray(params.files) ? params.files : [];
+      const sessionId = asString(params.sessionId, "session");
+      return {
+        id: `fuzzy-file-search-${sessionId}`,
+        text: `文件搜索: ${query || "输入中"} · ${files.length} 个结果`,
+      };
+    }
+    case "fuzzyFileSearch/sessionCompleted": {
+      const sessionId = asString(params.sessionId, "session");
+      return {
+        id: `fuzzy-file-search-${sessionId}`,
+        text: "文件搜索已完成",
+      };
+    }
     case "windows/worldWritableWarning": {
       const samplePaths = Array.isArray(params.samplePaths)
         ? params.samplePaths.filter((entry): entry is string => typeof entry === "string")

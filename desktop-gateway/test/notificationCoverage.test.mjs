@@ -558,6 +558,79 @@ test("handleBridgeNotification surfaces operational global notices", async () =>
   );
 });
 
+test("handleBridgeNotification surfaces connection scoped operational updates", async () => {
+  const state = createState();
+  state.snapshot.selectedThreadId = "thread-1";
+  const context = createDeps(state);
+
+  await handleBridgeNotification(
+    {
+      method: "app/list/updated",
+      params: { data: [{ id: "app-1", name: "App One" }, { id: "app-2", name: "App Two" }] },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "fs/changed",
+      params: { watchId: "watch-1", changedPaths: ["D:/repo/a.ts", "D:/repo/b.ts"] },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "fuzzyFileSearch/sessionUpdated",
+      params: { sessionId: "search-1", query: "main", files: [{ path: "Main.kt" }] },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "fuzzyFileSearch/sessionCompleted",
+      params: { sessionId: "search-1" },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "command/exec/outputDelta",
+      params: { processId: "cmd-1", stream: "stdout", deltaBase64: "b2s=", capReached: false },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "process/outputDelta",
+      params: { processHandle: "proc-1", stream: "stderr", deltaBase64: "ZXJy", capReached: false },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "process/exited",
+      params: {
+        processHandle: "proc-1",
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+        stdoutCapReached: false,
+        stderrCapReached: false,
+      },
+    },
+    context.deps
+  );
+
+  assert.equal(context.emitCount, 4);
+  assert.deepEqual(
+    state.snapshot.messages.map((message) => message.blocks[0].value),
+    [
+      "应用列表已更新: 2 个",
+      "文件变更: 2 项\nD:/repo/a.ts\nD:/repo/b.ts",
+      "文件搜索已完成",
+    ]
+  );
+});
+
 test("handleBridgeNotification refreshes catalog for thread lifecycle notifications", async () => {
   const state = createState();
   const context = createDeps(state);

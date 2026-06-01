@@ -165,12 +165,20 @@ export async function handleBridgeNotification(
     case "skills/changed":
     case "account/updated":
     case "account/rateLimits/updated":
+    case "app/list/updated":
     case "remoteControl/status/changed":
     case "externalAgentConfig/import/completed":
+    case "fs/changed":
+    case "fuzzyFileSearch/sessionUpdated":
+    case "fuzzyFileSearch/sessionCompleted":
     case "windows/worldWritableWarning":
     case "windowsSandbox/setupCompleted":
     case "account/login/completed":
       handleOperationalNotice(notification, deps);
+      return;
+    case "command/exec/outputDelta":
+    case "process/outputDelta":
+    case "process/exited":
       return;
     default:
       return;
