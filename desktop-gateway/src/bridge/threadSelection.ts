@@ -3,6 +3,7 @@ import type { ThreadRuntimeState } from "./types.js";
 
 interface ActivateThreadSelectionParams {
   threadId: string;
+  currentThreadId?: string;
   setCurrentThreadId: (threadId: string) => void;
   unsubscribeOtherThreads: (activeThreadId: string) => Promise<void>;
   resumeThread: (threadId: string) => Promise<void>;
@@ -60,6 +61,7 @@ export function isStaleSelectionRequest({
 
 export async function activateThreadSelection({
   threadId,
+  currentThreadId,
   setCurrentThreadId,
   unsubscribeOtherThreads,
   resumeThread,
@@ -68,15 +70,25 @@ export async function activateThreadSelection({
   emitChanged,
   getSnapshot,
 }: ActivateThreadSelectionParams): Promise<ClientSnapshot> {
+  const previousThreadId = currentThreadId ?? "";
   setCurrentThreadId(threadId);
-  await unsubscribeOtherThreads(threadId);
-  if (!isCurrentSelection(threadId)) {
-    return getSnapshot();
-  }
+  try {
+    await unsubscribeOtherThreads(threadId);
+    if (!isCurrentSelection(threadId)) {
+      return getSnapshot();
+    }
 
-  await resumeThread(threadId);
-  if (!isCurrentSelection(threadId)) {
-    return getSnapshot();
+    await resumeThread(threadId);
+    if (!isCurrentSelection(threadId)) {
+      return getSnapshot();
+    }
+  } catch (error) {
+    if (previousThreadId) {
+      setCurrentThreadId(previousThreadId);
+      syncSelectedThread(previousThreadId);
+      emitChanged();
+    }
+    throw error;
   }
 
   syncSelectedThread(threadId);

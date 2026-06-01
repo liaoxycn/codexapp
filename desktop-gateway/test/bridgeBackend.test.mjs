@@ -571,6 +571,32 @@ test("bridge backend refreshThreads does not override a newer manual selection",
   assert.equal(snapshot.cwd, "D:/Projects/B");
 });
 
+test("bridge backend restores previous selection when resume fails", async () => {
+  const backend = new AppServerBridgeBackend();
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("thread-a", cwd),
+    threadList: async () => [
+      thread("thread-a", { cwd: "D:/Projects/A" }),
+      thread("thread-b", { cwd: "D:/Projects/B" }),
+    ],
+    threadRead: async (threadId) => thread(threadId, { cwd: `D:/Projects/${threadId}` }),
+    threadResume: async (threadId) => {
+      if (threadId === "thread-b") {
+        throw new Error("resume failed");
+      }
+      return startedThreadResponse(threadId, `D:/Projects/${threadId}`);
+    },
+    threadUnsubscribe: async () => {},
+  };
+
+  await backend.createThread("D:/Projects/A");
+  await backend.refreshThreads("thread-a");
+  await assert.rejects(() => backend.selectThread("thread-b"), /resume failed/);
+
+  const snapshot = backend.getSnapshot();
+  assert.equal(snapshot.selectedThreadId, "thread-a");
+});
+
 test("bridge backend loadOlderMessages expands history window", async () => {
   const backend = new AppServerBridgeBackend();
   backend.appServer = {

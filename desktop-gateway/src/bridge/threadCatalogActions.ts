@@ -80,6 +80,7 @@ export async function refreshCatalogThreads(
 
   return activateThreadSelection({
     threadId: resolved,
+    currentThreadId: deps.getCurrentThreadId(),
     setCurrentThreadId: (nextThreadId) => {
       deps.setCurrentThreadId(nextThreadId);
     },

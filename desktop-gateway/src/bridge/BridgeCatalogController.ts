@@ -33,6 +33,7 @@ export class BridgeCatalogController {
     this.runtime.incrementSelectionVersion();
     return activateThreadSelection({
       threadId: resolved,
+      currentThreadId: this.runtime.currentThreadId,
       setCurrentThreadId: (nextThreadId) => {
         this.runtime.currentThreadId = nextThreadId;
       },
