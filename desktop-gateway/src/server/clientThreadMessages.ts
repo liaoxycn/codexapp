@@ -125,9 +125,14 @@ async function handleUnarchiveThread(
 
 async function handleRefreshThreads(
   context: ClientContext,
-  _message: GatewayRefreshThreadsMessage,
+  message: GatewayRefreshThreadsMessage,
   handlers: ClientMessageHandlers
 ): Promise<void> {
+  if (message.forceSnapshot) {
+    context.lastSnapshotPayload = null;
+    context.lastSnapshotMessage = null;
+    context.snapshotRevision = 0;
+  }
   await handlers.refreshSelectedThread(context, "manual");
 }
 

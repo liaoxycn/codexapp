@@ -104,6 +104,7 @@ class GatewayInboundStateReducerTest {
     fun reduceGatewayInboundStateRejectsStaleSnapshotPatchPayload() {
         val previous = emptyRemoteState(GatewayConfig(url = "ws://10.0.2.2:8765/mobile"))
             .copy(snapshotRevision = 5L)
+        var mismatchCallbacks = 0
         val raw = """
             {
               "type": "snapshot_patch",
@@ -114,11 +115,18 @@ class GatewayInboundStateReducerTest {
             }
         """.trimIndent()
 
-        val next = reduceGatewayInboundState(json, previous, raw)
+        val next = reduceGatewayInboundState(
+            json = json,
+            previous = previous,
+            raw = raw,
+            onSnapshotPatchMismatch = { mismatchCallbacks += 1 }
+        )
 
-        assertEquals(ConnectionStatus.ERROR, next.connectionStatus)
+        assertEquals(ConnectionStatus.CONNECTED, next.connectionStatus)
         assertEquals(5L, next.snapshotRevision)
-        assertTrue(next.connectionDetail.contains("基线不匹配"))
+        assertTrue(next.isManualRefreshing)
+        assertEquals(1, mismatchCallbacks)
+        assertTrue(next.connectionDetail.contains("正在刷新完整状态"))
     }
 
     @Test

@@ -93,4 +93,20 @@ class GatewayCommandSenderTest {
 
         assertFalse(sent)
     }
+
+    @Test
+    fun refreshThreadsCanRequestForcedSnapshot() {
+        val captured = mutableListOf<String>()
+        val sender = GatewayCommandSender(json) {
+            captured += it
+            true
+        }
+
+        val sent = sender.refreshThreads(forceSnapshot = true)
+
+        assertTrue(sent)
+        val payload = json.parseToJsonElement(captured.single()).jsonObject
+        assertEquals("refresh_threads", payload.getValue("type").jsonPrimitive.content)
+        assertEquals("true", payload.getValue("forceSnapshot").jsonPrimitive.content)
+    }
 }

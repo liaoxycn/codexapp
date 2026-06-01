@@ -54,6 +54,7 @@ export interface GatewayUnarchiveThreadMessage {
 
 export interface GatewayRefreshThreadsMessage {
   type: "refresh_threads";
+  forceSnapshot?: boolean;
 }
 
 export interface GatewayLoadOlderMessagesMessage {

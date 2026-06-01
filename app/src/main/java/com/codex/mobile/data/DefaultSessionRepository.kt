@@ -108,8 +108,17 @@ class DefaultSessionRepository(
     }
 
     private fun handleInboundMessage(raw: String) {
+        var shouldRequestFullSnapshot = false
         _state.update { previous ->
-            reduceGatewayInboundState(json, previous, raw)
+            reduceGatewayInboundState(
+                json = json,
+                previous = previous,
+                raw = raw,
+                onSnapshotPatchMismatch = { shouldRequestFullSnapshot = true }
+            )
+        }
+        if (shouldRequestFullSnapshot) {
+            commandSender.refreshThreads(forceSnapshot = true)
         }
     }
 

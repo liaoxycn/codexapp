@@ -182,6 +182,33 @@ test("handleClientMessage routes refresh_threads to manual refresh", async () =>
   assert.deepEqual(calls, ["manual"]);
 });
 
+test("handleClientMessage force refresh resets snapshot patch baseline", async () => {
+  const context = createContext({
+    authenticated: true,
+    supportsSnapshotPatch: true,
+    lastSnapshotPayload: "{\"type\":\"snapshot\"}",
+    lastSnapshotMessage: createSnapshot(),
+    snapshotRevision: 9,
+  });
+  const calls = [];
+  const { handlers } = createHandlers({
+    refreshSelectedThread: async (nextContext, source) => {
+      calls.push(source);
+      assert.equal(nextContext.lastSnapshotPayload, null);
+      assert.equal(nextContext.lastSnapshotMessage, null);
+      assert.equal(nextContext.snapshotRevision, 0);
+    },
+  });
+
+  await handleClientMessage(
+    context,
+    JSON.stringify({ type: "refresh_threads", forceSnapshot: true }),
+    handlers
+  );
+
+  assert.deepEqual(calls, ["manual"]);
+});
+
 test("handleClientMessage switches selected thread after fork_thread", async () => {
   const context = createContext({ authenticated: true, selectedThreadId: "thread-1" });
   const forkCalls = [];

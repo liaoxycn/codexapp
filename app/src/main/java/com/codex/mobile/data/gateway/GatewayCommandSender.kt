@@ -44,8 +44,8 @@ internal class GatewayCommandSender(
         return send(GatewayUnarchiveThreadMessage(threadId = threadId))
     }
 
-    fun refreshThreads(): Boolean {
-        return send(GatewayRefreshThreadsMessage())
+    fun refreshThreads(forceSnapshot: Boolean = false): Boolean {
+        return send(GatewayRefreshThreadsMessage(forceSnapshot = forceSnapshot))
     }
 
     fun loadOlderMessages(): Boolean {

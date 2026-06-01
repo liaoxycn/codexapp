@@ -89,8 +89,9 @@ internal fun GatewaySnapshotPatchMessage.applyTo(
 ): SessionRemoteState {
     if (previous.snapshotRevision != 0L && baseRevision != previous.snapshotRevision) {
         return previous.copy(
-            connectionStatus = ConnectionStatus.ERROR,
-            connectionDetail = "snapshot patch 基线不匹配，请刷新"
+            connectionStatus = ConnectionStatus.CONNECTED,
+            connectionDetail = "snapshot patch 基线不匹配，正在刷新完整状态",
+            isManualRefreshing = true
         )
     }
 
@@ -125,6 +126,10 @@ internal fun GatewaySnapshotPatchMessage.applyTo(
         isDemoMode = false,
         snapshotRevision = revision
     )
+}
+
+internal fun GatewaySnapshotPatchMessage.isStaleFor(previous: SessionRemoteState): Boolean {
+    return previous.snapshotRevision != 0L && baseRevision != previous.snapshotRevision
 }
 
 internal fun GatewayStatusMessage.applyTo(

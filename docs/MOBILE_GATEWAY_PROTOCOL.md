@@ -30,7 +30,7 @@
 | `rename_thread` | `threadId`, `name` | 重命名会话 |
 | `archive_thread` | `threadId` | 归档会话并选择下一个可用会话 |
 | `unarchive_thread` | `threadId` | 反归档并选中 |
-| `refresh_threads` | 无 | 手动刷新目录与当前会话 |
+| `refresh_threads` | `forceSnapshot?` | 手动刷新目录与当前会话；`forceSnapshot=true` 时下一包强制完整 `snapshot` |
 | `load_older_messages` | 无 | 当前会话加载更早历史 |
 | `send_prompt` | `text`, `threadId?` | 发送输入；如指定 threadId 会先切换 |
 | `stop_turn` | 无 | 中断当前 turn |
@@ -72,7 +72,7 @@
 
 ### snapshot_patch
 
-`snapshot_patch` 只带变更字段。客户端必须校验 `baseRevision`；不匹配时提示刷新并等待下一次完整 snapshot。
+`snapshot_patch` 只带变更字段。客户端必须校验 `baseRevision`；不匹配时发送 `refresh_threads` 且 `forceSnapshot=true`，gateway 下一包应发送完整 snapshot。
 
 ```json
 {
@@ -155,7 +155,7 @@ gateway 负责把 Codex App Server JSON-RPC 压平成移动端 snapshot：
 7. 审批：触发命令/文件审批，分别测试允许、拒绝。
 8. 归档/fork/重命名：目录和当前选中线程更新正确。
 9. 断线重连：断开 gateway 后重连，不丢当前线程和草稿。
-10. patch 降级：制造 patch revision 不匹配，应提示刷新且下一次 full snapshot 恢复。
+10. patch 降级：制造 patch revision 不匹配，应自动请求 `forceSnapshot`，下一次 full snapshot 恢复。
 
 ## 自测命令
 

@@ -55,7 +55,8 @@ internal data class GatewayUnarchiveThreadMessage(
 
 @Serializable
 internal data class GatewayRefreshThreadsMessage(
-    val type: String = "refresh_threads"
+    val type: String = "refresh_threads",
+    val forceSnapshot: Boolean = false
 )
 
 @Serializable
