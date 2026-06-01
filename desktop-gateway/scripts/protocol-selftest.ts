@@ -15,9 +15,12 @@ class FakeAppServer {
   private readonly requests = new EventEmitter();
   readonly shellCalls: Array<[string, string]> = [];
   readonly archivedThreadIds: string[] = [];
+  readonly unarchivedThreadIds: string[] = [];
   readonly rollbackCalls: Array<[string, number]> = [];
+  readonly interruptedTurns: Array<[string, string]> = [];
   private readonly threads = new Map<string, AppServerThread>();
   private readonly activeThreadIds = new Set<string>();
+  private readonly archivedThreadIdsSet = new Set<string>();
   private nextThreadNumber = 1;
 
   async start(): Promise<void> {}
@@ -36,8 +39,9 @@ class FakeAppServer {
     return () => {};
   }
 
-  async threadList(): Promise<AppServerThread[]> {
-    return [...this.activeThreadIds].map((threadId) => this.requireThread(threadId));
+  async threadList(archived = false): Promise<AppServerThread[]> {
+    const ids = archived ? this.archivedThreadIdsSet : this.activeThreadIds;
+    return [...ids].map((threadId) => this.requireThread(threadId));
   }
 
   async threadRead(threadId: string): Promise<AppServerThread> {
@@ -91,9 +95,15 @@ class FakeAppServer {
     this.requireThread(threadId);
     this.archivedThreadIds.push(threadId);
     this.activeThreadIds.delete(threadId);
+    this.archivedThreadIdsSet.add(threadId);
   }
 
-  async threadUnarchive(): Promise<void> {}
+  async threadUnarchive(threadId: string): Promise<void> {
+    this.requireThread(threadId);
+    this.unarchivedThreadIds.push(threadId);
+    this.archivedThreadIdsSet.delete(threadId);
+    this.activeThreadIds.add(threadId);
+  }
 
   async threadUnsubscribe(): Promise<void> {}
 
@@ -102,7 +112,11 @@ class FakeAppServer {
     return "turn-1";
   }
 
-  async turnInterrupt(): Promise<void> {}
+  async turnInterrupt(threadId: string, turnId: string): Promise<void> {
+    this.interruptedTurns.push([threadId, turnId]);
+    const thread = this.requireThread(threadId);
+    this.threads.set(threadId, { ...thread, status: "idle" });
+  }
 
   async turnSteer(): Promise<void> {}
 
@@ -145,6 +159,12 @@ async function main(): Promise<void> {
   const created = await backend.createThread("D:/Projects/protocol-selftest");
   const threadId = created.selectedThreadId;
   assert.ok(threadId.startsWith("protocol-selftest-"));
+
+  await backend.renameThread(threadId, "Renamed protocol selftest");
+  assert.equal(
+    backend.getSnapshot(threadId).threads.find((thread) => thread.id === threadId)?.title,
+    "Renamed protocol selftest"
+  );
 
   await backend.sendPrompt(threadId, "!echo protocol-selftest");
   await backend.approveCurrent(threadId, false);
@@ -200,8 +220,15 @@ async function main(): Promise<void> {
     true
   );
 
+  await backend.sendPrompt(threadId, "long task");
+  await backend.stopTurn(threadId);
+  assert.deepEqual(fake.interruptedTurns, [[threadId, "turn-1"]]);
+
   await backend.archiveThread(threadId);
   assert.deepEqual(fake.archivedThreadIds, [threadId]);
+  const restored = await backend.unarchiveThread(threadId);
+  assert.deepEqual(fake.unarchivedThreadIds, [threadId]);
+  assert.equal(restored.selectedThreadId, threadId);
   console.log(`[protocol-selftest] passed thread=${threadId}`);
 }
 
