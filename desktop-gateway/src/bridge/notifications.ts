@@ -5,6 +5,7 @@ import {
   handleCommandExecutionOutputDelta,
   handleFileChangeOutputDelta,
   handleFileChangePatchUpdated,
+  handleGuardianApprovalReview,
   handleItemLifecycle,
   handleMcpToolCallProgress,
   handlePlanDelta,
@@ -94,6 +95,10 @@ export async function handleBridgeNotification(
     case "item/started":
     case "item/completed":
       await handleItemLifecycle(notification, deps);
+      return;
+    case "item/autoApprovalReview/started":
+    case "item/autoApprovalReview/completed":
+      handleGuardianApprovalReview(notification, deps);
       return;
     case "serverRequest/resolved":
       handleServerRequestResolved(notification, deps);

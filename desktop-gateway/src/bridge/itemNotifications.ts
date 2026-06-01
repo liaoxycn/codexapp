@@ -12,6 +12,7 @@ import {
 } from "./runtimeMessages.js";
 import { touchThreadActivity } from "./summaries.js";
 import type { BridgeNotificationDeps } from "./notifications.js";
+import { asString } from "./appServerValues.js";
 
 export function handleAgentMessageDelta(
   notification: JsonRpcNotification,
@@ -271,4 +272,89 @@ export async function handleItemLifecycle(
   state.currentTurnId = turnId;
   mergeThreadItem(state, item, true);
   deps.emitChanged();
+}
+
+export function handleGuardianApprovalReview(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const { threadId, reviewId, review, action } = notification.params as {
+    threadId: string;
+    turnId: string;
+    reviewId: string;
+    review?: { status?: string | null; riskLevel?: string | null; rationale?: string | null } | null;
+    action?: { type?: string | null } | null;
+  };
+  const state = deps.threads.get(threadId);
+  if (!state || !reviewId) {
+    return;
+  }
+
+  const status = asString(review?.status, notification.method === "item/autoApprovalReview/started" ? "inProgress" : "completed");
+  const risk = asString(review?.riskLevel).trim();
+  const rationale = asString(review?.rationale).trim();
+  const actionLabel = formatReviewAction(action);
+  const lines = [
+    `自动审批审查 ${formatReviewStatus(status)}: ${actionLabel}`,
+    risk ? `风险: ${formatRiskLevel(risk)}` : "",
+    rationale,
+  ].filter(Boolean);
+  replaceOrAppendMessage(state, {
+    id: `auto-approval-review-${reviewId}`,
+    role: "system",
+    blocks: [{ kind: "status", value: lines.join("\n") }],
+  });
+  deps.emitChanged();
+}
+
+function formatReviewAction(action?: { type?: string | null } | null): string {
+  const type = asString(action?.type, "request");
+  switch (type) {
+    case "command":
+      return "命令";
+    case "execve":
+      return "进程执行";
+    case "applyPatch":
+      return "文件修改";
+    case "networkAccess":
+      return "网络访问";
+    case "mcpToolCall":
+      return "MCP 工具";
+    case "requestPermissions":
+      return "权限请求";
+    default:
+      return type;
+  }
+}
+
+function formatReviewStatus(status: string): string {
+  switch (status) {
+    case "inProgress":
+      return "进行中";
+    case "approved":
+      return "已允许";
+    case "denied":
+      return "已拒绝";
+    case "timedOut":
+      return "超时";
+    case "aborted":
+      return "已中止";
+    default:
+      return status || "已更新";
+  }
+}
+
+function formatRiskLevel(risk: string): string {
+  switch (risk) {
+    case "low":
+      return "低";
+    case "medium":
+      return "中";
+    case "high":
+      return "高";
+    case "critical":
+      return "严重";
+    default:
+      return risk;
+  }
 }

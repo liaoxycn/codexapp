@@ -302,6 +302,50 @@ test("handleBridgeNotification surfaces hook run updates", async () => {
   );
 });
 
+test("handleBridgeNotification surfaces auto approval review updates", async () => {
+  const state = createState();
+  const context = createDeps(state);
+
+  await handleBridgeNotification(
+    {
+      method: "item/autoApprovalReview/started",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        reviewId: "review-1",
+        startedAtMs: 1,
+        targetItemId: "cmd-1",
+        review: { status: "inProgress", riskLevel: "medium", userAuthorization: null, rationale: "检查命令" },
+        action: { type: "command", source: "shell", command: "npm test", cwd: "D:/repo" },
+      },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "item/autoApprovalReview/completed",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        reviewId: "review-1",
+        startedAtMs: 1,
+        completedAtMs: 2,
+        targetItemId: "cmd-1",
+        decisionSource: "agent",
+        review: { status: "approved", riskLevel: "low", userAuthorization: "high", rationale: "风险可控" },
+        action: { type: "command", source: "shell", command: "npm test", cwd: "D:/repo" },
+      },
+    },
+    context.deps
+  );
+
+  assert.equal(context.emitCount, 2);
+  assert.deepEqual(
+    state.snapshot.messages.map((message) => message.blocks[0].value),
+    ["自动审批审查 已允许: 命令\n风险: 低\n风险可控"]
+  );
+});
+
 test("handleBridgeNotification surfaces operational global notices", async () => {
   const state = createState();
   state.snapshot.selectedThreadId = "thread-1";
