@@ -20,6 +20,20 @@ function isRecentUnfinishedTurn(
   return ["inprogress", "running", "interrupted"].includes(turn.status.toLowerCase());
 }
 
+export function getActiveTurnId(thread: AppServerThread): string | null {
+  for (let index = thread.turns.length - 1; index >= 0; index -= 1) {
+    const turn = thread.turns[index];
+    if (turn.completedAt != null || isTerminalTurnStatus(turn.status)) {
+      continue;
+    }
+    const normalizedStatus = turn.status.toLowerCase();
+    if (["inprogress", "running"].includes(normalizedStatus)) {
+      return turn.id;
+    }
+  }
+  return null;
+}
+
 export function isThreadActivelyGenerating(thread: AppServerThread): boolean {
   const type = getThreadStatusType(thread.status);
   if (hasThreadActiveFlag(thread.status, "waitingOnApproval") || hasThreadActiveFlag(thread.status, "waitingOnUserInput")) {

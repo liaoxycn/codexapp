@@ -361,6 +361,74 @@ test("bridge backend rolls back last turn from prompt command", async () => {
   ), true);
 });
 
+test("bridge backend can stop a resumed in-progress turn", async () => {
+  const backend = new AppServerBridgeBackend();
+  const interruptCalls = [];
+  const liveThread = thread("running-thread", {
+    status: { type: "active", activeFlags: [] },
+    turns: [
+      {
+        id: "turn-live",
+        status: "inProgress",
+        completedAt: null,
+        items: [
+          { type: "agentMessage", id: "assistant-live", text: "working" },
+        ],
+      },
+    ],
+  });
+  backend.appServer = {
+    threadResume: async () => startedThreadResponse("running-thread", "D:/Projects/Running", liveThread),
+    turnInterrupt: async (threadId, turnId) => {
+      interruptCalls.push([threadId, turnId]);
+    },
+    threadUnsubscribe: async () => {},
+  };
+
+  await backend.selectThread("running-thread");
+  const snapshot = await backend.stopTurn("running-thread");
+
+  assert.deepEqual(interruptCalls, [["running-thread", "turn-live"]]);
+  assert.equal(snapshot.isGenerating, true);
+});
+
+test("bridge backend steers a resumed in-progress turn instead of starting another one", async () => {
+  const backend = new AppServerBridgeBackend();
+  const steerCalls = [];
+  const startCalls = [];
+  const liveThread = thread("steer-thread", {
+    status: { type: "active", activeFlags: [] },
+    turns: [
+      {
+        id: "turn-steer",
+        status: "running",
+        completedAt: null,
+        items: [
+          { type: "agentMessage", id: "assistant-steer", text: "working" },
+        ],
+      },
+    ],
+  });
+  backend.appServer = {
+    threadResume: async () => startedThreadResponse("steer-thread", "D:/Projects/Steer", liveThread),
+    threadRead: async () => liveThread,
+    turnSteer: async (threadId, turnId, text) => {
+      steerCalls.push([threadId, turnId, text]);
+    },
+    turnStart: async (threadId, text) => {
+      startCalls.push([threadId, text]);
+      return "turn-new";
+    },
+    threadUnsubscribe: async () => {},
+  };
+
+  await backend.selectThread("steer-thread");
+  await backend.sendPrompt("steer-thread", "继续");
+
+  assert.deepEqual(steerCalls, [["steer-thread", "turn-steer", "继续"]]);
+  assert.deepEqual(startCalls, []);
+});
+
 test("bridge backend accumulates command output deltas from notification stream", async () => {
   const backend = new AppServerBridgeBackend();
   backend.appServer = {

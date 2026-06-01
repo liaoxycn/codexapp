@@ -5,6 +5,7 @@ export {
   isTerminalTurnStatus,
 } from "./threadStatus.js";
 export {
+  getActiveTurnId,
   isThreadActivelyGenerating,
   resolveDisplayedThreadStatus,
   resolveLifecycleStatus,

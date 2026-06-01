@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  getActiveTurnId,
   isThreadActivelyGenerating,
   isTerminalTurnStatus,
   getThreadActiveFlags,
@@ -132,6 +133,54 @@ test("recent unfinished interrupted turn is treated as running", () => {
       })
     ),
     "running"
+  );
+});
+
+test("active turn id is recovered from latest non-terminal in-progress turn", () => {
+  assert.equal(
+    getActiveTurnId(
+      thread({
+        turns: [
+          {
+            id: "turn-done",
+            status: "completed",
+            completedAt: 100,
+            items: [],
+          },
+          {
+            id: "turn-live",
+            status: "inProgress",
+            completedAt: null,
+            items: [],
+          },
+        ],
+      })
+    ),
+    "turn-live"
+  );
+});
+
+test("active turn id ignores completed and interrupted terminal turns", () => {
+  assert.equal(
+    getActiveTurnId(
+      thread({
+        turns: [
+          {
+            id: "turn-completed",
+            status: "running",
+            completedAt: 100,
+            items: [],
+          },
+          {
+            id: "turn-interrupted",
+            status: "interrupted",
+            completedAt: null,
+            items: [],
+          },
+        ],
+      })
+    ),
+    null
   );
 });
 

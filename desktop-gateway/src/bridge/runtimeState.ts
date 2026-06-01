@@ -1,5 +1,6 @@
 import type { AppServerThread, ThreadResumeResult } from "../appServerTypes.js";
 import {
+  getActiveTurnId,
   resolveDisplayedThreadStatus,
   resolveThreadSummaryStatus,
   shouldRetainThreadRuntimeOverlay,
@@ -59,13 +60,20 @@ export function upsertThreadState({
   const resolvedSummaryStatus = resolveThreadSummaryStatus(thread);
   const lastActivityAtMs = Math.max(existing?.lastActivityAtMs ?? 0, getThreadLastActivityAtMs(thread));
   const retainRuntimeOverlay = shouldRetainThreadRuntimeOverlay(thread, existing);
+  const activeTurnId = getActiveTurnId(thread);
+  const currentTurnId = retainRuntimeOverlay
+    ? existing?.currentTurnId ?? activeTurnId
+    : null;
+  const isGenerating = retainRuntimeOverlay
+    ? Boolean(existing?.snapshot.isGenerating || activeTurnId != null || baseSnapshot.isGenerating)
+    : baseSnapshot.isGenerating;
 
   const nextSummary = existing
     ? {
         ...mapThreadToSummary(thread, archived || existing.summary.archived, lastActivityAtMs),
         status: resolveDisplayedThreadStatus(resolvedSummaryStatus, {
-          isGenerating: retainRuntimeOverlay && existing.snapshot.isGenerating,
-          currentTurnId: retainRuntimeOverlay ? existing.currentTurnId : null,
+          isGenerating,
+          currentTurnId,
           transientOperation: retainRuntimeOverlay ? existing.transientOperation : null,
           pendingApproval: retainRuntimeOverlay ? existing.pendingApproval?.text ?? null : null,
         }),
@@ -78,7 +86,7 @@ export function upsertThreadState({
     isSubscribed: resume != null || existing?.isSubscribed === true,
     lastActivityAtMs,
     historyWindow,
-    currentTurnId: retainRuntimeOverlay ? existing?.currentTurnId ?? null : null,
+    currentTurnId,
     activeAssistantMessageId: retainRuntimeOverlay ? existing?.activeAssistantMessageId ?? null : null,
     liveAssistantItemId: retainRuntimeOverlay ? existing?.liveAssistantItemId ?? null : null,
     transientOperation: retainRuntimeOverlay ? existing?.transientOperation ?? null : null,
@@ -97,6 +105,7 @@ export function upsertThreadState({
       messages: trimMessagesToWindow(mergedMessages, historyWindow),
       hasMoreHistory: mergedMessages.length > historyWindow,
       pendingApproval: existing?.pendingApproval?.text ?? null,
+      isGenerating,
     },
   };
 
