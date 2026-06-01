@@ -61,7 +61,13 @@ internal fun ThreadRow(
     var menuExpanded by remember { mutableStateOf(false) }
     val startPadding = 10.dp + (indentLevel * 8).dp
     val updatedLabel = if (summary.updatedAt > 0L) formatThreadUpdatedAt(summary.updatedAt) else "无更新时间"
-    val rowDescription = "会话：${summary.title}，状态：${threadStatusLabel(summary.status)}，更新：$updatedLabel"
+    val gitLabel = threadGitLabel(summary)
+    val rowDescription = listOf(
+        "会话：${summary.title}",
+        "状态：${threadStatusLabel(summary.status)}",
+        if (gitLabel.isNotBlank()) "Git：$gitLabel" else "",
+        "更新：$updatedLabel"
+    ).filter(String::isNotBlank).joinToString("，")
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -110,6 +116,17 @@ internal fun ThreadRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            if (gitLabel.isNotBlank()) {
+                Spacer(Modifier.height(1.dp))
+                Text(
+                    text = gitLabel,
+                    color = CodexTheme.colors.textTertiary,
+                    fontSize = 8.sp,
+                    lineHeight = 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
         Spacer(Modifier.width(8.dp))
         Column(
@@ -201,4 +218,8 @@ internal fun ThreadRow(
             }
         }
     }
+}
+
+internal fun threadGitLabel(summary: ThreadSummary): String {
+    return listOf(summary.gitBranch, summary.gitSha).filter(String::isNotBlank).joinToString(" · ")
 }

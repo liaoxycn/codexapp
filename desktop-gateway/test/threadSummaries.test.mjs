@@ -40,6 +40,19 @@ test("mapThreadToSummary uses latest message text as subtitle and cwd leaf as gr
   assert.equal(summary.groupLabel, "TestApp");
 });
 
+test("mapThreadToSummary includes branch and short git sha when present", () => {
+  const summary = mapThreadToSummary(thread("thread-git", {
+    gitInfo: {
+      branch: "feature/mobile-shell",
+      sha: "1234567890abcdef",
+      originUrl: "git@example.com:repo.git",
+    },
+  }));
+
+  assert.equal(summary.gitBranch, "feature/mobile-shell");
+  assert.equal(summary.gitSha, "1234567");
+});
+
 test("dedupeSummaries keeps the last payload for the same thread id", () => {
   const deduped = dedupeSummaries([
     { id: "thread-1", title: "old" },

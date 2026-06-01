@@ -12,6 +12,7 @@ export function mapThreadToSummary(
   const grouping = deriveThreadGrouping(thread);
   const status = resolveThreadSummaryStatus(thread);
   const subtitle = buildThreadSubtitle(thread);
+  const gitInfo = buildThreadGitInfo(thread);
   return {
     id: thread.id,
     title: thread.name ?? buildThreadTitle(thread.preview),
@@ -23,6 +24,7 @@ export function mapThreadToSummary(
     groupKind: grouping.kind,
     groupLabel: grouping.label,
     archived,
+    ...gitInfo,
   };
 }
 
@@ -113,6 +115,15 @@ function deriveThreadGrouping(thread: AppServerThread): { kind: "project" | "cha
     return { kind: "chat", label: "普通会话" };
   }
   return { kind: "project", label: leaf };
+}
+
+function buildThreadGitInfo(thread: AppServerThread): { gitBranch?: string; gitSha?: string } {
+  const branch = thread.gitInfo?.branch?.trim();
+  const sha = thread.gitInfo?.sha?.trim();
+  return {
+    ...(branch ? { gitBranch: branch } : {}),
+    ...(sha ? { gitSha: sha.slice(0, 7) } : {}),
+  };
 }
 
 function toMillisTimestamp(seconds: number): number {

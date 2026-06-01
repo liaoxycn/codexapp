@@ -9,7 +9,9 @@ data class ThreadSummary(
     val groupKind: ThreadGroupKind = ThreadGroupKind.CHAT,
     val groupLabel: String = "普通会话",
     val cwd: String = "",
-    val archived: Boolean = false
+    val archived: Boolean = false,
+    val gitBranch: String = "",
+    val gitSha: String = ""
 )
 
 enum class ThreadGroupKind {

@@ -127,6 +127,8 @@ export interface GatewayThreadPayload {
   groupKind?: "project" | "chat";
   groupLabel?: string;
   archived?: boolean;
+  gitBranch?: string;
+  gitSha?: string;
 }
 
 export interface GatewayMessagePayload {

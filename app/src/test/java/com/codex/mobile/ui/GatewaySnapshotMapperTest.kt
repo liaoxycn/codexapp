@@ -39,7 +39,9 @@ class GatewaySnapshotMapperTest {
                     status = "running",
                     updatedAt = 123L,
                     groupKind = "project",
-                    groupLabel = "codexapp"
+                    groupLabel = "codexapp",
+                    gitBranch = "feature/mobile-shell",
+                    gitSha = "1234567"
                 )
             ),
             selectedThreadId = "thread-1",
@@ -66,6 +68,8 @@ class GatewaySnapshotMapperTest {
         assertEquals(7L, next.snapshotRevision)
         assertEquals("thread-1", next.selectedThreadId)
         assertEquals("codexapp", next.threads.single().groupLabel)
+        assertEquals("feature/mobile-shell", next.threads.single().gitBranch)
+        assertEquals("1234567", next.threads.single().gitSha)
         assertEquals(ComposerChipIcon.FILE, next.chips.single().icon)
         assertEquals("D:/Projects/app/Main.kt", next.chips.single().path)
         assertTrue(next.messages.first().blocks.first() is MessageBlock.Code)

@@ -38,6 +38,11 @@ export interface AppServerThread {
   name: string | null;
   turns: AppServerTurn[];
   modelProvider: string;
+  gitInfo?: {
+    sha?: string | null;
+    branch?: string | null;
+    originUrl?: string | null;
+  } | null;
 }
 
 export interface AppServerTurn {

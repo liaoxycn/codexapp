@@ -152,7 +152,9 @@ internal fun List<GatewayThreadPayload>.toThreadSummaries(): List<ThreadSummary>
             groupKind = if (it.groupKind == "project") ThreadGroupKind.PROJECT else ThreadGroupKind.CHAT,
             groupLabel = it.groupLabel ?: "普通会话",
             cwd = it.cwd.orEmpty(),
-            archived = it.archived == true
+            archived = it.archived == true,
+            gitBranch = it.gitBranch.orEmpty(),
+            gitSha = it.gitSha.orEmpty()
         )
     }
 }

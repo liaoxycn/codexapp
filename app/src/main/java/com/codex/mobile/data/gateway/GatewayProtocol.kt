@@ -137,7 +137,9 @@ internal data class GatewayThreadPayload(
     val updatedAt: Long? = null,
     val groupKind: String? = null,
     val groupLabel: String? = null,
-    val archived: Boolean? = null
+    val archived: Boolean? = null,
+    val gitBranch: String? = null,
+    val gitSha: String? = null
 )
 
 @Serializable
