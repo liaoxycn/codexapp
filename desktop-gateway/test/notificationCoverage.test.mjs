@@ -158,3 +158,30 @@ test("handleBridgeNotification surfaces errors and thread warnings", async () =>
     ["警告: 配置有风险", "错误: 失败\n详情"]
   );
 });
+
+test("handleBridgeNotification refreshes catalog for thread lifecycle notifications", async () => {
+  const state = createState();
+  const context = createDeps(state);
+  const hydrated = [];
+  context.deps.hydrateThreads = async () => {
+    hydrated.push("hydrate");
+  };
+
+  for (const method of [
+    "thread/started",
+    "thread/archived",
+    "thread/unarchived",
+    "thread/name/updated",
+    "thread/closed",
+  ]) {
+    await handleBridgeNotification(
+      {
+        method,
+        params: { threadId: "thread-1" },
+      },
+      context.deps
+    );
+  }
+
+  assert.equal(hydrated.length, 5);
+});

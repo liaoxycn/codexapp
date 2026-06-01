@@ -84,6 +84,8 @@ export async function handleBridgeNotification(
     case "thread/started":
     case "thread/archived":
     case "thread/unarchived":
+    case "thread/name/updated":
+    case "thread/closed":
       await deps.hydrateThreads();
       return;
     case "thread/compacted":
