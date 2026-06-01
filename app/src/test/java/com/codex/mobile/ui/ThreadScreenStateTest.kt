@@ -67,6 +67,7 @@ class ThreadScreenStateTest {
         hasMoreHistory = hasMoreHistory,
         isLoadingOlder = false,
         composerText = "",
+        composerFocusRequest = 0L,
         isGenerating = false,
         isManualRefreshing = false,
         showComposerDetails = showComposerDetails,

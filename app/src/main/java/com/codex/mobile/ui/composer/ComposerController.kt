@@ -58,6 +58,7 @@ internal fun rememberComposerController(
 
     HandleComposerControllerEffects(
         composerText = state.composerText,
+        composerFocusRequest = state.composerFocusRequest,
         localState = localState,
         onActivePanelChange = onActivePanelChange,
         focusManager = focusManager,

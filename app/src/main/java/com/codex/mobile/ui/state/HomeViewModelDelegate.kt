@@ -119,6 +119,7 @@ internal class HomeViewModelDelegate(
 
     fun replaceComposer(text: String) {
         composerActions.replaceComposer(text)
+        uiStateStore.requestComposerFocus()
     }
 
     fun resendUserMessage(text: String) {

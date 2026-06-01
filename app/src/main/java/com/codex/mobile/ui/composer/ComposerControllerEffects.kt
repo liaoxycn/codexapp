@@ -11,6 +11,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 @Composable
 internal fun HandleComposerControllerEffects(
     composerText: String,
+    composerFocusRequest: Long,
     localState: ComposerControllerLocalState,
     onActivePanelChange: (ComposerPanel) -> Unit,
     focusManager: FocusManager,
@@ -37,6 +38,13 @@ internal fun HandleComposerControllerEffects(
         }
         if (composerText.isBlank()) {
             localState.updateSuppressInlineSlashPanel(false)
+        }
+    }
+
+    LaunchedEffect(composerFocusRequest) {
+        if (composerFocusRequest > 0L) {
+            localState.focusRequester.requestFocus()
+            keyboardController?.show()
         }
     }
 }

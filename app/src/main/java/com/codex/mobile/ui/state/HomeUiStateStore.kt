@@ -16,22 +16,26 @@ internal class HomeUiStateStore(
     scope: CoroutineScope
 ) {
     private val showComposerDetails = MutableStateFlow(false)
+    private val composerFocusRequest = MutableStateFlow(0L)
 
     val state: StateFlow<HomeUiState> = combine(
         remoteState,
         composerText,
-        showComposerDetails
-    ) { remote, text, expanded ->
+        showComposerDetails,
+        composerFocusRequest
+    ) { remote, text, expanded, focusRequest ->
         remote.toHomeState(
             composer = text,
-            composerExpanded = expanded
+            composerExpanded = expanded,
+            composerFocusRequest = focusRequest
         )
     }.stateIn(
         scope = scope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = remoteState.value.toHomeState(
             composer = composerText.value,
-            composerExpanded = showComposerDetails.value
+            composerExpanded = showComposerDetails.value,
+            composerFocusRequest = composerFocusRequest.value
         )
     )
 
@@ -41,5 +45,9 @@ internal class HomeUiStateStore(
 
     fun closeComposerDetails() {
         showComposerDetails.value = false
+    }
+
+    fun requestComposerFocus() {
+        composerFocusRequest.update { it + 1L }
     }
 }

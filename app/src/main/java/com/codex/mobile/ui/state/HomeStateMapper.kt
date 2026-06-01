@@ -5,7 +5,8 @@ import com.codex.mobile.model.SessionRemoteState
 
 internal fun SessionRemoteState.toHomeState(
     composer: String,
-    composerExpanded: Boolean
+    composerExpanded: Boolean,
+    composerFocusRequest: Long
 ): HomeUiState = HomeUiState(
     threads = threads,
     selectedThreadId = selectedThreadId,
@@ -15,6 +16,7 @@ internal fun SessionRemoteState.toHomeState(
     hasMoreHistory = hasMoreHistory,
     isLoadingOlder = isLoadingOlder,
     composerText = composer,
+    composerFocusRequest = composerFocusRequest,
     isGenerating = isGenerating,
     showComposerDetails = composerExpanded,
     chips = chips,

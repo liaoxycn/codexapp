@@ -9,6 +9,7 @@ data class HomeUiState(
     val hasMoreHistory: Boolean,
     val isLoadingOlder: Boolean,
     val composerText: String,
+    val composerFocusRequest: Long,
     val isGenerating: Boolean,
     val isManualRefreshing: Boolean,
     val showComposerDetails: Boolean,

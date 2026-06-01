@@ -4,6 +4,7 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -402,6 +403,41 @@ class ThreadScreenVisibilityTest {
     }
 
     @Test
+    fun composerFocusRequestFocusesInputFieldForEditFlow() {
+        rule.setContent {
+            CodexTheme {
+                Composer(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(
+                        composerText = "please inspect build failure",
+                        composerFocusRequest = 1L
+                    ),
+                    compactMode = false,
+                    activePanel = ComposerPanel.NONE,
+                    onActivePanelChange = {},
+                    onToggleCompact = {},
+                    onToggleDetails = {},
+                    onCompactContext = {},
+                    onRollbackLastTurn = {},
+                    onChange = {},
+                    onInsertText = {},
+                    onApplySlashCommand = {},
+                    onClearComposer = {},
+                    onInsertShellTemplate = {},
+                    onSend = {},
+                    onStop = {}
+                )
+            }
+        }
+
+        rule.waitForIdle()
+        rule.onNodeWithTag("composer_input_field").assertIsFocused()
+    }
+
+    @Test
     fun projectDrawerActionCreatesThreadWithProjectCwd() {
         var createdCwd: String? = null
         rule.setContent {
@@ -567,6 +603,7 @@ class ThreadScreenVisibilityTest {
         hasMoreHistory = hasMoreHistory,
         isLoadingOlder = isLoadingOlder,
         composerText = "",
+        composerFocusRequest = 0L,
         isGenerating = false,
         isManualRefreshing = false,
         showComposerDetails = false,
@@ -608,6 +645,7 @@ class ThreadScreenVisibilityTest {
         hasMoreHistory = false,
         isLoadingOlder = false,
         composerText = "",
+        composerFocusRequest = 0L,
         isGenerating = false,
         isManualRefreshing = false,
         showComposerDetails = false,

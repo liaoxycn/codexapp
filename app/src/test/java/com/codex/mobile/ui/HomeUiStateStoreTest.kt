@@ -42,6 +42,7 @@ class HomeUiStateStoreTest {
             assertEquals("hello codex", store.state.value.composerText)
             assertEquals(ConnectionStatus.CONNECTED, store.state.value.connectionStatus)
             assertEquals("已连接", store.state.value.connectionDetail)
+            assertEquals(0L, store.state.value.composerFocusRequest)
             assertFalse(store.state.value.showComposerDetails)
             collector.cancel()
             scope.coroutineContext[Job]?.cancel()
@@ -69,6 +70,28 @@ class HomeUiStateStoreTest {
             yield()
             assertFalse(store.state.value.showComposerDetails)
             assertEquals("thread-1", store.state.value.selectedThreadId)
+            collector.cancel()
+            scope.coroutineContext[Job]?.cancel()
+        }
+    }
+
+    @Test
+    fun requestComposerFocusIncrementsFocusRequest() {
+        runBlocking {
+            val remoteState = MutableStateFlow(SessionRemoteState(selectedThreadId = "thread-1"))
+            val composerText = MutableStateFlow("")
+            val scope = CoroutineScope(Dispatchers.Unconfined + Job())
+            val store = HomeUiStateStore(
+                remoteState = remoteState,
+                composerText = composerText,
+                scope = scope
+            )
+            val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) { store.state.collect {} }
+
+            store.requestComposerFocus()
+            yield()
+
+            assertEquals(1L, store.state.value.composerFocusRequest)
             collector.cancel()
             scope.coroutineContext[Job]?.cancel()
         }
