@@ -268,10 +268,6 @@ function Main {
 
     try {
         Set-Content -Encoding utf8 -LiteralPath $scriptLog -Value ""
-        Set-Content -Encoding utf8 -LiteralPath $gatewayLog -Value ""
-        Set-Content -Encoding utf8 -LiteralPath $gatewayErr -Value ""
-        Set-Content -Encoding utf8 -LiteralPath $buildLog -Value ""
-        Set-Content -Encoding utf8 -LiteralPath $buildErr -Value ""
 
         $adbExe = Get-PlatformToolsAdb
         $emulatorExe = Get-AvdBin
@@ -288,6 +284,8 @@ function Main {
         Write-Log "2/4 restart gateway dev"
         Stop-ProcessByName -Names @("node", "tsx", "desktop-gateway")
         Start-Sleep -Milliseconds 800
+        Set-Content -Encoding utf8 -LiteralPath $gatewayLog -Value ""
+        Set-Content -Encoding utf8 -LiteralPath $gatewayErr -Value ""
 
         $gatewayRoot = Resolve-Path $GatewayDir
         $gatewayPathArg = $GatewayPath.Replace('"', '\"')
