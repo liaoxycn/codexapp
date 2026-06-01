@@ -35,9 +35,6 @@
   - `thread/loaded/list`
   - `thread/read`
   - `thread/metadata/update`
-  - `thread/goal/set`
-  - `thread/goal/get`
-  - `thread/goal/clear`
   - `thread/archive`
   - `thread/unarchive`
   - `thread/name/set`
@@ -76,9 +73,10 @@
   - `item/permissions/requestApproval`
   - `mcpServer/elicitation/request`
 
-### 3.2 实验能力
+### 3.2 当前 schema 未暴露 / 不可依赖能力
+- `thread/goal/set/get/clear`：当前 client request schema 无对应方法，只能消费 `thread/goal/updated / cleared` 通知。
 - `thread/turns/list`
-- `thread/turns/items/list`：协议形状存在，但 README 明确写了当前仍返回 unsupported-method
+- `thread/turns/items/list`
 - `thread/realtime/start`
 - `thread/realtime/appendAudio`
 - `thread/realtime/appendText`
@@ -285,7 +283,7 @@ v1 不推荐保留：
 
 ### 10.3 历史
 - 默认读取线程：`thread/read`
-- 长历史分页：`thread/turns/list`（实验能力，单独灰度）
+- 长历史：当前 schema 未暴露 `thread/turns/list`；移动端先用 `thread/read` 的已返回历史做本地窗口展开。
 - 回滚最近一轮：Android 输入 `/rollback`，gateway 调 `thread/rollback`（`numTurns=1`）；只回滚会话历史，不还原本地文件改动。
 
 ### 10.4 审批
@@ -325,7 +323,6 @@ gateway -> Android：
 - `send_prompt` 当前不仅发普通 prompt，也承载输入区命令：
   - `/compact` -> gateway 调 `thread/compact/start`
   - `! xxx` -> gateway 先生成审批，再在批准后调 `thread/shellCommand`
-  - `/goal` 目前仍未接真实 RPC，暂只保留为候选命令占位
 
 ## 11. Android v1 页面规范
 
@@ -438,7 +435,7 @@ gateway -> Android：
 - 已知缺口：
   - `/goal` 仍未接真实设置 RPC；当前 app-server schema 未暴露对应 client request，需跟随 app-server 版本再核对。
 - 下一开发阶段应切到：
-  - `/goal` RPC 版本跟踪与真实设置链路
+  - app-server 新版本 schema 复核：若出现 goal 设置或历史分页请求，再补真实链路
 
 ## 17. 本地开发标准流程
 

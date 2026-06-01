@@ -44,11 +44,11 @@ class ComposerLogicTest {
     fun filtersSlashCommandsByKeywordAndLabel() {
         val commands = listOf(
             "/compact  压缩上下文",
-            "/goal  设置目标",
+            "/rollback  回滚上轮",
             "! ls  运行 shell 命令"
         )
 
-        assertEquals(listOf("/goal  设置目标"), filterSlashCommands(commands, "goal"))
+        assertEquals(listOf("/rollback  回滚上轮"), filterSlashCommands(commands, "rollback"))
         assertEquals(listOf("! ls  运行 shell 命令"), filterSlashCommands(commands, "shell"))
     }
 

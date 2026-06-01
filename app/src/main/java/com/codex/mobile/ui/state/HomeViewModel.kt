@@ -51,8 +51,6 @@ class HomeViewModel(
 
     fun clearComposer() = delegate.clearComposer()
 
-    fun insertGoalTemplate() = delegate.insertGoalTemplate()
-
     fun insertShellTemplate() = delegate.insertShellTemplate()
 
     fun replaceComposer(text: String) = delegate.replaceComposer(text)

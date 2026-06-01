@@ -41,7 +41,7 @@ export function createSeedThreads(workspacePath: string): ThreadRecord[] {
         { label: "workspace map", icon: "context" }
       ],
       pendingApproval: "允许桌面端扫描工作区目录，为移动端输入区生成最近文件索引。",
-      slashCommands: ["/compact  压缩上下文", "/goal  设置目标", "! ls  运行 shell 命令"],
+      slashCommands: ["/compact  压缩上下文", "/rollback  回滚上轮", "! ls  运行 shell 命令"],
       cwd: workspacePath,
       permissionSummary: "workspace-write",
       isGenerating: false
@@ -86,8 +86,8 @@ export function createSeedThreads(workspacePath: string): ThreadRecord[] {
     {
       summary: {
         id: "thread-history",
-        title: "线程历史分页",
-        preview: "thread/turns/list experimental",
+        title: "线程历史窗口",
+        preview: "thread/read bounded window",
         status: "idle",
         cwd: workspacePath,
         groupKind: "project",
@@ -106,7 +106,7 @@ export function createSeedThreads(workspacePath: string): ThreadRecord[] {
           blocks: [
             {
               kind: "text",
-              value: "默认只拉最近窗口；长历史再灰度启用 `thread/turns/list`，避免 UI 和协议同时失控。"
+              value: "当前 app-server 未暴露 `thread/turns/list` 请求；移动端先基于 `thread/read` 返回历史做本地窗口展开。"
             }
           ]
         }

@@ -109,10 +109,6 @@ internal class HomeViewModelDelegate(
         composerActions.clearComposer()
     }
 
-    fun insertGoalTemplate() {
-        composerActions.insertGoalTemplate()
-    }
-
     fun insertShellTemplate() {
         composerActions.insertShellTemplate()
     }

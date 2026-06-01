@@ -87,7 +87,7 @@ class ComposerActionHandlerTest {
     }
 
     @Test
-    fun insertsGoalAndShellTemplatesAsSeparateLines() {
+    fun insertsShellTemplate() {
         val session = ComposerSession("thread-1")
         val handler = ComposerActionHandler(
             composerSession = session,
@@ -96,10 +96,9 @@ class ComposerActionHandlerTest {
             sendPrompt = { true }
         )
 
-        handler.insertGoalTemplate()
         handler.insertShellTemplate()
 
-        assertEquals("/goal\n! ", session.currentText())
+        assertEquals("! ", session.currentText())
     }
 
     @Test

@@ -27,10 +27,6 @@ internal class ComposerActionHandler(
         composerSession.clear()
     }
 
-    fun insertGoalTemplate() {
-        composerSession.insertCommandTemplate("/goal ", selectedThreadId())
-    }
-
     fun insertShellTemplate() {
         composerSession.insertCommandTemplate("! ", selectedThreadId())
     }
