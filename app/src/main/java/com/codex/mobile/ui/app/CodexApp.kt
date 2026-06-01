@@ -91,10 +91,13 @@ fun CodexApp(
                     onActivePanelChange = controller.onComposerPanelChange,
                     onToggleCompact = controller.toggleCompactMode,
                     onToggleDetails = viewModel::toggleComposerDetails,
+                    onCompactContext = viewModel::compactContext,
+                    onRollbackLastTurn = viewModel::rollbackLastTurn,
                     onChange = viewModel::updateComposer,
                     onInsertText = viewModel::insertComposerText,
                     onApplySlashCommand = viewModel::applySlashCommand,
                     onClearComposer = viewModel::clearComposer,
+                    onInsertShellTemplate = viewModel::insertShellTemplate,
                     onSend = viewModel::send,
                     onStop = viewModel::stopGenerating
                 )

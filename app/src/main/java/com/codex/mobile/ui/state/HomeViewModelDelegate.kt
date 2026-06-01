@@ -105,6 +105,10 @@ internal class HomeViewModelDelegate(
         composerActions.compactContext()
     }
 
+    fun rollbackLastTurn() {
+        composerActions.rollbackLastTurn()
+    }
+
     fun clearComposer() {
         composerActions.clearComposer()
     }

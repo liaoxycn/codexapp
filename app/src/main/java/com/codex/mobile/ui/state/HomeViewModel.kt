@@ -49,6 +49,8 @@ class HomeViewModel(
 
     fun compactContext() = delegate.compactContext()
 
+    fun rollbackLastTurn() = delegate.rollbackLastTurn()
+
     fun clearComposer() = delegate.clearComposer()
 
     fun insertShellTemplate() = delegate.insertShellTemplate()

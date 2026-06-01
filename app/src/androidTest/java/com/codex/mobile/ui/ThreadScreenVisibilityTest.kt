@@ -340,10 +340,13 @@ class ThreadScreenVisibilityTest {
                     onActivePanelChange = {},
                     onToggleCompact = {},
                     onToggleDetails = {},
+                    onCompactContext = {},
+                    onRollbackLastTurn = {},
                     onChange = {},
                     onInsertText = { insertedText = it },
                     onApplySlashCommand = {},
                     onClearComposer = {},
+                    onInsertShellTemplate = {},
                     onSend = {},
                     onStop = {}
                 )
@@ -353,6 +356,49 @@ class ThreadScreenVisibilityTest {
         rule.onNodeWithContentDescription("app/Main.kt").performClick()
 
         assertEquals("@{D:/Projects/app/Main.kt}", insertedText)
+    }
+
+    @Test
+    fun composerDetailsExposeFrequentActions() {
+        var compactToggles = 0
+        var compactCalls = 0
+        var rollbackCalls = 0
+        var shellCalls = 0
+        rule.setContent {
+            CodexTheme {
+                Composer(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(showComposerDetails = true),
+                    compactMode = false,
+                    activePanel = ComposerPanel.NONE,
+                    onActivePanelChange = {},
+                    onToggleCompact = { compactToggles += 1 },
+                    onToggleDetails = {},
+                    onCompactContext = { compactCalls += 1 },
+                    onRollbackLastTurn = { rollbackCalls += 1 },
+                    onChange = {},
+                    onInsertText = {},
+                    onApplySlashCommand = {},
+                    onClearComposer = {},
+                    onInsertShellTemplate = { shellCalls += 1 },
+                    onSend = {},
+                    onStop = {}
+                )
+            }
+        }
+
+        rule.onNodeWithContentDescription("紧凑").performClick()
+        rule.onNodeWithContentDescription("压缩").performClick()
+        rule.onNodeWithContentDescription("回滚").performClick()
+        rule.onNodeWithContentDescription("Shell").performClick()
+
+        assertEquals(1, compactToggles)
+        assertEquals(1, compactCalls)
+        assertEquals(1, rollbackCalls)
+        assertEquals(1, shellCalls)
     }
 
     @Test

@@ -66,6 +66,26 @@ class ComposerActionHandlerTest {
     }
 
     @Test
+    fun rollbackLastTurnWritesCommandAndSubmitsIt() {
+        val session = ComposerSession("thread-1")
+        val sentPrompts = mutableListOf<String>()
+        val handler = ComposerActionHandler(
+            composerSession = session,
+            selectedThreadId = { "thread-1" },
+            launch = { block -> runBlockingImmediate(block) },
+            sendPrompt = { prompt ->
+                sentPrompts += prompt
+                true
+            }
+        )
+
+        handler.rollbackLastTurn()
+
+        assertEquals(listOf("/rollback"), sentPrompts)
+        assertEquals("", session.currentText())
+    }
+
+    @Test
     fun resendTextReplacesDraftAndSubmitsImmediately() {
         val session = ComposerSession("thread-1")
         val sentPrompts = mutableListOf<String>()

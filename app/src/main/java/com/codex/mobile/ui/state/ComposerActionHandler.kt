@@ -23,6 +23,11 @@ internal class ComposerActionHandler(
         send()
     }
 
+    fun rollbackLastTurn() {
+        composerSession.replace("/rollback ", selectedThreadId())
+        send()
+    }
+
     fun clearComposer() {
         composerSession.clear()
     }

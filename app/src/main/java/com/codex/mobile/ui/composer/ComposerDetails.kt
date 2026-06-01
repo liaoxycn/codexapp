@@ -12,7 +12,10 @@ import androidx.compose.material.Divider
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -35,11 +38,17 @@ internal fun ComposerDetailsSection(
     onSlashQueryChange: (String) -> Unit,
     onFocusComposer: () -> Unit,
     onActivePanelChange: (ComposerPanel) -> Unit,
+    onToggleCompact: () -> Unit,
+    onCompactContext: () -> Unit,
+    onRollbackLastTurn: () -> Unit,
     onClearComposer: () -> Unit,
+    onInsertShellTemplate: () -> Unit,
     onInsertText: (String) -> Unit,
     onResetInlineSlashPanel: () -> Unit,
     onSelectSlashCommand: (String) -> Unit,
 ) {
+    val fileChips = state.chips.filter { it.icon == com.codex.mobile.model.ComposerChipIcon.FILE }
+
     AnimatedVisibility(visible = state.showComposerDetails) {
         Column(
             verticalArrangement = Arrangement.spacedBy(3.dp),
@@ -55,6 +64,25 @@ internal fun ComposerDetailsSection(
                     onResetInlineSlashPanel()
                     onClearComposer()
                 }
+                MiniAction(if (compactMode) "常规" else "紧凑", Icons.Filled.Edit) {
+                    onToggleCompact()
+                }
+                MiniAction("压缩", Icons.Filled.Archive) {
+                    onActivePanelChange(ComposerPanel.NONE)
+                    onResetInlineSlashPanel()
+                    onCompactContext()
+                }
+                MiniAction("回滚", Icons.Filled.Refresh) {
+                    onActivePanelChange(ComposerPanel.NONE)
+                    onResetInlineSlashPanel()
+                    onRollbackLastTurn()
+                }
+                MiniAction("Shell", Icons.Filled.Edit) {
+                    onActivePanelChange(ComposerPanel.NONE)
+                    onResetInlineSlashPanel()
+                    onInsertShellTemplate()
+                    onFocusComposer()
+                }
                 MiniAction("/命令", Icons.Filled.Search) {
                     val opening = activePanel != ComposerPanel.SLASH
                     onResetInlineSlashPanel()
@@ -66,14 +94,19 @@ internal fun ComposerDetailsSection(
                         onFocusComposer()
                     }
                 }
-                state.chips
-                    .filter { it.icon == com.codex.mobile.model.ComposerChipIcon.FILE }
-                    .forEach { chip ->
+            }
+            if (fileChips.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    fileChips.forEach { chip ->
                         MiniAction(chip.label, Icons.AutoMirrored.Filled.InsertDriveFile) {
                             onInsertText("@{${chip.path ?: chip.label}}")
                             onFocusComposer()
                         }
                     }
+                }
             }
             if (state.cwd.isNotBlank() || state.permissionSummary.isNotBlank()) {
                 Row(
