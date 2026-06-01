@@ -25,6 +25,7 @@ internal fun ThreadMessageList(
     isLoadingOlder: Boolean,
     onEditUserMessage: (String) -> Unit,
     onResendUserMessage: (String) -> Unit,
+    onCopyMessage: (String) -> Unit,
     onApprovePending: () -> Unit,
     onRejectPending: () -> Unit,
 ) {
@@ -67,7 +68,8 @@ internal fun ThreadMessageList(
                 compactMode = compactMode,
                 messageIndex = index,
                 onEditUserMessage = onEditUserMessage,
-                onResendUserMessage = onResendUserMessage
+                onResendUserMessage = onResendUserMessage,
+                onCopyMessage = onCopyMessage
             )
         }
 

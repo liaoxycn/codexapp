@@ -52,6 +52,7 @@ class ThreadScreenVisibilityTest {
                     onLoadOlderMessages = {},
                     onEditUserMessage = {},
                     onResendUserMessage = {},
+                    onCopyMessage = {},
                     onApprovePending = {},
                     onRejectPending = {}
                 )
@@ -80,6 +81,7 @@ class ThreadScreenVisibilityTest {
                     onLoadOlderMessages = {},
                     onEditUserMessage = {},
                     onResendUserMessage = {},
+                    onCopyMessage = {},
                     onApprovePending = {},
                     onRejectPending = {}
                 )
@@ -107,6 +109,7 @@ class ThreadScreenVisibilityTest {
                     onLoadOlderMessages = {},
                     onEditUserMessage = {},
                     onResendUserMessage = {},
+                    onCopyMessage = {},
                     onApprovePending = {},
                     onRejectPending = {}
                 )
@@ -139,6 +142,7 @@ class ThreadScreenVisibilityTest {
                     onLoadOlderMessages = { loadCalls += 1 },
                     onEditUserMessage = {},
                     onResendUserMessage = {},
+                    onCopyMessage = {},
                     onApprovePending = {},
                     onRejectPending = {}
                 )
@@ -178,6 +182,7 @@ class ThreadScreenVisibilityTest {
                     onLoadOlderMessages = {},
                     onEditUserMessage = {},
                     onResendUserMessage = {},
+                    onCopyMessage = {},
                     onApprovePending = {},
                     onRejectPending = {}
                 )
@@ -211,6 +216,7 @@ class ThreadScreenVisibilityTest {
                     onLoadOlderMessages = {},
                     onEditUserMessage = {},
                     onResendUserMessage = {},
+                    onCopyMessage = {},
                     onApprovePending = { approveCalls += 1 },
                     onRejectPending = { rejectCalls += 1 }
                 )
@@ -229,6 +235,7 @@ class ThreadScreenVisibilityTest {
     fun userMessageMenuSupportsEditAndResend() {
         var editedText: String? = null
         var resentText: String? = null
+        var copiedText: String? = null
         rule.setContent {
             MaterialTheme {
                 ThreadScreen(
@@ -251,11 +258,16 @@ class ThreadScreenVisibilityTest {
                     onLoadOlderMessages = {},
                     onEditUserMessage = { editedText = it },
                     onResendUserMessage = { resentText = it },
+                    onCopyMessage = { copiedText = it },
                     onApprovePending = {},
                     onRejectPending = {}
                 )
             }
         }
+
+        rule.onNodeWithTag("user_message_more_user-editable").performClick()
+        rule.onNodeWithText("复制").performClick()
+        assertEquals("please inspect build failure", copiedText)
 
         rule.onNodeWithTag("user_message_more_user-editable").performClick()
         rule.onNodeWithText("编辑后重发").performClick()
@@ -264,6 +276,43 @@ class ThreadScreenVisibilityTest {
         rule.onNodeWithTag("user_message_more_user-editable").performClick()
         rule.onNodeWithText("重发").performClick()
         assertEquals("please inspect build failure", resentText)
+    }
+
+    @Test
+    fun assistantMessageCanBeCopied() {
+        var copiedText: String? = null
+        rule.setContent {
+            MaterialTheme {
+                ThreadScreen(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(
+                        messages = listOf(
+                            ThreadMessage(
+                                id = "assistant-copy",
+                                role = MessageRole.ASSISTANT,
+                                blocks = listOf(MessageBlock.Text("copy this answer"))
+                            )
+                        )
+                    ),
+                    compactMode = false,
+                    onOpenConnection = {},
+                    onRefreshCurrent = {},
+                    onLoadOlderMessages = {},
+                    onEditUserMessage = {},
+                    onResendUserMessage = {},
+                    onCopyMessage = { copiedText = it },
+                    onApprovePending = {},
+                    onRejectPending = {}
+                )
+            }
+        }
+
+        rule.onNodeWithTag("assistant_message_copy_assistant-copy").performClick()
+
+        assertEquals("copy this answer", copiedText)
     }
 
     @Test

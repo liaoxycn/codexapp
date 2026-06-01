@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,7 +43,8 @@ internal fun UserMessage(
     message: ThreadMessage,
     compactMode: Boolean,
     onEditAndResend: (String) -> Unit,
-    onResend: (String) -> Unit
+    onResend: (String) -> Unit,
+    onCopy: (String) -> Unit
 ) {
     var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
     var menuExpanded by rememberSaveable(message.id + ":menu") { mutableStateOf(false) }
@@ -72,6 +74,21 @@ internal fun UserMessage(
                         expanded = menuExpanded,
                         onDismissRequest = { menuExpanded = false }
                     ) {
+                        DropdownMenuItem(
+                            onClick = {
+                                menuExpanded = false
+                                onCopy(messageText)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.ContentCopy,
+                                contentDescription = null,
+                                tint = CodexTheme.colors.textSecondary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("复制")
+                        }
                         DropdownMenuItem(
                             onClick = {
                                 menuExpanded = false
@@ -133,4 +150,20 @@ internal fun UserMessage(
 
 internal fun ThreadMessage.userEditableText(): String {
     return blocks.filterIsInstance<MessageBlock.Text>().joinToString("\n") { it.value }.trim()
+}
+
+internal fun ThreadMessage.copyableText(): String {
+    return blocks.mapNotNull { block ->
+        when (block) {
+            is MessageBlock.Text -> block.value
+            is MessageBlock.Code -> block.value
+            is MessageBlock.Status -> block.value
+            is MessageBlock.Reasoning -> block.value
+            is MessageBlock.CommandSummary -> block.value
+            is MessageBlock.CommandMeta -> block.value
+            is MessageBlock.FileChangeSummary -> block.value
+            is MessageBlock.FileChangeMeta -> listOf(block.value, block.path).filter(String::isNotBlank).joinToString(" ")
+            is MessageBlock.FileChangeDiff -> block.value
+        }.trim().takeIf(String::isNotBlank)
+    }.joinToString("\n\n")
 }

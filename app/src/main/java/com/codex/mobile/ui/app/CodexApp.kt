@@ -14,6 +14,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.codex.mobile.model.ConnectionStatus
 import com.codex.mobile.ui.common.TopBar
@@ -36,6 +38,7 @@ fun CodexApp(
         threads = state.threads,
         selectedThreadId = state.selectedThreadId,
     )
+    val clipboard = LocalClipboardManager.current
 
     BackHandler(enabled = true, onBack = controller.handleBackPress)
 
@@ -107,6 +110,7 @@ fun CodexApp(
                 onLoadOlderMessages = viewModel::loadOlderMessages,
                 onEditUserMessage = viewModel::replaceComposer,
                 onResendUserMessage = viewModel::resendUserMessage,
+                onCopyMessage = { text -> clipboard.setText(AnnotatedString(text)) },
                 onApprovePending = viewModel::approvePending,
                 onRejectPending = viewModel::rejectPending
             )

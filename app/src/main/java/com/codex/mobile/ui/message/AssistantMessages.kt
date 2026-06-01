@@ -2,7 +2,13 @@ package com.codex.mobile.ui.message
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -10,6 +16,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.codex.mobile.model.MessageBlock
@@ -17,15 +26,40 @@ import com.codex.mobile.model.ThreadMessage
 import com.codex.mobile.ui.theme.CodexTheme
 
 @Composable
-internal fun AssistantMessage(message: ThreadMessage, compactMode: Boolean, messageIndex: Int) {
+internal fun AssistantMessage(
+    message: ThreadMessage,
+    compactMode: Boolean,
+    messageIndex: Int,
+    onCopyMessage: (String) -> Unit
+) {
     var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
     var reasoningExpanded by rememberSaveable(message.id + ":reasoning") { mutableStateOf(false) }
     val cards = remember(message.blocks) { deriveAssistantMessageCards(message.blocks) }
+    val copyText = remember(message.blocks) { message.copyableText() }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(if (compactMode) 3.dp else 5.dp)
     ) {
+        if (copyText.isNotBlank()) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                IconButton(
+                    onClick = { onCopyMessage(copyText) },
+                    modifier = Modifier
+                        .size(if (compactMode) 28.dp else 32.dp)
+                        .semantics { contentDescription = "复制助手消息" }
+                        .testTag("assistant_message_copy_${message.id}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.ContentCopy,
+                        contentDescription = null,
+                        tint = CodexTheme.colors.textSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+
         if (cards.hasFileChangeCard) {
             FileChangeCard(
                 messageId = message.id,

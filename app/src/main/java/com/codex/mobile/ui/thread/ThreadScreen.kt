@@ -41,6 +41,7 @@ internal fun ThreadScreen(
     onLoadOlderMessages: () -> Unit,
     onEditUserMessage: (String) -> Unit,
     onResendUserMessage: (String) -> Unit,
+    onCopyMessage: (String) -> Unit,
     onApprovePending: () -> Unit,
     onRejectPending: () -> Unit
 ) {
@@ -71,6 +72,7 @@ internal fun ThreadScreen(
             isLoadingOlder = controller.isLoadingOlder,
             onEditUserMessage = onEditUserMessage,
             onResendUserMessage = onResendUserMessage,
+            onCopyMessage = onCopyMessage,
             onApprovePending = onApprovePending,
             onRejectPending = onRejectPending,
         )

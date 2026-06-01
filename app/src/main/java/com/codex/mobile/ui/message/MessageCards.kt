@@ -10,16 +10,18 @@ internal fun MessageCard(
     compactMode: Boolean,
     messageIndex: Int,
     onEditUserMessage: (String) -> Unit,
-    onResendUserMessage: (String) -> Unit
+    onResendUserMessage: (String) -> Unit,
+    onCopyMessage: (String) -> Unit
 ) {
     when (message.role) {
         MessageRole.USER -> UserMessage(
             message = message,
             compactMode = compactMode,
             onEditAndResend = onEditUserMessage,
-            onResend = onResendUserMessage
+            onResend = onResendUserMessage,
+            onCopy = onCopyMessage
         )
-        MessageRole.ASSISTANT -> AssistantMessage(message, compactMode, messageIndex)
-        MessageRole.SYSTEM -> SystemMessage(message, compactMode)
+        MessageRole.ASSISTANT -> AssistantMessage(message, compactMode, messageIndex, onCopyMessage)
+        MessageRole.SYSTEM -> SystemMessage(message, compactMode, onCopyMessage)
     }
 }
