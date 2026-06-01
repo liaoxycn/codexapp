@@ -169,6 +169,7 @@ codexapp/
 │  │  ├─ backend.ts                      backend 兼容导出层
 │  │  └─ threadState.ts                  线程状态兼容导出层，聚合 threadStatus/threadSummaryState
 │  ├─ dist/                              TypeScript 构建输出，默认不提交
+│  ├─ scripts/                           gateway 辅助脚本，包含 exe 构建与协议自测
 │  └─ node_modules/                      npm 依赖，默认不提交
 ├─ scripts/                              本地构建、部署、自测脚本
 ├─ docs/                                 项目文档、规范、wiki、调研资料入口

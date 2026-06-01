@@ -72,6 +72,15 @@ npm run start
 - 如果是 Android 模拟器，通常可用 `ws://10.0.2.2:8765/mobile`
 - `gateway` 启动时会自动拉起本机 `codex app-server`
 
+### 2.4 协议自测
+
+```powershell
+cd desktop-gateway
+npm run protocol:selftest
+```
+
+该脚本使用内存 app-server stub，验证审批、compact、goal 通知、命令输出增量与归档清理，不写入真实 Codex 会话。
+
 ## 3. APK 获取
 
 ### 3.1 本地打包 APK
