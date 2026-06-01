@@ -312,6 +312,29 @@ test("bridge backend merges assistant delta from notification stream", async () 
   );
 });
 
+test("bridge backend accumulates command output deltas from notification stream", async () => {
+  const backend = new AppServerBridgeBackend();
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("command-delta-thread", cwd),
+  };
+
+  await backend.createThread("D:/Projects/CommandDeltaProject");
+  await backend.handleNotification({
+    method: "item/commandExecution/outputDelta",
+    params: { threadId: "command-delta-thread", turnId: "turn-1", itemId: "command-1", delta: "one" },
+  });
+  await backend.handleNotification({
+    method: "item/commandExecution/outputDelta",
+    params: { threadId: "command-delta-thread", turnId: "turn-1", itemId: "command-1", delta: "\ntwo" },
+  });
+
+  const snapshot = backend.getSnapshot("command-delta-thread");
+  assert.equal(
+    snapshot.messages.find((message) => message.id === "command-1")?.blocks.find((block) => block.kind === "code")?.value,
+    "one\ntwo"
+  );
+});
+
 test("bridge backend archives current thread and selects the next active thread", async () => {
   const backend = new AppServerBridgeBackend();
   const threadsById = {

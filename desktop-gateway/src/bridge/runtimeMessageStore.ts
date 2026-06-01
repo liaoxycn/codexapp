@@ -3,9 +3,9 @@ import type { GatewayMessagePayload } from "../protocol.js";
 import { mergeMessageBlocks } from "./messageMerging.js";
 import type { ThreadRuntimeState } from "./types.js";
 
-export function systemStatus(text: string): GatewayMessagePayload {
+export function systemStatus(text: string, id: string = randomUUID()): GatewayMessagePayload {
   return {
-    id: randomUUID(),
+    id,
     role: "system",
     blocks: [{ kind: "status", value: text }],
   };

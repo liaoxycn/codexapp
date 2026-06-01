@@ -4,6 +4,7 @@ import type {
 } from "../appServerTypes.js";
 import { buildFileChangeBlocks } from "./fileChanges.js";
 import {
+  appendOrMergeCodeMessage,
   appendAssistantDelta,
   appendOrMergeMessage,
   mergeThreadItem,
@@ -74,15 +75,7 @@ export function handleCommandExecutionOutputDelta(
     return;
   }
 
-  replaceOrAppendMessage(state, {
-    id: itemId,
-    role: "assistant",
-    blocks: [
-      { kind: "commandSummary", value: "命令执行中" },
-      { kind: "commandMeta", value: "命令输出更新中" },
-      { kind: "code", language: "shell", value: delta },
-    ],
-  });
+  appendOrMergeCodeMessage(state, itemId, delta, "shell", "命令执行中");
   deps.emitChanged();
 }
 

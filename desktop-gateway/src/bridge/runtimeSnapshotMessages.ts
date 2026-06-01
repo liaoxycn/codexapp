@@ -82,6 +82,40 @@ export function normalizeCompactMessages(state: ThreadRuntimeState, includeCompl
   state.transientOperation = null;
 }
 
+export function normalizeAllCompactMessages(state: ThreadRuntimeState): void {
+  const nextMessages: GatewayMessagePayload[] = [];
+  let pendingRequested: GatewayMessagePayload | null = null;
+  let pendingCompacted: GatewayMessagePayload | null = null;
+
+  const flush = () => {
+    if (pendingRequested) {
+      nextMessages.push(pendingRequested);
+    }
+    if (pendingCompacted) {
+      nextMessages.push(pendingCompacted);
+    }
+    pendingRequested = null;
+    pendingCompacted = null;
+  };
+
+  for (const message of state.snapshot.messages) {
+    const compactStatus = getCompactStatusValue(message);
+    if (!compactStatus) {
+      flush();
+      nextMessages.push(message);
+      continue;
+    }
+    if (compactStatus === "已请求压缩上下文") {
+      pendingRequested = systemStatus("已请求压缩上下文");
+      continue;
+    }
+    pendingCompacted = systemStatus("上下文已压缩");
+  }
+
+  flush();
+  state.snapshot.messages = nextMessages;
+}
+
 export function rebaseSnapshotMessagesFromThread(state: ThreadRuntimeState): void {
   if (!state.thread) {
     return;
@@ -90,10 +124,24 @@ export function rebaseSnapshotMessagesFromThread(state: ThreadRuntimeState): voi
   const allMessages = collectThreadMessages(state.thread);
   state.snapshot.messages = trimMessagesToWindow(allMessages, state.historyWindow);
   state.snapshot.hasMoreHistory = allMessages.length > state.historyWindow;
+  normalizeAllCompactMessages(state);
 }
 
 export function collectThreadMessages(thread: AppServerThread): GatewayMessagePayload[] {
   return thread.turns.flatMap((turn) => turn.items).flatMap((item) => mapItemToMessages(item, thread.cwd));
+}
+
+function getCompactStatusValue(message: GatewayMessagePayload): string | null {
+  if (
+    message.role !== "system" ||
+    message.blocks.length !== 1 ||
+    message.blocks[0]?.kind !== "status"
+  ) {
+    return null;
+  }
+
+  const value = message.blocks[0].value.trim();
+  return value === "已请求压缩上下文" || value === "上下文已压缩" ? value : null;
 }
 
 export function mergeSnapshotMessages(

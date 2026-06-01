@@ -43,6 +43,7 @@ function createContext(overrides = {}) {
     snapshotTimer: null,
     liveRefreshTimer: null,
     listRefreshTimer: null,
+    lastSnapshotPayload: null,
     ...overrides,
   };
 }
@@ -66,6 +67,19 @@ test("sendSnapshot serializes snapshot payload for client socket", () => {
   assert.equal(context.socket.sent[0].type, "snapshot");
   assert.equal(context.socket.sent[0].pendingApproval, "审批中");
   assert.equal(context.listRefreshTimer, null);
+});
+
+test("sendSnapshot skips duplicate payloads for the same client", () => {
+  const context = createContext();
+  const handlers = {
+    refreshSelectedThread: async () => {},
+    refreshThreadList: async () => {},
+  };
+
+  sendSnapshot(context, createSnapshot(), handlers);
+  sendSnapshot(context, createSnapshot(), handlers);
+
+  assert.equal(context.socket.sent.length, 1);
 });
 
 test("runBackendAction sends snapshot on success", async () => {

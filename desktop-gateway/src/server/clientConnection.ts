@@ -36,6 +36,7 @@ export function createGatewayClientContext({
     snapshotTimer: null,
     liveRefreshTimer: null,
     listRefreshTimer: null,
+    lastSnapshotPayload: null,
     unsubscribe: backend().subscribe(() => {
       if (context.authenticated && socket.readyState === socket.OPEN) {
         scheduleSnapshot(context, backend, (nextContext, snapshot) => sendSnapshot(nextContext, snapshot));

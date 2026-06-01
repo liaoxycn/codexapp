@@ -18,6 +18,7 @@ export interface ClientContext {
   snapshotTimer: NodeJS.Timeout | null;
   liveRefreshTimer: NodeJS.Timeout | null;
   listRefreshTimer: NodeJS.Timeout | null;
+  lastSnapshotPayload: string | null;
 }
 
 export type Backend = {

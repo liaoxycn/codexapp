@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeCompactMessages, mergeSnapshotMessages } from "../dist/bridge/runtimeSnapshotMessages.js";
+import {
+  normalizeAllCompactMessages,
+  normalizeCompactMessages,
+  mergeSnapshotMessages,
+} from "../dist/bridge/runtimeSnapshotMessages.js";
 
 function statusMessage(id, value) {
   return {
@@ -30,6 +34,28 @@ test("normalizeCompactMessages keeps one requested and one completed compact sta
     ["done", "已请求压缩上下文", "上下文已压缩"]
   );
   assert.equal(state.transientOperation, null);
+});
+
+test("normalizeAllCompactMessages cleans historical duplicate compact status runs", () => {
+  const state = {
+    snapshot: {
+      messages: [
+        statusMessage("status-1", "已请求压缩上下文"),
+        statusMessage("status-2", "已请求压缩上下文"),
+        statusMessage("status-3", "上下文已压缩"),
+        { id: "assistant-1", role: "assistant", blocks: [{ kind: "text", value: "done" }] },
+        statusMessage("status-4", "上下文已压缩"),
+        statusMessage("status-5", "上下文已压缩"),
+      ],
+    },
+  };
+
+  normalizeAllCompactMessages(state);
+
+  assert.deepEqual(
+    state.snapshot.messages.map((message) => message.blocks[0].value),
+    ["已请求压缩上下文", "上下文已压缩", "done", "上下文已压缩"]
+  );
 });
 
 test("mergeSnapshotMessages drops live assistant placeholder after real assistant text arrives", () => {

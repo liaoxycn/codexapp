@@ -47,7 +47,11 @@ export function sendSnapshot(
   snapshot: ClientSnapshot,
   handlers: SnapshotHandlers
 ): void {
-  context.socket.send(JSON.stringify(buildSnapshotMessage(snapshot)));
+  const payload = JSON.stringify(buildSnapshotMessage(snapshot));
+  if (context.lastSnapshotPayload !== payload) {
+    context.lastSnapshotPayload = payload;
+    context.socket.send(payload);
+  }
   scheduleLiveRefresh(context, snapshot, handlers.refreshSelectedThread);
   scheduleListRefresh(context, handlers.refreshThreadList);
 }

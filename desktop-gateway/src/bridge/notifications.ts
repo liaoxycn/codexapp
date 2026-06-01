@@ -9,6 +9,8 @@ import {
 } from "./itemNotifications.js";
 import {
   handleServerRequestResolved,
+  handleThreadGoalCleared,
+  handleThreadGoalUpdated,
   handleThreadCompacted,
   handleThreadStatusChanged,
   handleTurnCompleted,
@@ -65,6 +67,12 @@ export async function handleBridgeNotification(
       return;
     case "thread/compacted":
       handleThreadCompacted(notification, deps);
+      return;
+    case "thread/goal/updated":
+      handleThreadGoalUpdated(notification, deps);
+      return;
+    case "thread/goal/cleared":
+      handleThreadGoalCleared(notification, deps);
       return;
     default:
       return;

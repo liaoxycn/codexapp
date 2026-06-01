@@ -3,6 +3,11 @@ import type {
   JsonRpcNotification,
 } from "../appServerTypes.js";
 import { getThreadStatusType, isThreadActivelyGenerating, resolveLifecycleStatus } from "../threadState.js";
+import { asString } from "./appServerValues.js";
+import {
+  replaceOrAppendMessage,
+  systemStatus,
+} from "./runtimeMessages.js";
 import { normalizeCompactMessages, pruneCompletedArtifacts } from "./runtimeSnapshotMessages.js";
 import { touchThreadActivity } from "./summaries.js";
 import type { BridgeNotificationDeps } from "./notifications.js";
@@ -142,5 +147,39 @@ export function handleThreadCompacted(
   pruneCompletedArtifacts(state);
   normalizeCompactMessages(state, true);
   deps.updateSummaryStatus(threadId, state.pendingApproval ? "needs_approval" : "idle");
+  deps.emitChanged();
+}
+
+export function handleThreadGoalUpdated(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const { threadId, goal } = notification.params as {
+    threadId: string;
+    goal?: { objective?: string | null; status?: string | null };
+  };
+  const state = deps.threads.get(threadId);
+  if (!state) {
+    return;
+  }
+
+  const objective = asString(goal?.objective).trim();
+  const status = asString(goal?.status).trim();
+  const suffix = status ? ` · ${status}` : "";
+  replaceOrAppendMessage(state, systemStatus(`目标: ${objective || "已更新"}${suffix}`, "thread-goal"));
+  deps.emitChanged();
+}
+
+export function handleThreadGoalCleared(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const { threadId } = notification.params as { threadId: string };
+  const state = deps.threads.get(threadId);
+  if (!state) {
+    return;
+  }
+
+  replaceOrAppendMessage(state, systemStatus("目标已清除", "thread-goal"));
   deps.emitChanged();
 }

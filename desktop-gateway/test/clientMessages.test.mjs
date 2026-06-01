@@ -40,6 +40,7 @@ function createContext(overrides = {}) {
     snapshotTimer: null,
     liveRefreshTimer: null,
     listRefreshTimer: null,
+    lastSnapshotPayload: null,
     ...overrides,
   };
 }
