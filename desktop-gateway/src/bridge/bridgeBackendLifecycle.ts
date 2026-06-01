@@ -17,6 +17,8 @@ import type {
 
 export interface BridgeBackendLifecycleDeps {
   threads: Map<string, ThreadRuntimeState>;
+  respondToServerRequest(id: string | number, result: unknown): void;
+  respondToServerRequestError(id: string | number, code: number, message: string, data?: unknown): void;
   emitChanged(): void;
   hydrateThreads(): Promise<void>;
   refreshThread(threadId: string): Promise<void>;
@@ -44,9 +46,16 @@ export function handleBridgeBackendServerRequest(
   request: JsonRpcServerRequest,
   deps: BridgeBackendLifecycleDeps
 ): void {
-  applyServerRequest(request, (threadId, approval) => {
-    setBridgePendingApproval(threadId, approval, deps);
-  });
+  applyServerRequest(
+    request,
+    (threadId, approval) => {
+      setBridgePendingApproval(threadId, approval, deps);
+    },
+    {
+      respond: deps.respondToServerRequest,
+      respondError: deps.respondToServerRequestError,
+    }
+  );
 }
 
 export function setBridgePendingApproval(

@@ -6,9 +6,27 @@ export const HISTORY_WINDOW_STEP = 24;
 
 export interface PendingApproval {
   requestId?: string | number;
-  kind: "command" | "file" | "permissions" | "gatewayShell";
+  kind:
+    | "command"
+    | "file"
+    | "permissions"
+    | "mcpElicitation"
+    | "toolUserInput"
+    | "legacyCommand"
+    | "legacyPatch"
+    | "gatewayShell";
   text: string;
-  command?: string;
+  command?: string;
+
+  permissions?: {
+    fileSystem?: unknown | null;
+    network?: unknown | null;
+  };
+
+  questions?: Array<{
+    id: string;
+    options?: Array<{ label: string; description?: string }> | null;
+  }>;
 }
 
 export interface ThreadRuntimeState {

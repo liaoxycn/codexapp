@@ -38,9 +38,47 @@ export function mapThreadToSnapshot(
   };
 }
 
-export function buildApprovalResponse(kind: PendingApproval["kind"], allow: boolean): unknown {
+export function buildApprovalResponse(approval: PendingApproval, allow: boolean): unknown {
+  const { kind } = approval;
   if (kind === "command" || kind === "file") {
     return { decision: allow ? "accept" : "decline" };
+  }
+  if (kind === "legacyCommand" || kind === "legacyPatch") {
+    return { decision: allow ? "approved" : "denied" };
+  }
+  if (kind === "mcpElicitation") {
+    return {
+      action: allow ? "accept" : "decline",
+      content: null,
+      _meta: null,
+    };
+  }
+  if (kind === "toolUserInput") {
+    if (!allow) {
+      return { answers: {} };
+    }
+    return {
+      answers: Object.fromEntries(
+        (approval.questions ?? []).map((question) => [
+          question.id,
+          { answers: [question.options?.[0]?.label ?? ""] },
+        ])
+      ),
+    };
+  }
+  if (kind === "permissions") {
+    return {
+      permissions: allow
+        ? {
+            fileSystem: approval.permissions?.fileSystem ?? null,
+            network: approval.permissions?.network ?? null,
+          }
+        : {
+            fileSystem: null,
+            network: null,
+          },
+      scope: "turn",
+    };
   }
   return {
     permissions: {

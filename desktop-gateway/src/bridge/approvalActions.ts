@@ -73,7 +73,7 @@ export async function handleCurrentApproval({
     return getSnapshot(threadId);
   }
 
-  appServer.respond(pending.requestId!, buildApprovalResponse(pending.kind, allow));
+  appServer.respond(pending.requestId!, buildApprovalResponse(pending, allow));
   state.pendingApproval = null;
   state.snapshot.pendingApproval = null;
   state.snapshot.messages = state.snapshot.messages.concat(

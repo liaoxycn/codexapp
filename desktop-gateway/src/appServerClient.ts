@@ -128,6 +128,10 @@ export class AppServerClient {
     this.transport.respond(id, result);
   }
 
+  respondError(id: string | number, code: number, message: string, data?: unknown): void {
+    this.transport.respondError(id, code, message, data);
+  }
+
   private async request<TParams extends object, TResult = unknown>(
     method: string,
     params: TParams

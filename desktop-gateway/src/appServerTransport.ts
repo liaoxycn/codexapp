@@ -157,6 +157,18 @@ export class AppServerTransport {
     } as JsonRpcResponse);
   }
 
+  respondError(id: string | number, code: number, message: string, data?: unknown): void {
+    this.writeMessage({
+      jsonrpc: "2.0",
+      id,
+      error: {
+        code,
+        message,
+        ...(data === undefined ? {} : { data }),
+      },
+    } as JsonRpcResponse);
+  }
+
   private writeMessage(message: JsonRpcRequest | JsonRpcNotification | JsonRpcResponse) {
     if (!this.child?.stdin.writable) {
       throw new Error("app-server stdin unavailable");

@@ -107,6 +107,9 @@ export class BridgeThreadController {
   lifecycleDeps(): BridgeBackendLifecycleDeps {
     return {
       threads: this.threads,
+      respondToServerRequest: (id, result) => this.getAppServer().respond(id, result),
+      respondToServerRequestError: (id, code, message, data) =>
+        this.getAppServer().respondError(id, code, message, data),
       emitChanged: () => this.runtime.emitChanged(),
       hydrateThreads: async () => this.hydrateThreads(),
       refreshThread: async (threadId: string) => this.catalog.refreshThread(threadId),
