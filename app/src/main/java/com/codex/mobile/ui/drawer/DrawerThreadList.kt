@@ -95,6 +95,29 @@ internal fun DrawerThreadList(
                 )
             }
         }
+        item {
+            Spacer(Modifier.height(3.dp))
+            SectionHeader(text = "归档", startPadding = 10.dp)
+        }
+        if (sections.archivedThreads.isEmpty()) {
+            item {
+                DrawerEmptyState("暂无归档会话")
+            }
+        } else {
+            items(
+                items = sections.archivedThreads,
+                key = { thread -> thread.id }
+            ) { thread ->
+                ThreadRow(
+                    summary = thread,
+                    selected = thread.id == selectedThreadId,
+                    indentLevel = 0,
+                    onClick = { onSelectThread(thread.id) },
+                    onRename = { onRenameThread(thread) },
+                    onArchiveToggle = { onUnarchiveThread(thread.id) }
+                )
+            }
+        }
     }
 }
 

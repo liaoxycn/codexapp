@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
@@ -334,9 +335,44 @@ class ThreadScreenVisibilityTest {
         }
 
         rule.onNodeWithTag("thread_row_more_chat-1").performClick()
-        rule.onNodeWithText("归档").performClick()
+        rule.onAllNodesWithText("归档")[1].performClick()
 
         assertEquals("chat-1", archivedThreadId)
+    }
+
+    @Test
+    fun drawerArchivedSectionCanUnarchiveThread() {
+        var unarchivedThreadId: String? = null
+        rule.setContent {
+            CodexTheme {
+                DrawerContent(
+                    state = sampleDrawerState().copy(
+                        threads = sampleDrawerState().threads + ThreadSummary(
+                            id = "archived-1",
+                            title = "Archived chat",
+                            preview = "old work",
+                            status = ThreadStatus.IDLE,
+                            updatedAt = 500L,
+                            archived = true
+                        )
+                    ),
+                    onCreateThread = {},
+                    onCreateThreadInProject = {},
+                    onRefreshThreads = {},
+                    onSelectThread = {},
+                    onRenameThread = { _, _ -> },
+                    onArchiveThread = {},
+                    onUnarchiveThread = { unarchivedThreadId = it }
+                )
+            }
+        }
+
+        rule.onNodeWithText("归档").assertExists()
+        rule.onNodeWithText("Archived chat").assertExists()
+        rule.onNodeWithTag("thread_row_more_archived-1").performClick()
+        rule.onNodeWithText("取消归档").performClick()
+
+        assertEquals("archived-1", unarchivedThreadId)
     }
 
     private fun sampleState(

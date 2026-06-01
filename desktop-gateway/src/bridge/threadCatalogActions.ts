@@ -28,7 +28,7 @@ export interface ThreadCatalogActionDeps {
   syncSelectedThread: (selectedThreadId: string) => void;
   emitChanged: () => void;
   getSnapshot: (selectedThreadId?: string) => ClientSnapshot;
-  hydrateThreads: () => Promise<void>;
+  hydrateThreads: (options?: { preserveCurrentThread?: boolean }) => Promise<void>;
   refreshThread: (threadId: string) => Promise<void>;
   resumeThread: (threadId: string) => Promise<void>;
   unsubscribeOtherThreads: (activeThreadId: string) => Promise<void>;
@@ -50,7 +50,7 @@ export async function refreshCatalogThreads(
   const requested = deps.resolveThreadId(selectedThreadId);
   const requestedVersion = deps.getSelectionVersion();
 
-  await deps.hydrateThreads();
+  await deps.hydrateThreads({ preserveCurrentThread: true });
 
   if (isStaleSelectionRequest({
     currentThreadId: deps.getCurrentThreadId(),

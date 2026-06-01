@@ -31,10 +31,13 @@ export async function hydrateThreadCatalog({
   currentThreadId,
 }: HydrateThreadCatalogParams): Promise<string> {
   const activeList = await appServer.threadList(false);
+  const archivedList = await appServer.threadList(true);
   const activeThreadIds = new Set(activeList.map((thread) => thread.id));
+  const archivedThreadIds = new Set(archivedList.map((thread) => thread.id));
+  const catalogThreadIds = new Set([...activeThreadIds, ...archivedThreadIds]);
 
   for (const threadId of [...threads.keys()]) {
-    if (activeThreadIds.has(threadId)) {
+    if (catalogThreadIds.has(threadId)) {
       continue;
     }
 
@@ -49,12 +52,19 @@ export async function hydrateThreadCatalog({
   }
 
   const detailedThreads = await readThreadDetailsForSummaries(appServer, activeList);
+  const detailedArchivedThreads = await readThreadDetailsForSummaries(appServer, archivedList);
+  const detailedArchivedOnlyThreads = detailedArchivedThreads.filter((thread) => !activeThreadIds.has(thread.id));
   const retainedSummaries = [...threads.values()]
-    .filter((entry) => !activeThreadIds.has(entry.summary.id))
+    .filter((entry) => !catalogThreadIds.has(entry.summary.id))
     .map((entry) => entry.summary);
   const summaries = dedupeSummaries([
     ...retainedSummaries,
     ...buildVisibleThreadSummaries(detailedThreads),
+    ...buildVisibleThreadSummaries(detailedArchivedOnlyThreads).map((summary) => ({
+      ...summary,
+      archived: true,
+      status: "idle" as const,
+    })),
   ]);
 
   if (summaries.length === 0) {
@@ -62,12 +72,15 @@ export async function hydrateThreadCatalog({
   }
 
   const candidateId =
-    currentThreadId && summaries.some((thread) => thread.id === currentThreadId)
+    currentThreadId && summaries.some((thread) => thread.id === currentThreadId && thread.archived !== true)
       ? currentThreadId
-      : summaries[0].id;
+      : summaries.find((thread) => thread.archived !== true)?.id ?? "";
 
   for (const thread of detailedThreads) {
-    upsertThreadState({ threads, thread, summaries });
+    upsertThreadState({ threads, thread, summaries, syncSelection: false });
+  }
+  for (const thread of detailedArchivedOnlyThreads) {
+    upsertThreadState({ threads, thread, summaries, archived: true, syncSelection: false });
   }
 
   materializeMissingSummaryStates(threads, summaries, candidateId);

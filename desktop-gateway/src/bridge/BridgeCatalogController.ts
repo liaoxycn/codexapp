@@ -76,12 +76,15 @@ export class BridgeCatalogController {
     return this.runtime.getSnapshot(resolved);
   }
 
-  async hydrateThreads(): Promise<void> {
-    this.runtime.currentThreadId = await hydrateThreadCatalog({
+  async hydrateThreads(options: { preserveCurrentThread?: boolean } = {}): Promise<void> {
+    const hydratedThreadId = await hydrateThreadCatalog({
       appServer: this.getAppServer(),
       threads: this.threads,
       currentThreadId: this.runtime.currentThreadId,
     });
+    if (!options.preserveCurrentThread) {
+      this.runtime.currentThreadId = hydratedThreadId;
+    }
     this.runtime.emitChanged();
   }
 
@@ -113,7 +116,7 @@ export class BridgeCatalogController {
       syncSelectedThread: (selectedThreadId: string) => this.runtime.syncSelectedThread(selectedThreadId),
       emitChanged: () => this.runtime.emitChanged(),
       getSnapshot: (selectedThreadId?: string) => this.runtime.getSnapshot(selectedThreadId),
-      hydrateThreads: async () => this.hydrateThreads(),
+      hydrateThreads: async (options?: { preserveCurrentThread?: boolean }) => this.hydrateThreads(options),
       refreshThread: async (threadId: string) => this.refreshThread(threadId),
       resumeThread: async (threadId: string) => this.resumeThread(threadId),
       unsubscribeOtherThreads: async (activeThreadId: string) => this.unsubscribeOtherThreads(activeThreadId),

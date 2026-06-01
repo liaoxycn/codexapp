@@ -351,7 +351,10 @@ test("bridge backend archives current thread and selects the next active thread"
     threadArchive: async (threadId) => {
       activeIds = activeIds.filter((id) => id !== threadId);
     },
-    threadList: async () => activeIds.map((id) => threadsById[id]),
+    threadList: async (archived = false) =>
+      archived
+        ? Object.values(threadsById).filter((entry) => !activeIds.includes(entry.id))
+        : activeIds.map((id) => threadsById[id]),
     threadRead: async (threadId) => threadsById[threadId],
   };
 
@@ -377,7 +380,10 @@ test("bridge backend selects a thread again after unarchive refresh", async () =
         activeIds = [...activeIds, threadId];
       }
     },
-    threadList: async () => activeIds.map((id) => threadsById[id]),
+    threadList: async (archived = false) =>
+      archived
+        ? Object.values(threadsById).filter((entry) => !activeIds.includes(entry.id))
+        : activeIds.map((id) => threadsById[id]),
     threadRead: async (threadId) => threadsById[threadId],
   };
 
@@ -386,6 +392,27 @@ test("bridge backend selects a thread again after unarchive refresh", async () =
 
   assert.equal(snapshot.selectedThreadId, "thread-b");
   assert.equal(snapshot.cwd, "D:/Projects/B");
+});
+
+test("bridge backend includes archived threads in refreshed snapshots", async () => {
+  const backend = new AppServerBridgeBackend();
+  const threadsById = {
+    "thread-a": thread("thread-a", { cwd: "D:/Projects/A", updatedAt: 100 }),
+    "thread-archived": thread("thread-archived", { cwd: "D:/Projects/Old", updatedAt: 50 }),
+  };
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("thread-a", cwd),
+    threadList: async (archived = false) => archived ? [threadsById["thread-archived"]] : [threadsById["thread-a"]],
+    threadRead: async (threadId) => threadsById[threadId],
+  };
+
+  await backend.createThread("D:/Projects/A");
+  const snapshot = await backend.refreshThreads("thread-a");
+
+  assert.deepEqual(
+    snapshot.threads.map((item) => [item.id, item.archived]),
+    [["thread-a", false], ["thread-archived", true]]
+  );
 });
 
 test("bridge backend refreshThreads does not override a newer manual selection", async () => {
@@ -404,8 +431,11 @@ test("bridge backend refreshThreads does not override a newer manual selection",
       startIndex++ === 0 ? "thread-a" : "thread-b",
       cwd
     ),
-    threadList: async () => {
+    threadList: async (archived = false) => {
       await threadListBlocked;
+      if (archived) {
+        return [];
+      }
       return [threadsById["thread-a"], threadsById["thread-b"]];
     },
     threadRead: async (threadId) => threadsById[threadId],

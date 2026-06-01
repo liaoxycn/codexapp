@@ -26,6 +26,7 @@ class DrawerThreadSectionsTest {
 
         assertEquals(listOf("chat-2"), sections.chatThreads.map { it.id })
         assertTrue(sections.projectGroups.isEmpty())
+        assertTrue(sections.archivedThreads.isEmpty())
     }
 
     @Test
@@ -60,6 +61,24 @@ class DrawerThreadSectionsTest {
     }
 
     @Test
+    fun separatesArchivedThreadsFromActiveSections() {
+        val sections = buildDrawerThreadSections(
+            threads = listOf(
+                summary("active-chat", updatedAt = 1_000L),
+                summary("archived-chat", updatedAt = 2_000L, archived = true),
+                summary("archived-project", updatedAt = 3_000L, groupKind = ThreadGroupKind.PROJECT, groupLabel = "项目A", archived = true)
+            ),
+            selectedThreadId = "",
+            query = "",
+            expandedProjectGroups = emptySet()
+        )
+
+        assertEquals(listOf("active-chat"), sections.chatThreads.map { it.id })
+        assertTrue(sections.projectGroups.isEmpty())
+        assertEquals(listOf("archived-project", "archived-chat"), sections.archivedThreads.map { it.id })
+    }
+
+    @Test
     fun findsOnlyNewProjectGroupsForAutoExpand() {
         val newGroups = newlyDiscoveredProjectGroups(
             knownGroups = setOf("项目A"),
@@ -77,7 +96,8 @@ class DrawerThreadSectionsTest {
         preview: String = "preview",
         groupKind: ThreadGroupKind = ThreadGroupKind.CHAT,
         groupLabel: String = "普通会话",
-        cwd: String = ""
+        cwd: String = "",
+        archived: Boolean = false
     ) = ThreadSummary(
         id = id,
         title = title,
@@ -86,6 +106,7 @@ class DrawerThreadSectionsTest {
         updatedAt = updatedAt,
         groupKind = groupKind,
         groupLabel = groupLabel,
-        cwd = cwd
+        cwd = cwd,
+        archived = archived
     )
 }

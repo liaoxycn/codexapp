@@ -28,6 +28,8 @@ interface UpsertThreadStateParams {
   summaries?: GatewayThreadPayload[] | null;
   resume?: ThreadResumeResult | null;
   preserveLiveMessages?: boolean;
+  archived?: boolean;
+  syncSelection?: boolean;
 }
 
 export function upsertThreadState({
@@ -36,6 +38,8 @@ export function upsertThreadState({
   summaries,
   resume = null,
   preserveLiveMessages = false,
+  archived = false,
+  syncSelection = true,
 }: UpsertThreadStateParams): void {
   const existing = threads.get(thread.id);
   const mergedSummaries = summaries ?? buildRuntimeSummaries(threads);
@@ -56,18 +60,20 @@ export function upsertThreadState({
   const lastActivityAtMs = Math.max(existing?.lastActivityAtMs ?? 0, getThreadLastActivityAtMs(thread));
   const retainRuntimeOverlay = shouldRetainThreadRuntimeOverlay(thread, existing);
 
+  const nextSummary = existing
+    ? {
+        ...mapThreadToSummary(thread, archived || existing.summary.archived, lastActivityAtMs),
+        status: resolveDisplayedThreadStatus(resolvedSummaryStatus, {
+          isGenerating: retainRuntimeOverlay && existing.snapshot.isGenerating,
+          currentTurnId: retainRuntimeOverlay ? existing.currentTurnId : null,
+          transientOperation: retainRuntimeOverlay ? existing.transientOperation : null,
+          pendingApproval: retainRuntimeOverlay ? existing.pendingApproval?.text ?? null : null,
+        }),
+      }
+    : mapThreadToSummary(thread, archived);
+
   const runtimeState: ThreadRuntimeState = {
-    summary: existing
-      ? {
-          ...mapThreadToSummary(thread, false, lastActivityAtMs),
-          status: resolveDisplayedThreadStatus(resolvedSummaryStatus, {
-            isGenerating: retainRuntimeOverlay && existing.snapshot.isGenerating,
-            currentTurnId: retainRuntimeOverlay ? existing.currentTurnId : null,
-            transientOperation: retainRuntimeOverlay ? existing.transientOperation : null,
-            pendingApproval: retainRuntimeOverlay ? existing.pendingApproval?.text ?? null : null,
-          }),
-        }
-      : mapThreadToSummary(thread),
+    summary: nextSummary,
     thread,
     isSubscribed: resume != null || existing?.isSubscribed === true,
     lastActivityAtMs,
@@ -87,6 +93,7 @@ export function upsertThreadState({
     reasoningEffort: resume?.reasoningEffort ?? existing?.reasoningEffort ?? null,
     snapshot: {
       ...baseSnapshot,
+      selectedThreadId: thread.id,
       messages: trimMessagesToWindow(mergedMessages, historyWindow),
       hasMoreHistory: mergedMessages.length > historyWindow,
       pendingApproval: existing?.pendingApproval?.text ?? null,
@@ -94,5 +101,7 @@ export function upsertThreadState({
   };
 
   threads.set(thread.id, runtimeState);
-  syncSelectedThreadSnapshots(threads, thread.id);
+  if (syncSelection) {
+    syncSelectedThreadSnapshots(threads, thread.id);
+  }
 }
