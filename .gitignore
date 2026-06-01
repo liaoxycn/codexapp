@@ -6,5 +6,6 @@
 /desktop-gateway/node_modules/
 /desktop-gateway/dist/
 /desktop-gateway/run-logs/
+/scripts/logs/
 /artifacts/
 /desktop-gateway/build-sea/

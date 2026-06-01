@@ -171,7 +171,8 @@ codexapp/
 │  ├─ dist/                              TypeScript 构建输出，默认不提交
 │  ├─ scripts/                           gateway 辅助脚本，包含 exe 构建与协议自测
 │  └─ node_modules/                      npm 依赖，默认不提交
-├─ scripts/                              本地构建、部署、自测脚本
+├─ scripts/                              本地构建、部署、自测 Node 脚本
+│  └─ logs/                              脚本本地运行日志，默认不提交
 ├─ docs/                                 项目文档、规范、wiki、调研资料入口
 │  └─ research/                          调研资料、外部协议资料、生成型参考数据
 │     └─ codex-app-server-protocol/

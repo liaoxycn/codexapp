@@ -93,7 +93,7 @@ npm run protocol:selftest
 在项目根目录执行：
 
 ```powershell
-.\scripts\build-apk.ps1
+node .\scripts\build-apk.mjs
 ```
 
 打包完成后，APK 输出位置：
