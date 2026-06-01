@@ -67,11 +67,27 @@ internal fun HandleThreadHistoryPaging(
     LaunchedEffect(state.isLoadingOlder, state.messages.size, state.hasMoreHistory, state.selectedThreadId) {
         if (state.isLoadingOlder) return@LaunchedEffect
         val anchorId = topLoadAnchorId ?: return@LaunchedEffect
-        val anchorIndex = state.messages.indexOfFirst { it.id == anchorId }
-        if (anchorIndex >= 0 && state.messages.isNotEmpty()) {
-            val restoredStartIndex = if (state.hasMoreHistory) 1 else 0
-            listState.scrollToItem(restoredStartIndex + anchorIndex, topLoadAnchorOffset)
+        val restoredIndex = restoredHistoryAnchorIndex(
+            messages = state.messages,
+            anchorId = anchorId,
+            hasMoreHistory = state.hasMoreHistory
+        )
+        if (restoredIndex != null) {
+            listState.scrollToItem(restoredIndex, topLoadAnchorOffset)
         }
         topLoadAnchorId = null
     }
+}
+
+internal fun restoredHistoryAnchorIndex(
+    messages: List<com.codex.mobile.model.ThreadMessage>,
+    anchorId: String,
+    hasMoreHistory: Boolean
+): Int? {
+    val anchorIndex = messages.indexOfFirst { it.id == anchorId }
+    if (anchorIndex < 0 || messages.isEmpty()) {
+        return null
+    }
+    val restoredStartIndex = if (hasMoreHistory) 1 else 0
+    return restoredStartIndex + anchorIndex
 }

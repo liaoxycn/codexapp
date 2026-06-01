@@ -7,6 +7,7 @@ import com.codex.mobile.model.HomeUiState
 import com.codex.mobile.model.ThreadMessage
 import com.codex.mobile.model.ThreadSummary
 import com.codex.mobile.ui.thread.calculateThreadListMetrics
+import com.codex.mobile.ui.thread.restoredHistoryAnchorIndex
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -49,6 +50,24 @@ class ThreadScreenStateTest {
 
         assertTrue(metrics.showConnectionBanner)
         assertFalse(metrics.showJumpToBottom)
+    }
+
+    @Test
+    fun historyAnchorRestoreKeepsPreviouslyVisibleMessageAfterOlderItemsPrepend() {
+        val messagesAfterLoad = listOf(
+            message("msg-8"),
+            message("msg-9"),
+            message("msg-10"),
+            message("msg-11")
+        )
+
+        val restoredIndex = restoredHistoryAnchorIndex(
+            messages = messagesAfterLoad,
+            anchorId = "msg-10",
+            hasMoreHistory = true
+        )
+
+        assertEquals(3, restoredIndex)
     }
 
     private fun homeUiState(
