@@ -307,6 +307,52 @@ export function handleGuardianApprovalReview(
   deps.emitChanged();
 }
 
+export function handleRealtimeNotification(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const params = notification.params as Record<string, unknown>;
+  const threadId = asString(params.threadId);
+  const state = deps.threads.get(threadId);
+  if (!state) {
+    return;
+  }
+
+  if (notification.method === "thread/realtime/transcript/delta") {
+    appendOrMergeMessage(
+      state,
+      `realtime-transcript-${asString(params.role, "assistant")}`,
+      params.role === "user" ? "user" : "assistant",
+      { kind: "text", value: asString(params.delta) },
+      true
+    );
+    deps.emitChanged();
+    return;
+  }
+
+  if (notification.method === "thread/realtime/transcript/done") {
+    const role = params.role === "user" ? "user" : "assistant";
+    replaceOrAppendMessage(state, {
+      id: `realtime-transcript-${asString(params.role, "assistant")}`,
+      role,
+      blocks: [{ kind: "text", value: asString(params.text, "实时转写已完成") }],
+    });
+    deps.emitChanged();
+    return;
+  }
+
+  const status = formatRealtimeStatus(notification);
+  if (!status) {
+    return;
+  }
+  replaceOrAppendMessage(state, {
+    id: "thread-realtime-status",
+    role: "system",
+    blocks: [{ kind: "status", value: status }],
+  });
+  deps.emitChanged();
+}
+
 function formatReviewAction(action?: { type?: string | null } | null): string {
   const type = asString(action?.type, "request");
   switch (type) {
@@ -356,5 +402,23 @@ function formatRiskLevel(risk: string): string {
       return "严重";
     default:
       return risk;
+  }
+}
+
+function formatRealtimeStatus(notification: JsonRpcNotification): string | null {
+  const params = notification.params as Record<string, unknown>;
+  switch (notification.method) {
+    case "thread/realtime/started":
+      return `实时会话已开始${asString(params.realtimeSessionId).trim() ? `\n${asString(params.realtimeSessionId).trim()}` : ""}`;
+    case "thread/realtime/outputAudio/delta":
+      return "实时音频输出中";
+    case "thread/realtime/sdp":
+      return "实时连接参数已更新";
+    case "thread/realtime/error":
+      return `实时会话错误: ${asString(params.message, "unknown")}`;
+    case "thread/realtime/closed":
+      return `实时会话已关闭${asString(params.reason).trim() ? `\n${asString(params.reason).trim()}` : ""}`;
+    default:
+      return null;
   }
 }

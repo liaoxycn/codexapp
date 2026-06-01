@@ -12,6 +12,7 @@ import {
   handleReasoningSummaryPartAdded,
   handleReasoningSummaryDelta,
   handleReasoningTextDelta,
+  handleRealtimeNotification,
   handleTerminalInteraction,
 } from "./itemNotifications.js";
 import {
@@ -99,6 +100,15 @@ export async function handleBridgeNotification(
     case "item/autoApprovalReview/started":
     case "item/autoApprovalReview/completed":
       handleGuardianApprovalReview(notification, deps);
+      return;
+    case "thread/realtime/started":
+    case "thread/realtime/transcript/delta":
+    case "thread/realtime/transcript/done":
+    case "thread/realtime/outputAudio/delta":
+    case "thread/realtime/sdp":
+    case "thread/realtime/error":
+    case "thread/realtime/closed":
+      handleRealtimeNotification(notification, deps);
       return;
     case "serverRequest/resolved":
       handleServerRequestResolved(notification, deps);

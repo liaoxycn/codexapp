@@ -346,6 +346,60 @@ test("handleBridgeNotification surfaces auto approval review updates", async () 
   );
 });
 
+test("handleBridgeNotification surfaces realtime thread notifications", async () => {
+  const state = createState();
+  const context = createDeps(state);
+
+  await handleBridgeNotification(
+    {
+      method: "thread/realtime/started",
+      params: { threadId: "thread-1", realtimeSessionId: "rt-1", version: 1 },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "thread/realtime/transcript/delta",
+      params: { threadId: "thread-1", role: "assistant", delta: "你" },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "thread/realtime/transcript/delta",
+      params: { threadId: "thread-1", role: "assistant", delta: "好" },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "thread/realtime/transcript/done",
+      params: { threadId: "thread-1", role: "assistant", text: "你好" },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "thread/realtime/error",
+      params: { threadId: "thread-1", message: "network" },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "thread/realtime/closed",
+      params: { threadId: "thread-1", reason: "done" },
+    },
+    context.deps
+  );
+
+  assert.equal(context.emitCount, 6);
+  assert.deepEqual(
+    state.snapshot.messages.map((message) => message.blocks[0].value),
+    ["实时会话已关闭\ndone", "你好"]
+  );
+});
+
 test("handleBridgeNotification surfaces operational global notices", async () => {
   const state = createState();
   state.snapshot.selectedThreadId = "thread-1";
