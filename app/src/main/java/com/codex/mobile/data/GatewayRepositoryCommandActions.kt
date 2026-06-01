@@ -15,7 +15,8 @@ internal class GatewayRepositoryCommandActions(
     fun createThread(cwd: String?): Boolean {
         return runConnectedAction(
             unavailableDetail = "未连接 gateway，无法新建会话",
-            beforeSend = { updateState(SessionRemoteState::startCreatingThread) }
+            beforeSend = { updateState(SessionRemoteState::startCreatingThread) },
+            sendFailureDetail = "新建会话失败，gateway 连接已断开"
         ) {
             commandSender.createThread(cwd)
         }
@@ -28,7 +29,8 @@ internal class GatewayRepositoryCommandActions(
             beforeSend = {
                 val nextTitle = readState().threads.firstOrNull { it.id == id }?.title
                 updateState { it.startSelectingThread(id, nextTitle) }
-            }
+            },
+            sendFailureDetail = "切换会话失败，gateway 连接已断开"
         ) {
             commandSender.selectThread(id)
         }
@@ -72,7 +74,8 @@ internal class GatewayRepositoryCommandActions(
     fun loadOlderMessages(): Boolean {
         return runConnectedAction(
             unavailableDetail = "未连接 gateway，无法加载历史",
-            beforeSend = { updateState(SessionRemoteState::startLoadingOlderMessages) }
+            beforeSend = { updateState(SessionRemoteState::startLoadingOlderMessages) },
+            sendFailureDetail = "加载历史失败，gateway 连接已断开"
         ) {
             commandSender.loadOlderMessages()
         }
@@ -126,14 +129,22 @@ internal class GatewayRepositoryCommandActions(
     private inline fun runConnectedAction(
         unavailableDetail: String,
         noinline beforeSend: (() -> Unit)? = null,
+        sendFailureDetail: String = unavailableDetail,
         send: () -> Boolean
     ): Boolean {
         if (readState().connectionStatus != ConnectionStatus.CONNECTED) {
             markActionUnavailable(unavailableDetail)
             return false
         }
+        val previous = readState()
         beforeSend?.invoke()
-        return send()
+        val sent = send()
+        if (!sent) {
+            updateState {
+                previous.withUnavailableAction(sendFailureDetail)
+            }
+        }
+        return sent
     }
 
     private fun markActionUnavailable(detail: String) {

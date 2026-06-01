@@ -70,6 +70,10 @@ internal fun SessionRemoteState.withConnectionDetail(detail: String): SessionRem
 internal fun SessionRemoteState.withUnavailableAction(detail: String): SessionRemoteState {
     return copy(
         connectionDetail = detail,
+        pendingThreadTitle = null,
+        isThreadSwitching = false,
+        isLoadingOlder = false,
+        isManualRefreshing = false,
         isGenerating = false
     )
 }

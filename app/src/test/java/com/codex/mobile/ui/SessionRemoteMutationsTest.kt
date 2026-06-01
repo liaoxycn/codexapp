@@ -4,6 +4,7 @@ import com.codex.mobile.data.startCreatingThread
 import com.codex.mobile.data.startSelectingThread
 import com.codex.mobile.data.withOptimisticPrompt
 import com.codex.mobile.data.withSendFailure
+import com.codex.mobile.data.withUnavailableAction
 import com.codex.mobile.model.ConnectionStatus
 import com.codex.mobile.model.MessageBlock
 import com.codex.mobile.model.MessageRole
@@ -86,6 +87,24 @@ class SessionRemoteMutationsTest {
         assertEquals(ConnectionStatus.ERROR, next.connectionStatus)
         assertEquals("发送失败", next.connectionDetail)
         assertFalse(next.isGenerating)
+    }
+
+    @Test
+    fun unavailableActionClearsTransientOperationFlags() {
+        val next = SessionRemoteState(
+            pendingThreadTitle = "新会话",
+            isThreadSwitching = true,
+            isLoadingOlder = true,
+            isManualRefreshing = true,
+            isGenerating = true
+        ).withUnavailableAction("连接断开")
+
+        assertNull(next.pendingThreadTitle)
+        assertFalse(next.isThreadSwitching)
+        assertFalse(next.isLoadingOlder)
+        assertFalse(next.isManualRefreshing)
+        assertFalse(next.isGenerating)
+        assertEquals("连接断开", next.connectionDetail)
     }
 
     private fun message(id: String, role: MessageRole): ThreadMessage {

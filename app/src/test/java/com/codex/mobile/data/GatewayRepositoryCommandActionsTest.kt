@@ -9,6 +9,7 @@ import com.codex.mobile.model.ThreadSummary
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -169,5 +170,44 @@ class GatewayRepositoryCommandActionsTest {
         assertEquals("发送失败，gateway 连接已断开", state.connectionDetail)
         assertEquals(1, state.messages.size)
         assertFalse(state.isGenerating)
+    }
+
+    @Test
+    fun createThreadClearsSwitchingStateWhenSendFails() {
+        var state = SessionRemoteState(
+            connectionStatus = ConnectionStatus.CONNECTED,
+            selectedThreadId = "thread-1"
+        )
+        val actions = GatewayRepositoryCommandActions(
+            commandSender = GatewayCommandSender(json) { false },
+            readState = { state },
+            updateState = { transform -> state = transform(state) },
+            logDebug = {}
+        )
+
+        val accepted = actions.createThread("D:/Projects/home/codexapp")
+
+        assertFalse(accepted)
+        assertEquals("thread-1", state.selectedThreadId)
+        assertNull(state.pendingThreadTitle)
+        assertFalse(state.isThreadSwitching)
+        assertEquals("新建会话失败，gateway 连接已断开", state.connectionDetail)
+    }
+
+    @Test
+    fun loadOlderMessagesClearsLoadingFlagWhenSendFails() {
+        var state = SessionRemoteState(connectionStatus = ConnectionStatus.CONNECTED)
+        val actions = GatewayRepositoryCommandActions(
+            commandSender = GatewayCommandSender(json) { false },
+            readState = { state },
+            updateState = { transform -> state = transform(state) },
+            logDebug = {}
+        )
+
+        val accepted = actions.loadOlderMessages()
+
+        assertFalse(accepted)
+        assertFalse(state.isLoadingOlder)
+        assertEquals("加载历史失败，gateway 连接已断开", state.connectionDetail)
     }
 }
