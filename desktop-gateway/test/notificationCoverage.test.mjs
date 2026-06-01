@@ -302,6 +302,60 @@ test("handleBridgeNotification surfaces hook run updates", async () => {
   );
 });
 
+test("handleBridgeNotification surfaces operational global notices", async () => {
+  const state = createState();
+  state.snapshot.selectedThreadId = "thread-1";
+  const context = createDeps(state);
+
+  await handleBridgeNotification(
+    {
+      method: "mcpServer/oauthLogin/completed",
+      params: { name: "github", success: false, error: "denied" },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "windowsSandbox/setupCompleted",
+      params: { mode: "unelevated", success: true, error: null },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "windows/worldWritableWarning",
+      params: { samplePaths: ["C:/tmp/a", "C:/tmp/b"], extraCount: 1, failedScan: false },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "account/login/completed",
+      params: { loginId: "login-1", success: true, error: null },
+    },
+    context.deps
+  );
+  await handleBridgeNotification(
+    {
+      method: "externalAgentConfig/import/completed",
+      params: {},
+    },
+    context.deps
+  );
+
+  assert.equal(context.emitCount, 5);
+  assert.deepEqual(
+    state.snapshot.messages.map((message) => message.blocks[0].value),
+    [
+      "MCP 授权 github: 失败\ndenied",
+      "Windows Sandbox unelevated: 已就绪",
+      "Windows 权限警告: 发现可被其他用户写入的路径 等 3 项\nC:/tmp/a\nC:/tmp/b",
+      "账号登录: 已完成",
+      "外部代理配置已导入",
+    ]
+  );
+});
+
 test("handleBridgeNotification refreshes catalog for thread lifecycle notifications", async () => {
   const state = createState();
   const context = createDeps(state);

@@ -30,6 +30,7 @@ import {
   handleTurnCompleted,
   handleTurnStarted,
   handleHookRunUpdated,
+  handleOperationalNotice,
 } from "./threadNotifications.js";
 
 export interface BridgeNotificationDeps {
@@ -138,6 +139,13 @@ export async function handleBridgeNotification(
     case "configWarning":
     case "deprecationNotice":
       handleGlobalNotice(notification, deps);
+      return;
+    case "mcpServer/oauthLogin/completed":
+    case "externalAgentConfig/import/completed":
+    case "windows/worldWritableWarning":
+    case "windowsSandbox/setupCompleted":
+    case "account/login/completed":
+      handleOperationalNotice(notification, deps);
       return;
     default:
       return;

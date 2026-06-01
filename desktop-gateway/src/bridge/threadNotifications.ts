@@ -421,6 +421,23 @@ export function handleGlobalNotice(
   deps.emitChanged();
 }
 
+export function handleOperationalNotice(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const state = resolveNoticeTargetState(deps);
+  if (!state) {
+    return;
+  }
+
+  const notice = formatOperationalNotice(notification);
+  if (!notice) {
+    return;
+  }
+  replaceOrAppendMessage(state, systemStatus(notice.text, notice.id));
+  deps.emitChanged();
+}
+
 function resolveNoticeTargetState(deps: BridgeNotificationDeps) {
   for (const state of deps.threads.values()) {
     const selectedThreadId = state.snapshot.selectedThreadId;
@@ -479,4 +496,58 @@ function formatHookEntries(entries: HookRunSummary["entries"]): string[] {
       return kind ? `${kind}: ${text}` : text;
     })
     .filter(Boolean);
+}
+
+function formatOperationalNotice(notification: JsonRpcNotification): { id: string; text: string } | null {
+  const params = notification.params as Record<string, unknown>;
+  switch (notification.method) {
+    case "mcpServer/oauthLogin/completed": {
+      const name = asString(params.name, "MCP");
+      const success = params.success === true;
+      const error = asString(params.error).trim();
+      return {
+        id: `mcp-oauth-${name}`,
+        text: `MCP 授权 ${name}: ${success ? "已完成" : "失败"}${error ? `\n${error}` : ""}`,
+      };
+    }
+    case "externalAgentConfig/import/completed":
+      return {
+        id: "external-agent-config-import",
+        text: "外部代理配置已导入",
+      };
+    case "windows/worldWritableWarning": {
+      const samplePaths = Array.isArray(params.samplePaths)
+        ? params.samplePaths.filter((entry): entry is string => typeof entry === "string")
+        : [];
+      const extraCount = Number.isFinite(params.extraCount) ? Number(params.extraCount) : 0;
+      const failedScan = params.failedScan === true;
+      const suffix = extraCount > 0 ? ` 等 ${extraCount + samplePaths.length} 项` : "";
+      return {
+        id: "windows-world-writable-warning",
+        text: [
+          `Windows 权限警告: ${failedScan ? "扫描未完成" : "发现可被其他用户写入的路径"}${suffix}`,
+          ...samplePaths.slice(0, 3),
+        ].filter(Boolean).join("\n"),
+      };
+    }
+    case "windowsSandbox/setupCompleted": {
+      const mode = asString(params.mode, "sandbox");
+      const success = params.success === true;
+      const error = asString(params.error).trim();
+      return {
+        id: "windows-sandbox-setup",
+        text: `Windows Sandbox ${mode}: ${success ? "已就绪" : "设置失败"}${error ? `\n${error}` : ""}`,
+      };
+    }
+    case "account/login/completed": {
+      const success = params.success === true;
+      const error = asString(params.error).trim();
+      return {
+        id: "account-login-completed",
+        text: `账号登录: ${success ? "已完成" : "失败"}${error ? `\n${error}` : ""}`,
+      };
+    }
+    default:
+      return null;
+  }
 }
