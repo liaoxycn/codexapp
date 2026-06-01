@@ -276,6 +276,7 @@ v1 不推荐保留：
 - 生成中补充输入：`turn/steer`
 - 停止生成：`turn/interrupt`
 - 注入结构化上下文：`thread/inject_items`
+- 文件 mention：Android 插入 `@{path}`，gateway 在 `turn/start` / `turn/steer` 中附加 app-server 原生 `mention` UserInput。
 - 执行 `!` 命令：Android 先发 `send_prompt`，gateway 识别后先触发移动端审批；批准后才调用 `thread/shellCommand`
 - 手动压缩：`thread/compact/start`
 - 编辑后重发：历史用户消息回填输入区，用户修改后仍走 `send_prompt` / 生成中 `turn/steer`

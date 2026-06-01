@@ -154,6 +154,7 @@ export interface GatewayBlockPayload {
 export interface GatewayChipPayload {
   label: string;
   icon: "file" | "context";
+  path?: string;
 }
 
 export interface ClientSnapshot {

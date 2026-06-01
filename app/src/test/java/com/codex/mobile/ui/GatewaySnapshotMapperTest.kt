@@ -53,7 +53,7 @@ class GatewaySnapshotMapperTest {
                     )
                 )
             ),
-            chips = listOf(GatewayChipPayload(label = "上下文", icon = "context")),
+            chips = listOf(GatewayChipPayload(label = "app/Main.kt", icon = "file", path = "D:/Projects/app/Main.kt")),
             slashCommands = listOf("/compact"),
             cwd = "D:/Projects/home/codexapp",
             permissionSummary = "workspace-write",
@@ -66,7 +66,8 @@ class GatewaySnapshotMapperTest {
         assertEquals(7L, next.snapshotRevision)
         assertEquals("thread-1", next.selectedThreadId)
         assertEquals("codexapp", next.threads.single().groupLabel)
-        assertEquals(ComposerChipIcon.CONTEXT, next.chips.single().icon)
+        assertEquals(ComposerChipIcon.FILE, next.chips.single().icon)
+        assertEquals("D:/Projects/app/Main.kt", next.chips.single().path)
         assertTrue(next.messages.first().blocks.first() is MessageBlock.Code)
         assertTrue(next.messages.first().blocks.last() is MessageBlock.FileChangeMeta)
     }

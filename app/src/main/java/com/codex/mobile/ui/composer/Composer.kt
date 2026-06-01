@@ -58,6 +58,7 @@ internal fun Composer(
             onFocusComposer = controller.focusComposer,
             onActivePanelChange = onActivePanelChange,
             onClearComposer = onClearComposer,
+            onInsertText = onInsertText,
             onResetInlineSlashPanel = controller.resetInlineSlashPanel,
             onSelectSlashCommand = controller.selectSlashCommand,
         )

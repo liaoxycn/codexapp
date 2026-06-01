@@ -23,6 +23,8 @@ import com.codex.mobile.model.ThreadGroupKind
 import com.codex.mobile.model.ThreadStatus
 import com.codex.mobile.model.ThreadSummary
 import com.codex.mobile.ui.drawer.DrawerContent
+import com.codex.mobile.ui.composer.Composer
+import com.codex.mobile.ui.composer.ComposerPanel
 import com.codex.mobile.ui.theme.CodexTheme
 import com.codex.mobile.ui.thread.ThreadScreen
 import org.junit.Assert.assertEquals
@@ -262,6 +264,46 @@ class ThreadScreenVisibilityTest {
         rule.onNodeWithTag("user_message_more_user-editable").performClick()
         rule.onNodeWithText("重发").performClick()
         assertEquals("please inspect build failure", resentText)
+    }
+
+    @Test
+    fun composerFileChipInsertsMentionPath() {
+        var insertedText: String? = null
+        rule.setContent {
+            CodexTheme {
+                Composer(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(
+                        showComposerDetails = true,
+                        chips = listOf(
+                            ComposerChip(
+                                label = "app/Main.kt",
+                                icon = ComposerChipIcon.FILE,
+                                path = "D:/Projects/app/Main.kt"
+                            )
+                        )
+                    ),
+                    compactMode = false,
+                    activePanel = ComposerPanel.NONE,
+                    onActivePanelChange = {},
+                    onToggleCompact = {},
+                    onToggleDetails = {},
+                    onChange = {},
+                    onInsertText = { insertedText = it },
+                    onApplySlashCommand = {},
+                    onClearComposer = {},
+                    onSend = {},
+                    onStop = {}
+                )
+            }
+        }
+
+        rule.onNodeWithContentDescription("app/Main.kt").performClick()
+
+        assertEquals("@{D:/Projects/app/Main.kt}", insertedText)
     }
 
     @Test

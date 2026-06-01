@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildUserInput,
   sendThreadShellCommand,
   startThreadCompaction,
   startTurn,
@@ -28,6 +29,29 @@ test("startTurn sends normalized text input payload and returns turn id", async 
   ]);
 });
 
+test("buildUserInput extracts unique file mentions from composer text", () => {
+  assert.deepEqual(
+    buildUserInput("check @{D:/Projects/app/src/Main.kt} and @{D:/Projects/app/src/Main.kt} then @{src/App.tsx}"),
+    [
+      {
+        type: "text",
+        text: "check @{D:/Projects/app/src/Main.kt} and @{D:/Projects/app/src/Main.kt} then @{src/App.tsx}",
+        text_elements: [],
+      },
+      {
+        type: "mention",
+        name: "Main.kt",
+        path: "D:/Projects/app/src/Main.kt",
+      },
+      {
+        type: "mention",
+        name: "App.tsx",
+        path: "src/App.tsx",
+      },
+    ]
+  );
+});
+
 test("steerTurn reuses normalized text input payload", async () => {
   const calls = [];
   const request = async (method, params) => {
@@ -48,6 +72,31 @@ test("steerTurn reuses normalized text input payload", async () => {
     },
   ]);
 });
+
+test("steerTurn forwards structured mention input", async () => {
+  const calls = [];
+  const request = async (method, params) => {
+    calls.push({ method, params });
+    return null;
+  };
+
+  await steerTurn(request, "thread-2", "turn-9", "inspect @{D:\\Projects\\app\\Main.kt}");
+
+  assert.deepEqual(calls, [
+    {
+      method: "turn/steer",
+      params: {
+        threadId: "thread-2",
+        expectedTurnId: "turn-9",
+        input: [
+          { type: "text", text: "inspect @{D:\\Projects\\app\\Main.kt}", text_elements: [] },
+          { type: "mention", name: "Main.kt", path: "D:\\Projects\\app\\Main.kt" },
+        ],
+      },
+    },
+  ]);
+});
+
 
 test("thread compaction and shell command RPCs forward exact params", async () => {
   const calls = [];

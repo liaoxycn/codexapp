@@ -171,7 +171,8 @@ internal fun List<GatewayChipPayload>.toComposerChips(): List<ComposerChip> {
     return map { chip ->
         ComposerChip(
             label = chip.label,
-            icon = if (chip.icon == "context") ComposerChipIcon.CONTEXT else ComposerChipIcon.FILE
+            icon = if (chip.icon == "context") ComposerChipIcon.CONTEXT else ComposerChipIcon.FILE,
+            path = chip.path
         )
     }
 }

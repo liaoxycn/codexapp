@@ -116,7 +116,7 @@ function buildChips(
     chips.push({ label: `reasoning:${resume.reasoningEffort}`, icon: "context" });
   }
   const fileChip = resume?.instructionSources?.[0] ?? thread.cwd;
-  chips.push({ label: shrinkPathLabel(fileChip), icon: "file" });
+  chips.push({ label: shrinkPathLabel(fileChip), icon: "file", path: fileChip });
   return chips.slice(0, 3);
 }
 

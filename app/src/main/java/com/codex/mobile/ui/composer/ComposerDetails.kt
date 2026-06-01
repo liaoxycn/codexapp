@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.Divider
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
@@ -35,6 +36,7 @@ internal fun ComposerDetailsSection(
     onFocusComposer: () -> Unit,
     onActivePanelChange: (ComposerPanel) -> Unit,
     onClearComposer: () -> Unit,
+    onInsertText: (String) -> Unit,
     onResetInlineSlashPanel: () -> Unit,
     onSelectSlashCommand: (String) -> Unit,
 ) {
@@ -64,6 +66,14 @@ internal fun ComposerDetailsSection(
                         onFocusComposer()
                     }
                 }
+                state.chips
+                    .filter { it.icon == com.codex.mobile.model.ComposerChipIcon.FILE }
+                    .forEach { chip ->
+                        MiniAction(chip.label, Icons.AutoMirrored.Filled.InsertDriveFile) {
+                            onInsertText("@{${chip.path ?: chip.label}}")
+                            onFocusComposer()
+                        }
+                    }
             }
             if (state.cwd.isNotBlank() || state.permissionSummary.isNotBlank()) {
                 Row(

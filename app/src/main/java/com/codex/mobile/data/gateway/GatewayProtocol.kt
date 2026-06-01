@@ -158,6 +158,7 @@ internal data class GatewayBlockPayload(
 @Serializable
 internal data class GatewayChipPayload(
     val label: String,
-    val icon: String
+    val icon: String,
+    val path: String? = null
 )
 
