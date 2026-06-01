@@ -42,6 +42,13 @@ internal class GatewayRepositoryCommandActions(
         }
     }
 
+    fun forkThread(id: String): Boolean {
+        if (id.isBlank()) return false
+        return runConnectedAction("未连接 gateway，无法分叉会话") {
+            commandSender.forkThread(id)
+        }
+    }
+
     fun archiveThread(id: String): Boolean {
         if (id.isBlank()) return false
         return runConnectedAction("未连接 gateway，无法归档会话") {

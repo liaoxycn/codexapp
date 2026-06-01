@@ -15,7 +15,7 @@ import {
 
 type ThreadCatalogClient = Pick<
   AppServerClient,
-  "threadArchive" | "threadSetName" | "threadStart" | "threadUnarchive"
+  "threadArchive" | "threadFork" | "threadSetName" | "threadStart" | "threadUnarchive"
 >;
 
 export interface ThreadCatalogActionDeps {
@@ -39,6 +39,7 @@ export interface ThreadCatalogActionDeps {
 export {
   archiveCatalogThread,
   createCatalogThread,
+  forkCatalogThread,
   renameCatalogThread,
   unarchiveCatalogThread,
 } from "./threadCatalogMutations.js";

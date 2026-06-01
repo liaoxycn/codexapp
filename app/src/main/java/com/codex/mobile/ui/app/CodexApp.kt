@@ -58,6 +58,7 @@ fun CodexApp(
                 onCreateThreadInProject = controller.createThreadInProject,
                 onRefreshThreads = viewModel::refreshThreads,
                 onSelectThread = controller.selectThread,
+                onForkThread = viewModel::forkThread,
                 onRenameThread = viewModel::renameThread,
                 onArchiveThread = viewModel::archiveThread,
                 onUnarchiveThread = viewModel::unarchiveThread,

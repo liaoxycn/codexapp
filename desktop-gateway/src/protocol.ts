@@ -2,6 +2,7 @@ export type GatewayIncomingMessage =
   | GatewayHelloMessage
   | GatewaySelectThreadMessage
   | GatewayCreateThreadMessage
+  | GatewayForkThreadMessage
   | GatewayRenameThreadMessage
   | GatewayArchiveThreadMessage
   | GatewayUnarchiveThreadMessage
@@ -28,6 +29,11 @@ export interface GatewaySelectThreadMessage {
 export interface GatewayCreateThreadMessage {
   type: "create_thread";
   cwd?: string;
+}
+
+export interface GatewayForkThreadMessage {
+  type: "fork_thread";
+  threadId: string;
 }
 
 export interface GatewayRenameThreadMessage {

@@ -63,6 +63,7 @@ class HomeRepositoryActionsTest {
 
         actions.selectThread("thread-1")
         actions.createThread("D:/Projects/Test")
+        actions.forkThread("thread-fork")
         actions.renameThread("thread-1", "Renamed")
         actions.archiveThread("thread-2")
         actions.unarchiveThread("thread-3")
@@ -74,6 +75,7 @@ class HomeRepositoryActionsTest {
 
         assertEquals(listOf("thread-1"), repository.selectCalls)
         assertEquals(listOf("D:/Projects/Test"), repository.createThreadCalls)
+        assertEquals(listOf("thread-fork"), repository.forkThreadCalls)
         assertEquals(listOf("thread-1" to "Renamed"), repository.renameThreadCalls)
         assertEquals(listOf("thread-2"), repository.archiveThreadCalls)
         assertEquals(listOf("thread-3"), repository.unarchiveThreadCalls)
@@ -90,6 +92,7 @@ class HomeRepositoryActionsTest {
         var disconnectCalls = 0
         val createThreadCalls = mutableListOf<String?>()
         val selectCalls = mutableListOf<String>()
+        val forkThreadCalls = mutableListOf<String>()
         val renameThreadCalls = mutableListOf<Pair<String, String>>()
         val archiveThreadCalls = mutableListOf<String>()
         val unarchiveThreadCalls = mutableListOf<String>()
@@ -115,6 +118,10 @@ class HomeRepositoryActionsTest {
 
         override suspend fun selectThread(id: String) {
             selectCalls += id
+        }
+
+        override suspend fun forkThread(id: String) {
+            forkThreadCalls += id
         }
 
         override suspend fun renameThread(id: String, name: String) {

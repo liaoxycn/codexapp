@@ -18,6 +18,10 @@ internal class HomeRepositoryActions(
         launch { repository.createThread(cwd) }
     }
 
+    fun forkThread(id: String) {
+        launch { repository.forkThread(id) }
+    }
+
     fun renameThread(id: String, name: String) {
         launch { repository.renameThread(id, name) }
     }

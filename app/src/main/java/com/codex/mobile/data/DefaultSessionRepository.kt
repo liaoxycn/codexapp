@@ -67,6 +67,10 @@ class DefaultSessionRepository(
         commandActions.selectThread(id)
     }
 
+    override suspend fun forkThread(id: String) {
+        commandActions.forkThread(id)
+    }
+
     override suspend fun renameThread(id: String, name: String) {
         commandActions.renameThread(id, name)
     }

@@ -11,6 +11,7 @@ interface SessionRepository {
     suspend fun disconnect()
     suspend fun createThread(cwd: String? = null)
     suspend fun selectThread(id: String)
+    suspend fun forkThread(id: String)
     suspend fun renameThread(id: String, name: String)
     suspend fun archiveThread(id: String)
     suspend fun unarchiveThread(id: String)

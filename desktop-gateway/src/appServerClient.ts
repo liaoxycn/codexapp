@@ -3,6 +3,8 @@ import type {
   AppServerThread,
   JsonRpcNotification,
   JsonRpcServerRequest,
+  ThreadForkResponse,
+  ThreadRollbackResponse,
   ThreadResumeResult,
   ThreadStartResponse,
 } from "./appServerTypes.js";
@@ -10,9 +12,11 @@ import { startAppServerSession } from "./appServerLifecycle.js";
 import { AppServerTransport } from "./appServerTransport.js";
 import {
   archiveThread,
+  forkThread,
   listThreads,
   readThread,
   resumeThread,
+  rollbackThread,
   setThreadName,
   startThread,
   unarchiveThread,
@@ -74,6 +78,14 @@ export class AppServerClient {
 
   async threadStart(cwd?: string | null): Promise<ThreadStartResponse> {
     return await startThread(this.request.bind(this), cwd);
+  }
+
+  async threadFork(threadId: string): Promise<ThreadForkResponse> {
+    return await forkThread(this.request.bind(this), threadId);
+  }
+
+  async threadRollback(threadId: string, numTurns: number): Promise<ThreadRollbackResponse> {
+    return await rollbackThread(this.request.bind(this), threadId, numTurns);
   }
 
   async threadSetName(threadId: string, name: string): Promise<void> {

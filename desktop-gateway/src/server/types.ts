@@ -30,6 +30,7 @@ export type Backend = {
   getDefaultThreadId(): string;
   getSnapshot(selectedThreadId?: string): ClientSnapshot;
   createThread(cwd?: string): ClientSnapshot | Promise<ClientSnapshot>;
+  forkThread(threadId: string): ClientSnapshot | Promise<ClientSnapshot>;
   selectThread(threadId: string): ClientSnapshot | Promise<ClientSnapshot>;
   renameThread(threadId: string, name: string): ClientSnapshot | Promise<ClientSnapshot>;
   archiveThread(threadId: string): ClientSnapshot | Promise<ClientSnapshot>;

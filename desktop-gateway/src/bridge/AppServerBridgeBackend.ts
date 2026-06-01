@@ -69,6 +69,10 @@ export class AppServerBridgeBackend {
     return this.controller.createThread(cwd);
   }
 
+  async forkThread(threadId: string): Promise<ClientSnapshot> {
+    return this.controller.forkThread(threadId);
+  }
+
   async renameThread(threadId: string, name: string): Promise<ClientSnapshot> {
     return this.controller.renameThread(threadId, name);
   }

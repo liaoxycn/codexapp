@@ -44,6 +44,34 @@ export async function createCatalogThread(
   return deps.getSnapshot(threadId);
 }
 
+export async function forkCatalogThread(
+  deps: ThreadCatalogActionDeps,
+  threadId: string
+): Promise<ClientSnapshot> {
+  const resolved = deps.resolveThreadId(threadId);
+  const forked = await deps.appServer.threadFork(resolved);
+  const forkedThreadId = forked.thread.id;
+
+  deps.setCurrentThreadId(forkedThreadId);
+  deps.incrementSelectionVersion();
+
+  const mergedSummaries = dedupeSummaries([
+    ...buildRuntimeSummaries(deps.threads),
+    mapThreadToSummary(forked.thread),
+  ]);
+
+  upsertThreadState({
+    threads: deps.threads,
+    thread: forked.thread,
+    summaries: mergedSummaries,
+    resume: forked,
+  });
+
+  deps.syncSelectedThread(forkedThreadId);
+  deps.emitChanged();
+  return deps.getSnapshot(forkedThreadId);
+}
+
 export async function renameCatalogThread(
   deps: ThreadCatalogActionDeps,
   threadId: string,

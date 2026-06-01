@@ -118,13 +118,15 @@ class GatewayRepositoryCommandActionsTest {
         )
 
         assertTrue(actions.renameThread("thread-1", "  Renamed  "))
-        assertTrue(actions.archiveThread("thread-2"))
-        assertTrue(actions.unarchiveThread("thread-3"))
+        assertTrue(actions.forkThread("thread-2"))
+        assertTrue(actions.archiveThread("thread-3"))
+        assertTrue(actions.unarchiveThread("thread-4"))
 
         assertTrue(sentMessages[0].contains("\"type\":\"rename_thread\""))
         assertTrue(sentMessages[0].contains("\"name\":\"Renamed\""))
-        assertTrue(sentMessages[1].contains("\"type\":\"archive_thread\""))
-        assertTrue(sentMessages[2].contains("\"type\":\"unarchive_thread\""))
+        assertTrue(sentMessages[1].contains("\"type\":\"fork_thread\""))
+        assertTrue(sentMessages[2].contains("\"type\":\"archive_thread\""))
+        assertTrue(sentMessages[3].contains("\"type\":\"unarchive_thread\""))
     }
 
     @Test

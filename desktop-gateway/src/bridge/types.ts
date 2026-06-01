@@ -20,7 +20,7 @@ export interface ThreadRuntimeState {
   currentTurnId: string | null;
   activeAssistantMessageId: string | null;
   liveAssistantItemId: string | null;
-  transientOperation: "compact" | "shell" | null;
+  transientOperation: "compact" | "rollback" | "shell" | null;
   pendingApproval: PendingApproval | null;
   stopRequested: boolean;
   isFinalizing: boolean;

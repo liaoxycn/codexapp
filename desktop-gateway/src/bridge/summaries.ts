@@ -31,7 +31,7 @@ export function mapThreadToSnapshot(
     hasMoreHistory: allMessages.length > INITIAL_HISTORY_WINDOW,
     pendingApproval: null,
     chips: buildChips(thread, resume),
-    slashCommands: ["/compact  压缩上下文", "/goal  设置目标", "! ls  运行 shell 命令"],
+    slashCommands: ["/compact  压缩上下文", "/rollback  回滚上轮", "/goal  设置目标", "! ls  运行 shell 命令"],
     cwd: thread.cwd,
     permissionSummary: buildPermissionSummary(resume?.approvalPolicy ?? null, resume?.sandbox ?? null),
     isGenerating: threadIsGenerating,

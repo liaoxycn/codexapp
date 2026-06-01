@@ -28,6 +28,10 @@ internal class GatewayCommandSender(
         )
     }
 
+    fun forkThread(threadId: String): Boolean {
+        return send(GatewayForkThreadMessage(threadId = threadId))
+    }
+
     fun renameThread(threadId: String, name: String): Boolean {
         return send(GatewayRenameThreadMessage(threadId = threadId, name = name))
     }
@@ -79,6 +83,10 @@ internal class GatewayCommandSender(
 
     private fun send(message: GatewaySelectThreadMessage): Boolean {
         return sendText(json.encodeToString(GatewaySelectThreadMessage.serializer(), message))
+    }
+
+    private fun send(message: GatewayForkThreadMessage): Boolean {
+        return sendText(json.encodeToString(GatewayForkThreadMessage.serializer(), message))
     }
 
     private fun send(message: GatewayRenameThreadMessage): Boolean {

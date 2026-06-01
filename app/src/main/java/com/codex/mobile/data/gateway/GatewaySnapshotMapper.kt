@@ -46,6 +46,7 @@ internal fun emptyRemoteState(
     chips = emptyList(),
     slashCommands = listOf(
         "/compact  压缩当前上下文",
+        "/rollback 回滚最近一轮",
         "/goal     设置当前会话目标",
         "! ls      执行 shell 命令"
     ),

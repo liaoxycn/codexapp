@@ -81,6 +81,29 @@ export class InMemoryDesktopBackend {
     return this.getSnapshot(id);
   }
 
+  forkThread(threadId: string): ClientSnapshot {
+    const source = this.ensureThread(threadId);
+    const id = randomUUID();
+    this.threads.set(id, {
+      ...source,
+      summary: {
+        ...source.summary,
+        id,
+        title: `${source.summary.title} 副本`,
+        status: "idle",
+        archived: false
+      },
+      messages: source.messages.map(cloneMessage),
+      chips: source.chips.map((chip) => ({ ...chip })),
+      pendingApproval: null,
+      slashCommands: [...source.slashCommands],
+      isGenerating: false,
+      pendingTimer: undefined
+    });
+    this.events.emit("changed");
+    return this.getSnapshot(id);
+  }
+
   selectThread(threadId: string): ClientSnapshot {
     return this.getSnapshot(threadId);
   }

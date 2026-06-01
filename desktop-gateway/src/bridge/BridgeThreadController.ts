@@ -38,6 +38,10 @@ export class BridgeThreadController {
     return this.catalog.createThread(cwd);
   }
 
+  async forkThread(threadId: string): Promise<ClientSnapshot> {
+    return this.catalog.forkThread(threadId);
+  }
+
   async renameThread(threadId: string, name: string): Promise<ClientSnapshot> {
     return this.catalog.renameThread(threadId, name);
   }

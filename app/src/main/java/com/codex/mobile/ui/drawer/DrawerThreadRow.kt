@@ -18,6 +18,7 @@ import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
@@ -53,6 +54,7 @@ internal fun ThreadRow(
     selected: Boolean,
     indentLevel: Int,
     onClick: () -> Unit,
+    onFork: () -> Unit,
     onRename: () -> Unit,
     onArchiveToggle: () -> Unit
 ) {
@@ -151,6 +153,21 @@ internal fun ThreadRow(
                 expanded = menuExpanded,
                 onDismissRequest = { menuExpanded = false }
             ) {
+                DropdownMenuItem(
+                    onClick = {
+                        menuExpanded = false
+                        onFork()
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.CallSplit,
+                        contentDescription = null,
+                        tint = CodexTheme.colors.textSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("分叉")
+                }
                 DropdownMenuItem(
                     onClick = {
                         menuExpanded = false

@@ -21,6 +21,8 @@ class HomeViewModel(
 
     fun createThread(cwd: String? = null) = delegate.createThread(cwd)
 
+    fun forkThread(id: String) = delegate.forkThread(id)
+
     fun renameThread(id: String, name: String) = delegate.renameThread(id, name)
 
     fun archiveThread(id: String) = delegate.archiveThread(id)

@@ -312,6 +312,55 @@ test("bridge backend merges assistant delta from notification stream", async () 
   );
 });
 
+test("bridge backend forks a thread and selects the fork", async () => {
+  const backend = new AppServerBridgeBackend();
+  const forkCalls = [];
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("source-thread", cwd),
+    threadFork: async (threadId) => {
+      forkCalls.push(threadId);
+      return startedThreadResponse("forked-thread", "D:/Projects/ForkProject", {
+        preview: "forked preview",
+      });
+    },
+  };
+
+  await backend.createThread("D:/Projects/ForkProject");
+  const snapshot = await backend.forkThread("source-thread");
+
+  assert.deepEqual(forkCalls, ["source-thread"]);
+  assert.equal(snapshot.selectedThreadId, "forked-thread");
+  assert.equal(snapshot.cwd, "D:/Projects/ForkProject");
+  assert.equal(snapshot.threads.some((item) => item.id === "forked-thread"), true);
+});
+
+test("bridge backend rolls back last turn from prompt command", async () => {
+  const backend = new AppServerBridgeBackend();
+  const rollbackCalls = [];
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("rollback-thread", cwd),
+    threadRead: async (threadId) => thread(threadId, { cwd: "D:/Projects/RollbackProject" }),
+    threadRollback: async (threadId, numTurns) => {
+      rollbackCalls.push([threadId, numTurns]);
+      return {
+        thread: thread(threadId, {
+          cwd: "D:/Projects/RollbackProject",
+          turns: [],
+        }),
+      };
+    },
+  };
+
+  await backend.createThread("D:/Projects/RollbackProject");
+  const snapshot = await backend.sendPrompt("rollback-thread", "/rollback");
+
+  assert.deepEqual(rollbackCalls, [["rollback-thread", 1]]);
+  assert.equal(snapshot.isGenerating, false);
+  assert.equal(snapshot.messages.some((message) =>
+    message.blocks.some((block) => block.kind === "status" && block.value === "已回滚最近 1 轮")
+  ), true);
+});
+
 test("bridge backend accumulates command output deltas from notification stream", async () => {
   const backend = new AppServerBridgeBackend();
   backend.appServer = {

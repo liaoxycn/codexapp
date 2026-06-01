@@ -1,6 +1,7 @@
 import type {
   GatewayArchiveThreadMessage,
   GatewayCreateThreadMessage,
+  GatewayForkThreadMessage,
   GatewayIncomingMessage,
   GatewayLoadOlderMessagesMessage,
   GatewayRefreshThreadsMessage,
@@ -19,6 +20,9 @@ export async function handleThreadClientMessage(
   switch (message.type) {
     case "create_thread":
       await handleCreateThread(context, message, handlers);
+      return true;
+    case "fork_thread":
+      await handleForkThread(context, message, handlers);
       return true;
     case "select_thread":
       await handleSelectThread(context, message, handlers);
@@ -41,6 +45,19 @@ export async function handleThreadClientMessage(
     default:
       return false;
   }
+}
+
+async function handleForkThread(
+  context: ClientContext,
+  message: GatewayForkThreadMessage,
+  handlers: ClientMessageHandlers
+): Promise<void> {
+  context.selectionVersion += 1;
+  await handlers.runBackendAction(context, async () => {
+    const snapshot = await handlers.backend().forkThread(message.threadId);
+    context.selectedThreadId = snapshot.selectedThreadId;
+    return snapshot;
+  });
 }
 
 async function handleCreateThread(

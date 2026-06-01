@@ -11,6 +11,7 @@ import { activateThreadSelection } from "./threadSelection.js";
 import {
   archiveCatalogThread,
   createCatalogThread,
+  forkCatalogThread,
   expandThreadHistoryWindow,
   refreshCatalogThreads,
   renameCatalogThread,
@@ -46,6 +47,10 @@ export class BridgeCatalogController {
 
   async createThread(cwd?: string): Promise<ClientSnapshot> {
     return createCatalogThread(this.threadCatalogActionDeps(), cwd);
+  }
+
+  async forkThread(threadId: string): Promise<ClientSnapshot> {
+    return forkCatalogThread(this.threadCatalogActionDeps(), threadId);
   }
 
   async renameThread(threadId: string, name: string): Promise<ClientSnapshot> {

@@ -29,6 +29,12 @@ internal data class GatewayCreateThreadMessage(
 )
 
 @Serializable
+internal data class GatewayForkThreadMessage(
+    val type: String = "fork_thread",
+    val threadId: String
+)
+
+@Serializable
 internal data class GatewayRenameThreadMessage(
     val type: String = "rename_thread",
     val threadId: String,

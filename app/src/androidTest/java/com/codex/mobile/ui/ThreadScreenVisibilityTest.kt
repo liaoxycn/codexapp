@@ -275,6 +275,7 @@ class ThreadScreenVisibilityTest {
                     onCreateThreadInProject = { createdCwd = it },
                     onRefreshThreads = {},
                     onSelectThread = {},
+                    onForkThread = {},
                     onRenameThread = { _, _ -> },
                     onArchiveThread = {},
                     onUnarchiveThread = {}
@@ -300,6 +301,7 @@ class ThreadScreenVisibilityTest {
                     onCreateThreadInProject = {},
                     onRefreshThreads = {},
                     onSelectThread = {},
+                    onForkThread = {},
                     onRenameThread = { id, name -> renameCall = id to name },
                     onArchiveThread = {},
                     onUnarchiveThread = {}
@@ -317,6 +319,31 @@ class ThreadScreenVisibilityTest {
     }
 
     @Test
+    fun drawerThreadMenuForksThread() {
+        var forkedThreadId: String? = null
+        rule.setContent {
+            CodexTheme {
+                DrawerContent(
+                    state = sampleDrawerState(),
+                    onCreateThread = {},
+                    onCreateThreadInProject = {},
+                    onRefreshThreads = {},
+                    onSelectThread = {},
+                    onForkThread = { forkedThreadId = it },
+                    onRenameThread = { _, _ -> },
+                    onArchiveThread = {},
+                    onUnarchiveThread = {}
+                )
+            }
+        }
+
+        rule.onNodeWithTag("thread_row_more_chat-1").performClick()
+        rule.onNodeWithText("分叉").performClick()
+
+        assertEquals("chat-1", forkedThreadId)
+    }
+
+    @Test
     fun drawerThreadMenuArchivesThread() {
         var archivedThreadId: String? = null
         rule.setContent {
@@ -327,6 +354,7 @@ class ThreadScreenVisibilityTest {
                     onCreateThreadInProject = {},
                     onRefreshThreads = {},
                     onSelectThread = {},
+                    onForkThread = {},
                     onRenameThread = { _, _ -> },
                     onArchiveThread = { archivedThreadId = it },
                     onUnarchiveThread = {}
@@ -360,6 +388,7 @@ class ThreadScreenVisibilityTest {
                     onCreateThreadInProject = {},
                     onRefreshThreads = {},
                     onSelectThread = {},
+                    onForkThread = {},
                     onRenameThread = { _, _ -> },
                     onArchiveThread = {},
                     onUnarchiveThread = { unarchivedThreadId = it }

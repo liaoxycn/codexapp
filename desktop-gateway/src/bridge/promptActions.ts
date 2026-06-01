@@ -6,6 +6,7 @@ import {
   hasTrailingSystemStatus,
   systemStatus,
 } from "./runtimeMessages.js";
+import { upsertThreadState } from "./runtimeState.js";
 import type {
   ThreadLifecycleStatus,
   ThreadRuntimeState,
@@ -13,7 +14,7 @@ import type {
 
 type PromptActionAppServer = Pick<
   AppServerClient,
-  "threadCompactStart" | "turnInterrupt" | "turnStart" | "turnSteer"
+  "threadCompactStart" | "threadRollback" | "turnInterrupt" | "turnStart" | "turnSteer"
 >;
 
 interface SharedPromptActionDeps {
@@ -71,6 +72,40 @@ export async function handlePromptSubmission({
       updateSummaryStatus(threadId, latest.pendingApproval ? "needs_approval" : "failed");
       emitChanged();
     });
+
+    emitChanged();
+    return getSnapshot(threadId);
+  }
+
+  if (trimmed === "/rollback") {
+    state.transientOperation = "rollback";
+    state.currentTurnId = null;
+    state.liveAssistantItemId = null;
+    state.activeAssistantMessageId = null;
+    state.snapshot.isGenerating = false;
+
+    try {
+      const rolledBack = await appServer.threadRollback(threadId, 1);
+      upsertThreadState({
+        threads,
+        thread: rolledBack.thread,
+        preserveLiveMessages: false,
+      });
+      const latest = threads.get(threadId);
+      if (latest && !hasTrailingSystemStatus(latest, "已回滚最近 1 轮")) {
+        latest.snapshot.messages = latest.snapshot.messages.concat(systemStatus("已回滚最近 1 轮"));
+      }
+      updateSummaryStatus(threadId, "idle");
+    } catch (error) {
+      const latest = threads.get(threadId) ?? state;
+      latest.snapshot.messages = latest.snapshot.messages.concat(
+        systemStatus(`回滚失败: ${error instanceof Error ? error.message : "unknown"}`)
+      );
+      updateSummaryStatus(threadId, "failed");
+    } finally {
+      const latest = threads.get(threadId) ?? state;
+      latest.transientOperation = null;
+    }
 
     emitChanged();
     return getSnapshot(threadId);

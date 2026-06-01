@@ -216,6 +216,12 @@ export interface ThreadResumeResult {
 
 export interface ThreadStartResponse extends ThreadResumeResult {}
 
+export interface ThreadForkResponse extends ThreadResumeResult {}
+
+export interface ThreadRollbackResponse {
+  thread: AppServerThread;
+}
+
 export interface TurnStartResult {
   turn: AppServerTurn;
 }

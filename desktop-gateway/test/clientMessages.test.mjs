@@ -54,6 +54,7 @@ function createBackend(overrides = {}) {
     getDefaultThreadId: () => "thread-default",
     getSnapshot: (selectedThreadId = "thread-1") => createSnapshot({ selectedThreadId }),
     createThread: async () => createSnapshot({ selectedThreadId: "thread-created" }),
+    forkThread: async () => createSnapshot({ selectedThreadId: "thread-forked" }),
     selectThread: async (threadId) => createSnapshot({ selectedThreadId: threadId }),
     renameThread: async (threadId) => createSnapshot({ selectedThreadId: threadId }),
     archiveThread: async () => createSnapshot({ selectedThreadId: "thread-next" }),
@@ -179,6 +180,27 @@ test("handleClientMessage routes refresh_threads to manual refresh", async () =>
   );
 
   assert.deepEqual(calls, ["manual"]);
+});
+
+test("handleClientMessage switches selected thread after fork_thread", async () => {
+  const context = createContext({ authenticated: true, selectedThreadId: "thread-1" });
+  const forkCalls = [];
+  const { handlers, backend, snapshots } = createHandlers({ backend: createBackend() });
+  backend.forkThread = async (threadId) => {
+    forkCalls.push(threadId);
+    return createSnapshot({ selectedThreadId: "thread-forked" });
+  };
+
+  await handleClientMessage(
+    context,
+    JSON.stringify({ type: "fork_thread", threadId: "thread-1" }),
+    handlers
+  );
+
+  assert.equal(context.selectionVersion, 1);
+  assert.equal(context.selectedThreadId, "thread-forked");
+  assert.deepEqual(forkCalls, ["thread-1"]);
+  assert.equal(snapshots.at(-1).selectedThreadId, "thread-forked");
 });
 
 test("handleClientMessage switches selected thread for send_prompt and pokes desktop", async () => {

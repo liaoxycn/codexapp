@@ -15,6 +15,7 @@ class FakeAppServer {
   private readonly requests = new EventEmitter();
   readonly shellCalls: Array<[string, string]> = [];
   readonly archivedThreadIds: string[] = [];
+  readonly rollbackCalls: Array<[string, number]> = [];
   private readonly threads = new Map<string, AppServerThread>();
   private readonly activeThreadIds = new Set<string>();
   private nextThreadNumber = 1;
@@ -65,6 +66,20 @@ class FakeAppServer {
     this.threads.set(id, thread);
     this.activeThreadIds.add(id);
     return this.threadResume(id);
+  }
+
+  async threadFork(threadId: string): Promise<ThreadResumeResult> {
+    const source = this.requireThread(threadId);
+    const id = `protocol-selftest-${this.nextThreadNumber++}`;
+    const thread = createThread(id, source.cwd);
+    this.threads.set(id, { ...thread, preview: `forked from ${threadId}` });
+    this.activeThreadIds.add(id);
+    return this.threadResume(id);
+  }
+
+  async threadRollback(threadId: string, numTurns: number): Promise<{ thread: AppServerThread }> {
+    this.rollbackCalls.push([threadId, numTurns]);
+    return { thread: this.requireThread(threadId) };
   }
 
   async threadSetName(threadId: string, name: string): Promise<void> {
@@ -170,6 +185,19 @@ async function main(): Promise<void> {
       message.blocks.some((block) => block.kind === "status" && block.value === "上下文已压缩")
     ).length,
     1
+  );
+
+  const forked = await backend.forkThread(threadId);
+  assert.notEqual(forked.selectedThreadId, threadId);
+  assert.match(forked.threads.find((thread) => thread.id === forked.selectedThreadId)?.preview ?? "", /forked from/);
+
+  await backend.sendPrompt(threadId, "/rollback");
+  assert.deepEqual(fake.rollbackCalls, [[threadId, 1]]);
+  assert.equal(
+    backend.getSnapshot(threadId).messages.some((message) =>
+      message.blocks.some((block) => block.kind === "status" && block.value === "已回滚最近 1 轮")
+    ),
+    true
   );
 
   await backend.archiveThread(threadId);

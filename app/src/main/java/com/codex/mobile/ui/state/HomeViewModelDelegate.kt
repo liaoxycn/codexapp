@@ -49,6 +49,10 @@ internal class HomeViewModelDelegate(
         repositoryActions.createThread(cwd)
     }
 
+    fun forkThread(id: String) {
+        repositoryActions.forkThread(id)
+    }
+
     fun renameThread(id: String, name: String) {
         repositoryActions.renameThread(id, name)
     }

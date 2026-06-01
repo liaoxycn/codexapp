@@ -2,6 +2,8 @@ import type {
   AppServerThread,
   ThreadListResult,
   ThreadReadResult,
+  ThreadForkResponse,
+  ThreadRollbackResponse,
   ThreadResumeResult,
   ThreadStartResponse,
 } from "./appServerTypes.js";
@@ -69,6 +71,27 @@ export async function startThread(
   return (await request("thread/start", {
     cwd: cwd ?? null,
   })) as ThreadStartResponse;
+}
+
+export async function forkThread(
+  request: RequestFn,
+  threadId: string
+): Promise<ThreadForkResponse> {
+  return (await request("thread/fork", {
+    threadId,
+    threadSource: "user",
+  })) as ThreadForkResponse;
+}
+
+export async function rollbackThread(
+  request: RequestFn,
+  threadId: string,
+  numTurns: number
+): Promise<ThreadRollbackResponse> {
+  return (await request("thread/rollback", {
+    threadId,
+    numTurns,
+  })) as ThreadRollbackResponse;
 }
 
 export async function setThreadName(

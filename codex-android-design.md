@@ -269,7 +269,7 @@ v1 不推荐保留：
 - 显示内存中活跃线程：`thread/loaded/list`
 - 读取线程详情：`thread/read`
 - 恢复线程：`thread/resume`
-- 分叉线程：`thread/fork`
+- 分叉线程：Android 抽屉会话更多菜单发送 `fork_thread`，gateway 调 `thread/fork` 并选中新线程。
 - 重命名：`thread/name/set`
 - 归档 / 取消归档：`thread/archive` / `thread/unarchive`
 
@@ -286,7 +286,7 @@ v1 不推荐保留：
 ### 10.3 历史
 - 默认读取线程：`thread/read`
 - 长历史分页：`thread/turns/list`（实验能力，单独灰度）
-- 回滚最近若干轮：`thread/rollback`
+- 回滚最近一轮：Android 输入 `/rollback`，gateway 调 `thread/rollback`（`numTurns=1`）；只回滚会话历史，不还原本地文件改动。
 
 ### 10.4 审批
 - 命令审批：服务端发 `item/commandExecution/requestApproval`，客户端回 `{ decision: ... }`

@@ -30,6 +30,7 @@ internal fun DrawerContent(
     onCreateThreadInProject: (String) -> Unit,
     onRefreshThreads: () -> Unit,
     onSelectThread: (String) -> Unit,
+    onForkThread: (String) -> Unit,
     onRenameThread: (String, String) -> Unit,
     onArchiveThread: (String) -> Unit,
     onUnarchiveThread: (String) -> Unit
@@ -77,6 +78,7 @@ internal fun DrawerContent(
             sections = sectionsState.sections,
             onCreateThreadInProject = onCreateThreadInProject,
             onSelectThread = onSelectThread,
+            onForkThread = onForkThread,
             onRenameThread = { renamingThread = it },
             onArchiveThread = onArchiveThread,
             onUnarchiveThread = onUnarchiveThread,

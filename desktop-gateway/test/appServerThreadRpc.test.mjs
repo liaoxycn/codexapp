@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   archiveThread,
+  forkThread,
   listThreads,
   readThread,
   resumeThread,
+  rollbackThread,
   setThreadName,
   startThread,
   unarchiveThread,
@@ -75,6 +77,8 @@ test("thread RPC helpers forward expected payloads", async () => {
   const read = await readThread(request, "thread-1", false);
   const resumed = await resumeThread(request, "thread-2", { excludeTurns: true });
   const started = await startThread(request, "D:/Projects/Test");
+  const forked = await forkThread(request, "thread-2");
+  const rolledBack = await rollbackThread(request, "thread-2", 1);
   await setThreadName(request, "thread-3", "Rename me");
   await archiveThread(request, "thread-4");
   await unarchiveThread(request, "thread-5");
@@ -83,10 +87,14 @@ test("thread RPC helpers forward expected payloads", async () => {
   assert.equal(read.id, "thread-1");
   assert.equal(resumed.threadId, "thread-2");
   assert.equal(started.threadId, "started-1");
+  assert.equal(forked, null);
+  assert.equal(rolledBack, null);
   assert.deepEqual(calls, [
     { method: "thread/read", params: { threadId: "thread-1", includeTurns: false } },
     { method: "thread/resume", params: { threadId: "thread-2", excludeTurns: true } },
     { method: "thread/start", params: { cwd: "D:/Projects/Test" } },
+    { method: "thread/fork", params: { threadId: "thread-2", threadSource: "user" } },
+    { method: "thread/rollback", params: { threadId: "thread-2", numTurns: 1 } },
     { method: "thread/name/set", params: { threadId: "thread-3", name: "Rename me" } },
     { method: "thread/archive", params: { threadId: "thread-4" } },
     { method: "thread/unarchive", params: { threadId: "thread-5" } },
