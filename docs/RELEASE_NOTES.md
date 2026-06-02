@@ -1,1 +1,1 @@
-修复 release workflow Android SDK 初始化\n- 处理 sdkmanager license 管道在 pipefail 下的 SIGPIPE 失败\n- 继续验证 Node 24 action 升级后的发布链路\n- 目标是消除 Node 20 deprecated 告警且恢复稳定发包
+继续收口 release workflow Node 20 告警\n- 删除 upload/download-artifact 中转\n- build job 直接发布 GitHub Release 并附带 codexapp.apk\n- 目标是消除最后残留的 actions/upload-artifact Node 20 deprecated 注解

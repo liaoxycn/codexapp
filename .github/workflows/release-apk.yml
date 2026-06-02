@@ -106,30 +106,10 @@ jobs:
             "$OUTPUT_APK"
           "$APKSIGNER" verify --verbose "$OUTPUT_APK"
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v5
-        with:
-          name: codexapp
-          path: app/build/outputs/apk/release/codexapp.apk
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs:
-      - build-apk
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v5
-        with:
-          path: release-assets
-
       - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v3
         with:
           body_path: docs/RELEASE_NOTES.md
           files: |
-            release-assets/codexapp/codexapp.apk
+            app/build/outputs/apk/release/codexapp.apk
