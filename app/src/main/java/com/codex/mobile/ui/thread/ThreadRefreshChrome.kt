@@ -46,11 +46,11 @@ internal fun PullRefreshHint(
             enter = fadeIn(),
             exit = fadeOut()
         ) {
-            val refreshLabel = when {
-                refreshing || generating -> "刷新会话中"
-                progress >= 1f -> "松开刷新"
-                else -> "继续上滑"
-            }
+            val refreshLabel = pullRefreshHintLabel(
+                refreshing = refreshing,
+                generating = generating,
+                progress = progress
+            )
             Text(
                 text = refreshLabel,
                 color = CodexTheme.colors.textSecondary,
@@ -65,6 +65,19 @@ internal fun PullRefreshHint(
                     .padding(horizontal = 10.dp, vertical = 6.dp)
             )
         }
+    }
+}
+
+internal fun pullRefreshHintLabel(
+    refreshing: Boolean,
+    generating: Boolean,
+    progress: Float
+): String {
+    return when {
+        refreshing -> "刷新会话中"
+        generating -> "会话运行中"
+        progress >= 1f -> "松开刷新"
+        else -> "继续上滑"
     }
 }
 
