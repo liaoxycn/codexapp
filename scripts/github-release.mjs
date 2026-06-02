@@ -18,26 +18,31 @@ async function main() {
   const branch = await currentBranch();
   const notes = await resolveNotes(options);
   const commitMessage = `Release ${tag}`;
+  const releaseState = await inspectReleaseState(tag, remote, pushRetries);
 
-  await ensureNoExistingTag(tag, remote, pushRetries);
+  if (!releaseState.hasLocalTag) {
+    await updateAndroidVersion(version, options.VersionCode);
+    await writeFile(path.join(root, "docs", "RELEASE_NOTES.md"), notes, "utf8");
 
-  await updateAndroidVersion(version, options.VersionCode);
-  await writeFile(path.join(root, "docs", "RELEASE_NOTES.md"), notes, "utf8");
-
-  await runChecked("git", ["add", "-A"], { cwd: root, displayName: "git add" });
-  await runChecked("git", ["commit", "-m", commitMessage], {
-    cwd: root,
-    displayName: "git commit",
-  });
+    await runChecked("git", ["add", "-A"], { cwd: root, displayName: "git add" });
+    await runChecked("git", ["commit", "-m", commitMessage], {
+      cwd: root,
+      displayName: "git commit",
+    });
+  } else {
+    console.log(`[github-release] local ${tag} already points at HEAD; resuming push only`);
+  }
   await runCheckedWithRetry("git", ["push", remote, branch], {
     cwd: root,
     displayName: "git push branch",
     attempts: pushRetries,
   });
-  await runChecked("git", ["tag", "-a", tag, "-m", commitMessage], {
-    cwd: root,
-    displayName: "git tag",
-  });
+  if (!releaseState.hasLocalTag) {
+    await runChecked("git", ["tag", "-a", tag, "-m", commitMessage], {
+      cwd: root,
+      displayName: "git tag",
+    });
+  }
   await runCheckedWithRetry("git", ["push", remote, tag], {
     cwd: root,
     displayName: "git push tag",
@@ -115,11 +120,7 @@ async function currentBranch() {
   return branch;
 }
 
-async function ensureNoExistingTag(tag, remote, attempts) {
-  const local = await runCapture("git", ["rev-parse", "-q", "--verify", `refs/tags/${tag}`], { cwd: root });
-  if (local.code === 0) {
-    throw new Error(`Local tag already exists: ${tag}`);
-  }
+async function inspectReleaseState(tag, remote, attempts) {
   const remoteTag = await runCaptureWithRetry("git", ["ls-remote", "--tags", remote, tag], {
     cwd: root,
     displayName: "git query remote tag",
@@ -128,6 +129,22 @@ async function ensureNoExistingTag(tag, remote, attempts) {
   if (remoteTag.stdout.trim()) {
     throw new Error(`Remote tag already exists: ${tag}`);
   }
+  const localTag = await runCapture("git", ["rev-parse", "-q", "--verify", `refs/tags/${tag}`], { cwd: root });
+  if (localTag.code !== 0) {
+    return { hasLocalTag: false };
+  }
+  const tagCommit = await runCapture("git", ["rev-list", "-n", "1", tag], { cwd: root });
+  if (tagCommit.code !== 0) {
+    throw new Error(tagCommit.stderr || `Failed to resolve local tag: ${tag}`);
+  }
+  const head = await runCapture("git", ["rev-parse", "HEAD"], { cwd: root });
+  if (head.code !== 0) {
+    throw new Error(head.stderr || "Failed to resolve HEAD");
+  }
+  if (tagCommit.stdout.trim() !== head.stdout.trim()) {
+    throw new Error(`Local tag ${tag} exists but does not point at HEAD`);
+  }
+  return { hasLocalTag: true };
 }
 
 async function runCaptureWithRetry(file, args, { attempts, displayName, cwd }) {
