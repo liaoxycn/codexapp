@@ -40,6 +40,7 @@ internal fun DrawerContent(
     onArchiveThread: (String) -> Unit,
     onRestartDesktop: () -> Unit,
     onDownloadUpdate: () -> Unit = {},
+    onOpenUpdateReleasePage: () -> Unit = {},
 ) {
     var renamingThread by remember { mutableStateOf<ThreadSummary?>(null) }
     var confirmingDesktopRestart by remember { mutableStateOf(false) }
@@ -108,6 +109,10 @@ internal fun DrawerContent(
             onDownloadUpdate = {
                 clearDrawerInput()
                 onDownloadUpdate()
+            },
+            onOpenUpdateReleasePage = {
+                clearDrawerInput()
+                onOpenUpdateReleasePage()
             },
         )
         Spacer(Modifier.height(10.dp))

@@ -59,6 +59,7 @@ internal fun DrawerHeader(
     onOpenConnection: () -> Unit,
     onRestartDesktop: () -> Unit,
     onDownloadUpdate: () -> Unit,
+    onOpenUpdateReleasePage: () -> Unit,
 ) {
     val shouldShowRestartPrompt = desktopRestartRequired && !hasRunningThread
     Column(
@@ -108,6 +109,7 @@ internal fun DrawerHeader(
             AppUpdatePrompt(
                 state = appUpdate,
                 onDownload = onDownloadUpdate,
+                onOpenReleasePage = onOpenUpdateReleasePage,
             )
             val diagnosticsNowMillis = rememberDiagnosticsClock(diagnostics)
             if (shouldShowDiagnostics(diagnostics, nowMillis = diagnosticsNowMillis)) {
@@ -233,6 +235,7 @@ private fun buildDiagnosticsText(diagnostics: StateDiagnostics): String {
 private fun AppUpdatePrompt(
     state: AppUpdateState,
     onDownload: () -> Unit,
+    onOpenReleasePage: () -> Unit,
 ) {
     when (state.status) {
         AppUpdateStatus.AVAILABLE -> UpdateNoticeRow(
@@ -245,16 +248,16 @@ private fun AppUpdatePrompt(
         AppUpdateStatus.DOWNLOAD_QUEUED -> UpdateNoticeRow(
             icon = Icons.Filled.Download,
             title = state.message.ifBlank { "已交给系统下载器" },
-            action = "看通知",
+            action = "等待安装",
             loading = false,
-            onClick = {}
+            onClick = null
         )
         AppUpdateStatus.RELEASE_PAGE_OPENED -> UpdateNoticeRow(
             icon = Icons.Filled.Download,
             title = state.message.ifBlank { "已打开 GitHub 发布页" },
-            action = "浏览器",
+            action = "已打开",
             loading = false,
-            onClick = {}
+            onClick = null
         )
         AppUpdateStatus.ERROR -> {
             if (state.latestVersion.isBlank() && state.downloadUrl.isBlank()) return
@@ -263,7 +266,7 @@ private fun AppUpdatePrompt(
                 title = state.message.ifBlank { "更新失败" },
                 action = "发布页",
                 loading = false,
-                onClick = {}
+                onClick = onOpenReleasePage
             )
         }
         else -> Unit
@@ -276,16 +279,17 @@ private fun UpdateNoticeRow(
     title: String,
     action: String,
     loading: Boolean,
-    onClick: () -> Unit
+    onClick: (() -> Unit)?
 ) {
     val warning = Color(0xFFD97706)
+    val actionable = !loading && onClick != null
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(Color(0xFFFFF7ED))
             .border(1.dp, Color(0xFFFED7AA), RoundedCornerShape(8.dp))
-            .clickable(enabled = !loading, onClick = onClick)
+            .clickable(enabled = actionable, onClick = { onClick?.invoke() })
             .padding(horizontal = 8.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -320,7 +324,7 @@ private fun UpdateNoticeRow(
         }
         Text(
             text = action,
-            color = warning,
+            color = if (actionable) warning else Color(0xFFB45309),
             fontSize = 11.sp,
             lineHeight = 14.sp,
             fontWeight = FontWeight.SemiBold,

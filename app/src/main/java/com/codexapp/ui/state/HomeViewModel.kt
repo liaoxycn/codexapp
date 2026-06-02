@@ -84,4 +84,6 @@ class HomeViewModel(
     fun checkAppUpdate() = delegate.checkAppUpdate()
 
     fun downloadAppUpdate() = delegate.downloadAppUpdate()
+
+    fun openAppUpdateReleasePage() = delegate.openAppUpdateReleasePage()
 }

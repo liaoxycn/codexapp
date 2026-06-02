@@ -29,6 +29,8 @@ import com.codexapp.model.GatewayConfig
 import com.codexapp.model.GatewayConfigOption
 import com.codexapp.model.GatewayConfigOptions
 import com.codexapp.model.HomeUiState
+import com.codexapp.model.AppUpdateState
+import com.codexapp.model.AppUpdateStatus
 import com.codexapp.model.MessageBlock
 import com.codexapp.model.MessageRole
 import com.codexapp.model.NewThreadDraft
@@ -1007,6 +1009,67 @@ class ThreadScreenVisibilityTest {
         rule.onNodeWithContentDescription("连接设置").performClick()
 
         assertEquals(1, openConnectionCalls)
+    }
+
+    @Test
+    fun appUpdateErrorRowOpensReleasePage() {
+        var openReleaseCalls = 0
+        rule.setContent {
+            CodexTheme {
+                DrawerContent(
+                    state = sampleDrawerState().copy(
+                        appUpdate = AppUpdateState(
+                            status = AppUpdateStatus.ERROR,
+                            latestVersion = "0.2.18",
+                            releasePageUrl = "https://github.com/liaoxycn/codexapp/releases/latest",
+                            message = "系统下载器不可用"
+                        )
+                    ),
+                    onCreateThread = {},
+                    onCreateThreadInProject = {},
+                    onOpenConnection = {},
+                    onRefreshThreads = {},
+                    onSelectThread = {},
+                    onRenameThread = { _, _ -> },
+                    onArchiveThread = {},
+                    onRestartDesktop = {},
+                    onOpenUpdateReleasePage = { openReleaseCalls += 1 }
+                )
+            }
+        }
+
+        rule.onNodeWithText("发布页").performClick()
+        assertEquals(1, openReleaseCalls)
+    }
+
+    @Test
+    fun appUpdateQueuedRowDoesNotExposeFakeAction() {
+        var openReleaseCalls = 0
+        rule.setContent {
+            CodexTheme {
+                DrawerContent(
+                    state = sampleDrawerState().copy(
+                        appUpdate = AppUpdateState(
+                            status = AppUpdateStatus.DOWNLOAD_QUEUED,
+                            latestVersion = "0.2.18",
+                            message = "已交给系统下载器"
+                        )
+                    ),
+                    onCreateThread = {},
+                    onCreateThreadInProject = {},
+                    onOpenConnection = {},
+                    onRefreshThreads = {},
+                    onSelectThread = {},
+                    onRenameThread = { _, _ -> },
+                    onArchiveThread = {},
+                    onRestartDesktop = {},
+                    onOpenUpdateReleasePage = { openReleaseCalls += 1 }
+                )
+            }
+        }
+
+        rule.onNodeWithText("等待安装").assertIsDisplayed()
+        assertEquals(0, openReleaseCalls)
     }
 
     @Test
