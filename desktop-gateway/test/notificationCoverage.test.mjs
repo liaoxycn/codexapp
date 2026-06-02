@@ -140,6 +140,7 @@ test("handleBridgeNotification surfaces streaming item notifications", async () 
   );
 
   assert.equal(context.emitCount, 6);
+  assert.deepEqual(context.statuses, Array(6).fill("running"));
   assert.deepEqual(
     state.snapshot.messages.map((message) => message.blocks.at(-1).value),
     ["思考摘要 1", "思考", "步骤", "+line", "MCP 进度: 连接中", "\nstdin> y\n"]
@@ -305,6 +306,7 @@ test("handleBridgeNotification surfaces hook run updates", async () => {
   );
 
   assert.equal(context.emitCount, 2);
+  assert.deepEqual(context.statuses, ["running", "running"]);
   assert.deepEqual(
     state.snapshot.messages.map((message) => message.blocks[0].value),
     ["Hook preToolUse command: 已完成\n允许执行\nfeedback: ok"]

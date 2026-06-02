@@ -511,3 +511,62 @@ test("active running lease keeps live overlay across same-timestamp idle refresh
     true
   );
 });
+
+test("active runtime ids keep live overlay across stale idle refresh", () => {
+  const idleThread = thread({
+    status: "idle",
+    turns: [
+      {
+        id: "turn-live",
+        status: "completed",
+        items: [
+          { type: "agentMessage", id: "item-live", text: "done" },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(
+    shouldRetainThreadRuntimeOverlay(idleThread, {
+      activeTurnIds: ["turn-live"],
+      runtimeStatus: "running",
+      transientOperation: null,
+      pendingApproval: null,
+    }),
+    true
+  );
+  assert.equal(
+    shouldRetainThreadRuntimeOverlay(idleThread, {
+      activeHookIds: ["hook-1"],
+      runtimeStatus: "running",
+      transientOperation: null,
+      pendingApproval: null,
+    }),
+    true
+  );
+});
+
+test("runtime running without active ids does not keep stale idle overlay", () => {
+  assert.equal(
+    shouldRetainThreadRuntimeOverlay(
+      thread({
+        status: "idle",
+        turns: [
+          {
+            id: "turn-done",
+            status: "completed",
+            items: [
+              { type: "agentMessage", id: "item-done", text: "done" },
+            ],
+          },
+        ],
+      }),
+      {
+        runtimeStatus: "running",
+        transientOperation: null,
+        pendingApproval: null,
+      }
+    ),
+    false
+  );
+});

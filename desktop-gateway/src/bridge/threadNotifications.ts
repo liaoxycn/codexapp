@@ -117,7 +117,7 @@ export function handleHookRunUpdated(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
 ): void {
-  const { threadId, run } = notification.params as {
+  const { threadId, turnId, run } = notification.params as {
     threadId: string;
     turnId?: string | null;
     run?: HookRunSummary | null;
@@ -128,7 +128,11 @@ export function handleHookRunUpdated(
   }
 
   if (notification.method === "hook/started") {
+    if (turnId) {
+      state.currentTurnId = turnId;
+    }
     markRuntimeHookStarted(state, run.id);
+    markRunningSignal(state);
   } else {
     markRuntimeHookFinished(state, run.id, run.status ?? undefined);
   }
@@ -140,6 +144,7 @@ export function handleHookRunUpdated(
     ...formatHookEntries(run.entries),
   ].filter(Boolean).join("\n");
   replaceOrAppendMessage(state, systemStatus(detail, `hook-run-${run.id}`));
+  deps.updateSummaryStatus(threadId, resolveRuntimeStatus(state));
   deps.emitChanged();
 }
 

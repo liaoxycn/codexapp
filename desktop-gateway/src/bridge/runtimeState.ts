@@ -74,8 +74,7 @@ export function upsertThreadState({
   const inferredIsGenerating = retainRuntimeOverlay
     ? Boolean(existing?.snapshot.isGenerating || activeTurnId != null || baseSnapshot.isGenerating || runningLeaseActive)
     : baseSnapshot.isGenerating;
-  const initialRuntimeStatus = existing?.runtimeStatus ?? resolvedSummaryStatus;
-  const runtimeStatus = existing ? resolveRuntimeStatus(existing) : initialRuntimeStatus;
+  const runtimeStatus = existing && retainRuntimeOverlay ? resolveRuntimeStatus(existing) : resolvedSummaryStatus;
   const isGenerating = runtimeStatus === "running";
 
   const nextSummary = existing

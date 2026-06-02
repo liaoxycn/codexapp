@@ -1,4 +1,5 @@
 import type { ThreadLifecycleStatus, ThreadRuntimeState } from "./types.js";
+import { hasRunningActivityLease } from "./runningLease.js";
 
 let nextRuntimeSeq = 1;
 
@@ -80,6 +81,9 @@ export function resolveRuntimeStatus(state: ThreadRuntimeState): ThreadLifecycle
     return "needs_approval";
   }
   if (state.activeTurnIds.length > 0 || state.activeHookIds.length > 0) {
+    return "running";
+  }
+  if (hasRunningActivityLease(state)) {
     return "running";
   }
   return state.runtimeStatus;

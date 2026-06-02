@@ -172,6 +172,9 @@ export function shouldRetainThreadRuntimeOverlay(
     isGenerating?: boolean;
     snapshot?: { isGenerating?: boolean } | null;
     currentTurnId?: string | null;
+    activeTurnIds?: string[];
+    activeHookIds?: string[];
+    runtimeStatus?: string | null;
     transientOperation?: string | null;
     pendingApproval?: { text?: string | null } | null;
     lastActivityAtMs?: number;
@@ -187,6 +190,13 @@ export function shouldRetainThreadRuntimeOverlay(
     (existingRuntime?.runningSignalUntilMs ?? 0) > nowMs ||
       (existingRuntime?.turnCompletionGraceUntilMs ?? 0) > nowMs
   );
+  const hasActiveRuntimeSignal = Boolean(
+    (existingRuntime?.activeTurnIds?.length ?? 0) > 0 ||
+      (existingRuntime?.activeHookIds?.length ?? 0) > 0
+  );
+  if (hasActiveRuntimeSignal) {
+    return true;
+  }
   const hasLiveOverlay = Boolean(
     existingRuntime?.isGenerating ||
       existingRuntime?.snapshot?.isGenerating ||

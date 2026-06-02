@@ -7,7 +7,7 @@ import {
   pruneCompletedArtifacts,
   rebaseSnapshotMessagesFromThread,
 } from "./runtimeSnapshotMessages.js";
-import { clearRunningLease, hasRunningLease } from "./runningLease.js";
+import { clearRunningLease, hasRunningActivityLease } from "./runningLease.js";
 import {
   markRuntimeIdle,
   resolveRuntimeStatus,
@@ -56,7 +56,11 @@ export async function finalizeTurnRuntimeState({
     const nextTurnStarted =
       completedTurnId != null && state.currentTurnId != null && state.currentTurnId !== completedTurnId;
     const keepRunning =
-      nextTurnStarted || (!shouldShowStopped && turnStatus !== "failed" && resolveRuntimeStatus(state) === "running" && hasRunningLease(state));
+      nextTurnStarted ||
+      (!shouldShowStopped &&
+        turnStatus !== "failed" &&
+        resolveRuntimeStatus(state) === "running" &&
+        hasRunningActivityLease(state));
     if (!nextTurnStarted) {
       state.currentTurnId = null;
       state.activeAssistantMessageId = null;

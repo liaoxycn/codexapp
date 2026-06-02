@@ -24,6 +24,10 @@ export function hasRunningLease(state: ThreadRuntimeState, nowMs = Date.now()): 
   return (state.runningSignalUntilMs ?? 0) > nowMs || (state.turnCompletionGraceUntilMs ?? 0) > nowMs;
 }
 
+export function hasRunningActivityLease(state: ThreadRuntimeState, nowMs = Date.now()): boolean {
+  return (state.runningSignalUntilMs ?? 0) > nowMs;
+}
+
 export function clearRunningLease(state: ThreadRuntimeState): void {
   state.runningSignalUntilMs = 0;
   state.turnCompletionGraceUntilMs = 0;

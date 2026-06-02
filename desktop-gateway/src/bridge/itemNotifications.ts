@@ -10,8 +10,8 @@ import {
   replaceOrAppendMessage,
 } from "./runtimeMessageStore.js";
 import { mergeThreadItem, replaceOrReuseLiveAssistantMessage } from "./runtimeMessages.js";
-import { markRunningSignal } from "./runningLease.js";
-import { markRuntimeTurnStarted, resolveRuntimeStatus } from "./runtimeStatusRegistry.js";
+import { clearRunningLease, markRunningSignal } from "./runningLease.js";
+import { markRuntimeTurnFinished, markRuntimeTurnStarted, resolveRuntimeStatus } from "./runtimeStatusRegistry.js";
 import { touchThreadActivity } from "./summaries.js";
 import type { BridgeNotificationDeps } from "./notifications.js";
 import { asString } from "./appServerValues.js";
@@ -32,9 +32,8 @@ export function handleAgentMessageDelta(
     return;
   }
 
-  markRuntimeActivity(state, turnId);
+  markRuntimeActivity(threadId, state, deps, turnId);
   appendAssistantDelta(state, itemId, delta);
-  deps.updateSummaryStatus(threadId, resolveRuntimeStatus(state));
   deps.emitChanged();
 }
 
@@ -53,7 +52,7 @@ export function handleReasoningSummaryDelta(
     return;
   }
 
-  markRuntimeActivity(state, turnId);
+  markRuntimeActivity(threadId, state, deps, turnId);
   appendOrMergeMessage(
     state,
     itemId,
@@ -79,7 +78,7 @@ export function handleReasoningSummaryPartAdded(
     return;
   }
 
-  markRuntimeActivity(state, turnId);
+  markRuntimeActivity(threadId, state, deps, turnId);
   appendOrMergeMessage(
     state,
     itemId,
@@ -105,7 +104,7 @@ export function handleReasoningTextDelta(
     return;
   }
 
-  markRuntimeActivity(state, turnId);
+  markRuntimeActivity(threadId, state, deps, turnId);
   appendOrMergeMessage(
     state,
     itemId,
@@ -131,7 +130,7 @@ export function handlePlanDelta(
     return;
   }
 
-  markRuntimeActivity(state, turnId);
+  markRuntimeActivity(threadId, state, deps, turnId);
   appendOrMergeMessage(
     state,
     itemId,
@@ -157,7 +156,7 @@ export function handleCommandExecutionOutputDelta(
     return;
   }
 
-  markRuntimeActivity(state, turnId);
+  markRuntimeActivity(threadId, state, deps, turnId);
   appendOrMergeCodeMessage(state, itemId, delta, "shell", "命令执行中");
   deps.emitChanged();
 }
@@ -178,7 +177,7 @@ export function handleTerminalInteraction(
     return;
   }
 
-  markRuntimeActivity(state, turnId);
+  markRuntimeActivity(threadId, state, deps, turnId);
   appendOrMergeCodeMessage(state, itemId, `\nstdin> ${stdin}`, "shell", "终端交互");
   deps.emitChanged();
 }
@@ -198,7 +197,7 @@ export function handleFileChangeOutputDelta(
     return;
   }
 
-  markRuntimeActivity(state, turnId);
+  markRuntimeActivity(threadId, state, deps, turnId);
   appendOrMergeCodeMessage(state, itemId, delta, "diff", "文件改动中");
   deps.emitChanged();
 }
@@ -218,6 +217,7 @@ export function handleFileChangePatchUpdated(
     return;
   }
 
+  markRuntimeActivity(threadId, state, deps, turnId);
   replaceOrAppendMessage(state, {
     id: itemId,
     role: "assistant",
@@ -241,7 +241,7 @@ export function handleMcpToolCallProgress(
     return;
   }
 
-  markRuntimeActivity(state, turnId);
+  markRuntimeActivity(threadId, state, deps, turnId);
   replaceOrAppendMessage(state, {
     id: itemId,
     role: "assistant",
@@ -279,7 +279,7 @@ export async function handleItemLifecycle(
     return;
   }
 
-  markRuntimeActivity(state, turnId);
+  markRuntimeActivity(threadId, state, deps, turnId);
   mergeThreadItem(state, item, true);
   deps.emitChanged();
 }
@@ -309,7 +309,7 @@ export function handleGuardianApprovalReview(
     risk ? `风险: ${formatRiskLevel(risk)}` : "",
     rationale,
   ].filter(Boolean);
-  markRuntimeActivity(state, turnId);
+  markRuntimeActivity(threadId, state, deps, turnId);
   replaceOrAppendMessage(state, {
     id: `auto-approval-review-${reviewId}`,
     role: "system",
@@ -330,8 +330,10 @@ export function handleRawResponseItemCompleted(
     return;
   }
 
+  markRuntimeActivity(threadId, state, deps, turnId);
   const message = mapRawResponseItem(turnId, params.item);
   if (!message) {
+    deps.emitChanged();
     return;
   }
   replaceOrReuseLiveAssistantMessage(state, message);
@@ -344,6 +346,7 @@ export function handleRealtimeNotification(
 ): void {
   const params = notification.params as Record<string, unknown>;
   const threadId = asString(params.threadId);
+  const realtimeTurnId = `realtime-${threadId}`;
   const state = deps.threads.get(threadId);
   if (!state) {
     return;
@@ -354,14 +357,14 @@ export function handleRealtimeNotification(
     if (!item) {
       return;
     }
-    markRuntimeActivity(state, `realtime-${threadId}`);
+    markRuntimeActivity(threadId, state, deps, realtimeTurnId);
     mergeThreadItem(state, item, true);
     deps.emitChanged();
     return;
   }
 
   if (notification.method === "thread/realtime/transcript/delta") {
-    markRuntimeActivity(state, `realtime-${threadId}`);
+    markRuntimeActivity(threadId, state, deps, realtimeTurnId);
     appendOrMergeMessage(
       state,
       `realtime-transcript-${asString(params.role, "assistant")}`,
@@ -375,7 +378,7 @@ export function handleRealtimeNotification(
 
   if (notification.method === "thread/realtime/transcript/done") {
     const role = params.role === "user" ? "user" : "assistant";
-    markRuntimeActivity(state, `realtime-${threadId}`);
+    markRuntimeActivity(threadId, state, deps, realtimeTurnId);
     replaceOrAppendMessage(state, {
       id: `realtime-transcript-${asString(params.role, "assistant")}`,
       role,
@@ -389,7 +392,23 @@ export function handleRealtimeNotification(
   if (!status) {
     return;
   }
-  markRuntimeActivity(state, `realtime-${threadId}`);
+  if (notification.method === "thread/realtime/closed") {
+    replaceOrAppendMessage(state, {
+      id: "thread-realtime-status",
+      role: "system",
+      blocks: [{ kind: "status", value: status }],
+    });
+    markRuntimeTurnFinished(state, realtimeTurnId, "completed");
+    if (state.currentTurnId === realtimeTurnId) {
+      state.currentTurnId = null;
+    }
+    clearRunningLease(state);
+    deps.updateSummaryStatus(threadId, resolveRuntimeStatus(state));
+    deps.emitChanged();
+    return;
+  }
+
+  markRuntimeActivity(threadId, state, deps, realtimeTurnId);
   replaceOrAppendMessage(state, {
     id: "thread-realtime-status",
     role: "system",
@@ -622,10 +641,16 @@ function formatRealtimeStatus(notification: JsonRpcNotification): string | null 
   }
 }
 
-function markRuntimeActivity(state: ThreadRuntimeState, turnId?: string | null): void {
+function markRuntimeActivity(
+  threadId: string,
+  state: ThreadRuntimeState,
+  deps: BridgeNotificationDeps,
+  turnId?: string | null
+): void {
   if (turnId) {
     state.currentTurnId = turnId;
     markRuntimeTurnStarted(state, turnId);
   }
   markRunningSignal(state);
+  deps.updateSummaryStatus(threadId, resolveRuntimeStatus(state));
 }
