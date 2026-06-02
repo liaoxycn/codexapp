@@ -31,6 +31,37 @@ test("parseArgs keeps normal single-value parsing strict", () => {
   assert.equal(parsed.OutputName, "CodexMobile.apk");
 });
 
+test("parseArgs supports consume-rest values passed with equals syntax", () => {
+  const parsed = withArgv(["-Notes=## 本次更新", "- 修复 A", "-Version", "0.2.13"], () =>
+    parseArgs(
+      {
+        Version: "",
+        Notes: "",
+      },
+      { consumeRestKeys: ["Notes"] }
+    )
+  );
+
+  assert.equal(parsed.Notes, "## 本次更新\n- 修复 A");
+  assert.equal(parsed.Version, "0.2.13");
+});
+
+test("parseArgs does not treat markdown bullets containing option names as options", () => {
+  const parsed = withArgv(["-Version", "0.2.13", "-Notes", "- 修复 -Notes 截断", "-VersionCode", "33"], () =>
+    parseArgs(
+      {
+        Version: "",
+        VersionCode: 0,
+        Notes: "",
+      },
+      { consumeRestKeys: ["Notes"] }
+    )
+  );
+
+  assert.equal(parsed.Notes, "- 修复 -Notes 截断");
+  assert.equal(parsed.VersionCode, 33);
+});
+
 function withArgv(args, callback) {
   const originalArgv = process.argv;
   process.argv = ["node", "script", ...args];

@@ -225,11 +225,11 @@ function normalizeKey(key) {
 }
 
 function isKnownOptionToken(value, keyMap) {
-  if (!String(value).startsWith("-")) {
+  const match = /^--?([A-Za-z][A-Za-z0-9_-]*)(=.*)?$/.exec(String(value));
+  if (!match) {
     return false;
   }
-  const withoutDash = String(value).replace(/^-+/, "");
-  const rawKey = withoutDash.includes("=") ? withoutDash.slice(0, withoutDash.indexOf("=")) : withoutDash;
+  const rawKey = match[1];
   return keyMap.has(normalizeKey(rawKey));
 }
 

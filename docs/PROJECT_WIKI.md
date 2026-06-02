@@ -182,7 +182,7 @@ codexapp/
 │  ├─ run-gateway-dev.mjs                gateway 开发模式启动辅助
 │  ├─ poke-desktop.mjs                   本地触发 `/poke`/Desktop 唤起逻辑的验证脚本
 │  ├─ pre-release-check.mjs              发布前一键检查，串联 Android/Gateway/协议自测，可选 dev-run
-│  ├─ github-release.mjs                 提交当前阶段改动、写版本/更新说明、推送 tag 触发 Actions；关键步骤写入 scripts/logs，push/tag 内部重试
+│  ├─ github-release.mjs                 提交当前阶段改动、写版本/更新说明、推送 tag 触发 Actions；关键步骤写入 scripts/logs，latest 摘要写入 scripts/logs/github-release-latest.json
 │  ├─ script-utils.test.mjs              脚本共享参数解析等工具的 Node 单测
 │  ├─ script-utils.mjs                   脚本共享工具
 │  └─ logs/                              脚本本地运行日志，默认不提交

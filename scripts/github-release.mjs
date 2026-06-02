@@ -12,20 +12,26 @@ const pushRetries = 3;
 
 async function main() {
   const logger = await createReleaseLogger().catch(() => createConsoleLogger());
+  const summary = createReleaseSummary(logger);
   try {
-    await runRelease(logger);
+    await runRelease(logger, summary);
   } catch (error) {
+    summary.status = "internal-error-recorded";
+    summary.error = error.stack || error.message;
     await logger.log(`ERROR ${error.stack || error.message}`);
     await logger.log("externalExitCode=0 reason=internal-error-recorded");
     console.error(`[github-release] internal error recorded; see ${logger.relativePath}`);
   } finally {
+    summary.finishedAt = new Date().toISOString();
+    summary.externalExitCode = 0;
+    await writeLatestSummary(summary, logger);
     await logger.log("externalExitCode=0");
     await logger.log("END");
     console.log(`[github-release] log: ${logger.relativePath}`);
   }
 }
 
-async function runRelease(logger) {
+async function runRelease(logger, summary) {
   await logger.log("START");
   const options = parseReleaseArgs();
   validateOptions(options);
@@ -34,10 +40,21 @@ async function runRelease(logger) {
   const branch = await currentBranch(logger);
   const notes = await resolveNotes(options);
   const commitMessage = `Release ${tag}`;
+  Object.assign(summary, {
+    status: "running",
+    version,
+    versionCode: options.VersionCode,
+    tag,
+    branch,
+    notesLength: notes.length,
+  });
   await logger.log(`release version=${version} versionCode=${options.VersionCode} tag=${tag} branch=${branch} notesLength=${notes.length}`);
   const releaseState = await inspectReleaseState(tag, remote, pushRetries, logger);
+  summary.releaseState = releaseState;
 
   if (releaseState.hasRemoteTag) {
+    summary.status = "already-triggered";
+    summary.githubActionsTrigger = "already-triggered";
     await logger.log(`remote tag already exists; treat release as already triggered tag=${tag}`);
     console.log(`[github-release] ${tag} already exists on ${remote}; nothing to trigger`);
     return;
@@ -78,6 +95,10 @@ async function runRelease(logger) {
     attempts: pushRetries,
     logger,
   });
+  summary.branchPushed = branchPushed;
+  summary.tagPushed = tagPushed;
+  summary.githubActionsTrigger = tagPushed ? "attempted" : "not-confirmed";
+  summary.status = tagPushed ? "triggered" : "push-failed-recorded";
 
   await logger.log(`push result branch=${branchPushed ? "ok" : "failed"} tag=${tagPushed ? "ok" : "failed"}`);
   await logger.log(`githubActionsTrigger=${tagPushed ? "attempted" : "not-confirmed"}`);
@@ -98,6 +119,24 @@ async function createReleaseLogger() {
       await appendFile(filePath, `[${new Date().toISOString()}] ${message}\n`, "utf8");
     },
   };
+}
+
+function createReleaseSummary(logger) {
+  return {
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    status: "starting",
+    logPath: logger.relativePath,
+    externalExitCode: 0,
+  };
+}
+
+async function writeLatestSummary(summary, logger) {
+  if (logger.relativePath === "console") {
+    return;
+  }
+  const summaryPath = path.join(root, "scripts", "logs", "github-release-latest.json");
+  await writeFile(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, "utf8");
 }
 
 function createConsoleLogger() {
