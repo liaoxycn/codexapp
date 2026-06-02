@@ -11,6 +11,7 @@ function createState(messages = []) {
   return {
     activeAssistantMessageId: null,
     liveAssistantItemId: null,
+    currentTurnStartedAtMs: null,
     snapshot: {
       messages,
     },
@@ -33,6 +34,15 @@ test("ensureActiveAssistantMessage inserts stable reasoning placeholder", () => 
   ]);
 });
 
+test("ensureActiveAssistantMessage attaches live turn duration", () => {
+  const state = createState();
+  state.currentTurnStartedAtMs = Date.now() - 5000;
+
+  ensureActiveAssistantMessage(state, "turn-1");
+
+  assert.equal(state.snapshot.messages[0]?.durationMs >= 1000, true);
+});
+
 test("appendAssistantDelta reuses live placeholder and keeps reasoning block", () => {
   const state = createState();
 
@@ -51,6 +61,17 @@ test("appendAssistantDelta reuses live placeholder and keeps reasoning block", (
       ],
     },
   ]);
+});
+
+test("appendAssistantDelta keeps live turn duration on reused message", () => {
+  const state = createState();
+  state.currentTurnStartedAtMs = Date.now() - 5000;
+
+  ensureActiveAssistantMessage(state, "turn-1");
+  appendAssistantDelta(state, "item-1", "hello");
+
+  assert.equal(state.snapshot.messages[0]?.id, "item-1");
+  assert.equal(state.snapshot.messages[0]?.durationMs >= 1000, true);
 });
 
 test("collapseLiveAssistantMessage keeps richer merged message when both ids exist", () => {

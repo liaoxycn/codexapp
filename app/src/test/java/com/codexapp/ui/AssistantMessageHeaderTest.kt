@@ -1,7 +1,7 @@
 package com.codexapp.ui
 
 import com.codexapp.ui.message.buildProcessHeaderTitle
-import com.codexapp.ui.message.buildAssistantFooterDuration
+import com.codexapp.ui.message.buildProcessedHeader
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -12,17 +12,17 @@ class AssistantMessageHeaderTest {
     }
 
     @Test
-    fun assistantFooterShowsDurationWhenPresent() {
-        assertEquals("1m 1s", buildAssistantFooterDuration(61_000L))
+    fun processedHeaderShowsDurationWhenPresent() {
+        assertEquals("已处理 1m 1s", buildProcessedHeader(61_000L))
     }
 
     @Test
-    fun assistantFooterShowsShortRunningDuration() {
-        assertEquals("5s", buildAssistantFooterDuration(5_000L))
+    fun processedHeaderShowsShortRunningDuration() {
+        assertEquals("已处理 5s", buildProcessedHeader(5_000L))
     }
 
     @Test
-    fun assistantFooterHidesDurationWhenMissing() {
-        assertEquals(null, buildAssistantFooterDuration(null))
+    fun processedHeaderHidesDurationWhenMissing() {
+        assertEquals(null, buildProcessedHeader(null))
     }
 }

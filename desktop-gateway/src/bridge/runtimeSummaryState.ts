@@ -82,6 +82,7 @@ export function markAllThreadsFailedState(
     }
 
     state.currentTurnId = null;
+    state.currentTurnStartedAtMs = null;
     state.activeAssistantMessageId = null;
     state.liveAssistantItemId = null;
     state.transientOperation = null;
@@ -113,6 +114,7 @@ export function createPlaceholderThreadRuntimeState(
     isLocalCatalogEntry: false,
     historyWindow: INITIAL_HISTORY_WINDOW,
     currentTurnId: null,
+    currentTurnStartedAtMs: null,
     activeAssistantMessageId: null,
     liveAssistantItemId: null,
     transientOperation: null,

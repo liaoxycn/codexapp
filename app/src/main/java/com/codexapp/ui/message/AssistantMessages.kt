@@ -3,6 +3,7 @@ package com.codexapp.ui.message
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,19 +59,17 @@ internal fun AssistantMessage(
 ) {
     var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
     var reasoningExpanded by rememberSaveable(message.id + ":reasoning") { mutableStateOf(false) }
-    var processExpanded by rememberSaveable(message.id + ":process") { mutableStateOf(false) }
-    val cards = remember(message.blocks) { deriveAssistantMessageCards(message.blocks) }
     val forkNumTurns = message.forkNumTurns
     val finalText = remember(message.blocks) { message.assistantFinalText() }
     val context = LocalContext.current
     val canCopy = showActions && enableFinalActions && message.isFinal && finalText.isNotBlank()
     val canFork = showActions && enableFinalActions && message.isFinal && forkNumTurns != null
-    val showFooterActions = showActions && (canCopy || canFork || message.durationMs != null)
-    val inlineProcessBlocks = remember(message.blocks, finalText) {
-        if (finalText.isBlank()) emptyList() else message.blocks.filter { it is MessageBlock.Reasoning || it is MessageBlock.Status }
+    val showFooterActions = showActions && (canCopy || canFork)
+    val inlineProcessBlocks = remember(message.blocks) {
+        message.blocks.filter { it.isAssistantProcessBlock() }
     }
-    val bodyBlocks = remember(message.blocks, finalText) {
-        if (finalText.isBlank()) message.blocks else message.blocks.filterNot { it is MessageBlock.Reasoning || it is MessageBlock.Status }
+    val bodyBlocks = remember(message.blocks) {
+        message.blocks.filterNot { it.isAssistantProcessBlock() }
     }
     val stableProcessMessages = remember(processMessages, inlineProcessBlocks, message.id) {
         if (inlineProcessBlocks.isEmpty()) {
@@ -81,7 +82,18 @@ internal fun AssistantMessage(
             )
         }
     }
-    val reservesProcessSlot = finalText.isNotBlank() || stableProcessMessages.isNotEmpty()
+    val processStartsExpanded = remember(stableProcessMessages) {
+        stableProcessMessages.any { processMessage ->
+            processMessage.blocks.any { it.isAssistantArtifactProcessBlock() }
+        }
+    }
+    var processExpanded by rememberSaveable(message.id + ":process") { mutableStateOf(processStartsExpanded) }
+    LaunchedEffect(processStartsExpanded) {
+        if (processStartsExpanded) {
+            processExpanded = true
+        }
+    }
+    val processedHeader = buildProcessedHeader(message.durationMs)
 
     Box(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -90,91 +102,67 @@ internal fun AssistantMessage(
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(if (compactMode) 3.dp else 5.dp)
         ) {
-            if (cards.hasFileChangeCard) {
-                FileChangeCard(
-                    messageId = message.id,
-                    summary = cards.fileChangeSummary ?: "文件改动",
-                    entries = cards.fileChangeEntries,
-                    compactMode = compactMode
-                )
-            }
+            AssistantProcessedHeader(processedHeader, compactMode)
 
-            if (cards.hasCommandCard) {
-                CommandExecutionCard(
-                    messageId = message.id,
-                    blockIndex = messageIndex,
-                    summary = cards.commandSummary ?: if (cards.commandOutput != null) "命令执行中" else "命令状态",
-                    metaLines = cards.commandMetaLines,
-                    outputLanguage = cards.commandOutput?.language ?: "shell",
-                    outputValue = cards.commandOutput?.value.orEmpty(),
-                    compactMode = compactMode
-                )
-            }
+            StableProcessSlot(
+                messages = stableProcessMessages,
+                expanded = processExpanded,
+                onToggle = { processExpanded = !processExpanded },
+                compactMode = compactMode
+            )
 
-            bodyBlocks.forEach { block ->
-                when (block) {
-                    is MessageBlock.Text -> ExpandableText(
-                        text = block.value,
-                        expanded = expanded,
-                        onToggle = { expanded = !expanded },
-                        textColor = CodexTheme.colors.textPrimary,
-                        fontSize = if (compactMode) 12.sp else 13.sp,
-                        lineHeight = if (compactMode) 17.sp else 19.sp,
-                        maxCollapsedLines = if (compactMode) 6 else 8,
-                        collapseEnabled = false
-                    )
+            StableAssistantBodySlot(
+                blocks = bodyBlocks,
+                expanded = expanded,
+                reasoningExpanded = reasoningExpanded,
+                onToggleExpanded = { expanded = !expanded },
+                onToggleReasoning = { reasoningExpanded = !reasoningExpanded },
+                compactMode = compactMode,
+                messageId = message.id,
+                messageIndex = messageIndex
+            )
 
-                    is MessageBlock.Code -> if (!block.language.equals("shell", ignoreCase = true)) {
-                        CodeBlock(
-                            messageId = message.id,
-                            blockIndex = messageIndex,
-                            language = block.language,
-                            value = block.value,
-                            compactMode = compactMode
-                        )
+            AssistantTurnFooterActions(
+                messageId = message.id,
+                canShowActions = showFooterActions,
+                canCopy = canCopy,
+                canFork = canFork,
+                compactMode = compactMode,
+                onCopyFinalText = { context.copyTextToClipboard("Codex 回复", finalText) },
+                onForkFromMessage = {
+                    if (forkNumTurns != null) {
+                        onForkFromMessage(forkNumTurns)
                     }
-
-                    is MessageBlock.Status -> InlineStatus(block.value, compactMode)
-                    is MessageBlock.Reasoning -> ReasoningBlock(
-                        text = block.value,
-                        expanded = reasoningExpanded,
-                        onToggle = { reasoningExpanded = !reasoningExpanded },
-                        compactMode = compactMode
-                    )
-
-                    is MessageBlock.CommandSummary,
-                    is MessageBlock.CommandMeta,
-                    is MessageBlock.FileChangeSummary,
-                    is MessageBlock.FileChangeMeta,
-                    is MessageBlock.FileChangeDiff -> Unit
                 }
-            }
-
-            if (reservesProcessSlot) {
-                StableProcessSlot(
-                    messages = stableProcessMessages,
-                    expanded = processExpanded,
-                    onToggle = { processExpanded = !processExpanded },
-                    compactMode = compactMode
-                )
-            }
-
-            if (showFooterActions) {
-                AssistantTurnFooterActions(
-                    messageId = message.id,
-                    durationMs = message.durationMs,
-                    canCopy = canCopy,
-                    canFork = canFork,
-                    compactMode = compactMode,
-                    onCopyFinalText = { context.copyTextToClipboard("Codex 回复", finalText) },
-                    onForkFromMessage = {
-                        if (forkNumTurns != null) {
-                            onForkFromMessage(forkNumTurns)
-                        }
-                    }
-                )
-            }
+            )
         }
+    }
+}
+
+@Composable
+private fun AssistantProcessedHeader(text: String?, compactMode: Boolean) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(if (compactMode) 22.dp else 26.dp)
+            .testTag("assistant_processed_header")
+    ) {
+        if (text != null) {
+            Text(
+                text = text,
+                color = CodexTheme.colors.textSecondary,
+                fontSize = if (compactMode) 11.sp else 12.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.align(Alignment.TopStart)
+            )
+        }
+        Spacer(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(CodexTheme.colors.border)
+        )
     }
 }
 
@@ -211,7 +199,9 @@ private fun TurnProcessBlock(
 ) {
     val count = messages.sumOf { it.blocks.size }.coerceAtLeast(messages.size)
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = processSlotMinHeight(compactMode)),
         verticalArrangement = Arrangement.spacedBy(if (compactMode) 3.dp else 5.dp)
     ) {
         Row(
@@ -258,9 +248,70 @@ private fun TurnProcessBlock(
 private fun processSlotMinHeight(compactMode: Boolean) = if (compactMode) 20.dp else 22.dp
 
 @Composable
+private fun StableAssistantBodySlot(
+    blocks: List<MessageBlock>,
+    expanded: Boolean,
+    reasoningExpanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    onToggleReasoning: () -> Unit,
+    compactMode: Boolean,
+    messageId: String,
+    messageIndex: Int
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = bodySlotMinHeight(compactMode))
+            .testTag("assistant_body_slot_$messageId"),
+        verticalArrangement = Arrangement.spacedBy(if (compactMode) 3.dp else 5.dp)
+    ) {
+        blocks.forEach { block ->
+            when (block) {
+                is MessageBlock.Text -> ExpandableText(
+                    text = block.value,
+                    expanded = expanded,
+                    onToggle = onToggleExpanded,
+                    textColor = CodexTheme.colors.textPrimary,
+                    fontSize = if (compactMode) 12.sp else 13.sp,
+                    lineHeight = if (compactMode) 17.sp else 19.sp,
+                    maxCollapsedLines = if (compactMode) 6 else 8,
+                    collapseEnabled = false
+                )
+
+                is MessageBlock.Code -> if (!block.language.equals("shell", ignoreCase = true)) {
+                    CodeBlock(
+                        messageId = messageId,
+                        blockIndex = messageIndex,
+                        language = block.language,
+                        value = block.value,
+                        compactMode = compactMode
+                    )
+                }
+
+                is MessageBlock.Status -> InlineStatus(block.value, compactMode)
+                is MessageBlock.Reasoning -> ReasoningBlock(
+                    text = block.value,
+                    expanded = reasoningExpanded,
+                    onToggle = onToggleReasoning,
+                    compactMode = compactMode
+                )
+
+                is MessageBlock.CommandSummary,
+                is MessageBlock.CommandMeta,
+                is MessageBlock.FileChangeSummary,
+                is MessageBlock.FileChangeMeta,
+                is MessageBlock.FileChangeDiff -> Unit
+            }
+        }
+    }
+}
+
+private fun bodySlotMinHeight(compactMode: Boolean) = if (compactMode) 17.dp else 19.dp
+
+@Composable
 private fun AssistantTurnFooterActions(
     messageId: String,
-    durationMs: Long?,
+    canShowActions: Boolean,
     canCopy: Boolean,
     canFork: Boolean,
     compactMode: Boolean,
@@ -270,12 +321,13 @@ private fun AssistantTurnFooterActions(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(if (compactMode) 25.dp else 28.dp)
             .padding(top = if (compactMode) 1.dp else 2.dp)
             .testTag("assistant_turn_footer_$messageId"),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (canCopy) {
+        if (canShowActions && canCopy) {
             IconButton(
                 onClick = onCopyFinalText,
                 modifier = Modifier
@@ -291,7 +343,7 @@ private fun AssistantTurnFooterActions(
                 )
             }
         }
-        if (canFork) {
+        if (canShowActions && canFork) {
             IconButton(
                 onClick = onForkFromMessage,
                 modifier = Modifier
@@ -307,14 +359,6 @@ private fun AssistantTurnFooterActions(
                 )
             }
         }
-        buildAssistantFooterDuration(durationMs)?.let { duration ->
-            Text(
-                text = duration,
-                color = CodexTheme.colors.textTertiary,
-                fontSize = if (compactMode) 11.sp else 12.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
     }
 }
 
@@ -322,9 +366,9 @@ internal fun buildProcessHeaderTitle(count: Int): String {
     return "已处理 $count 项"
 }
 
-internal fun buildAssistantFooterDuration(durationMs: Long?): String? {
+internal fun buildProcessedHeader(durationMs: Long?): String? {
     val duration = durationMs?.takeIf { it > 0L }?.let { formatDuration(it) }
-    return duration
+    return duration?.let { "已处理 $it" }
 }
 
 private fun formatDuration(durationMs: Long): String {
@@ -340,6 +384,34 @@ private fun formatDuration(durationMs: Long): String {
 
 private fun ThreadMessage.assistantFinalText(): String {
     return blocks.filterIsInstance<MessageBlock.Text>().joinToString("\n") { it.value }.trim()
+}
+
+private fun MessageBlock.isAssistantProcessBlock(): Boolean {
+    return when (this) {
+        is MessageBlock.Reasoning,
+        is MessageBlock.Status,
+        is MessageBlock.CommandSummary,
+        is MessageBlock.CommandMeta,
+        is MessageBlock.FileChangeSummary,
+        is MessageBlock.FileChangeMeta,
+        is MessageBlock.FileChangeDiff -> true
+        is MessageBlock.Code -> language.equals("shell", ignoreCase = true)
+        is MessageBlock.Text -> false
+    }
+}
+
+private fun MessageBlock.isAssistantArtifactProcessBlock(): Boolean {
+    return when (this) {
+        is MessageBlock.CommandSummary,
+        is MessageBlock.CommandMeta,
+        is MessageBlock.FileChangeSummary,
+        is MessageBlock.FileChangeMeta,
+        is MessageBlock.FileChangeDiff -> true
+        is MessageBlock.Code -> language.equals("shell", ignoreCase = true)
+        is MessageBlock.Reasoning,
+        is MessageBlock.Status,
+        is MessageBlock.Text -> false
+    }
 }
 
 private fun Context.copyTextToClipboard(label: String, text: String) {

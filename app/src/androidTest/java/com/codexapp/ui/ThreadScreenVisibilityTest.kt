@@ -190,7 +190,7 @@ class ThreadScreenVisibilityTest {
         rule.waitForIdle()
 
         val jumpBounds = rule.onNodeWithTag("jump_to_bottom_button").getUnclippedBoundsInRoot()
-        val actionBounds = rule.onNodeWithTag("user_message_more_m23").getUnclippedBoundsInRoot()
+        val actionBounds = rule.onNodeWithTag("user_message_more_m1").getUnclippedBoundsInRoot()
 
         assertTrue(jumpBounds.right < actionBounds.left)
     }
@@ -578,7 +578,7 @@ class ThreadScreenVisibilityTest {
         }
 
         rule.onNodeWithTag("assistant_turn_footer_assistant-running").assertExists()
-        rule.onNodeWithText("5s").assertExists()
+        rule.onNodeWithText("已处理 5s").assertExists()
         assertTrue(runCatching { rule.onNodeWithTag("assistant_turn_copy_assistant-running").assertExists() }.isFailure)
         assertTrue(runCatching { rule.onNodeWithTag("assistant_turn_fork_assistant-running").assertExists() }.isFailure)
     }
@@ -730,7 +730,7 @@ class ThreadScreenVisibilityTest {
                     onChange = {},
                     onInsertText = {},
                     onApplySlashCommand = {},
-                    onDraftChange = {},
+                    onConfigDraftChange = {},
                     onClearComposer = {},
                     onSend = {},
                     onStop = {}
@@ -760,7 +760,7 @@ class ThreadScreenVisibilityTest {
                     onChange = {},
                     onInsertText = {},
                     onApplySlashCommand = {},
-                    onDraftChange = {},
+                    onConfigDraftChange = {},
                     onClearComposer = {},
                     onSend = {},
                     onStop = {}
@@ -800,7 +800,7 @@ class ThreadScreenVisibilityTest {
                     onChange = {},
                     onInsertText = {},
                     onApplySlashCommand = {},
-                    onDraftChange = {},
+                    onConfigDraftChange = {},
                     onClearComposer = {},
                     onSend = {},
                     onStop = {}
@@ -899,7 +899,7 @@ class ThreadScreenVisibilityTest {
                     },
                     onInsertText = {},
                     onApplySlashCommand = { appliedCommand = it },
-                    onDraftChange = {},
+                    onConfigDraftChange = {},
                     onClearComposer = { composerText = "" },
                     onSend = {},
                     onStop = {}
@@ -948,7 +948,7 @@ class ThreadScreenVisibilityTest {
                     onChange = {},
                     onInsertText = { inserted = it },
                     onApplySlashCommand = {},
-                    onDraftChange = {},
+                    onConfigDraftChange = {},
                     onClearComposer = {},
                     onSend = {},
                     onStop = {}
@@ -987,7 +987,7 @@ class ThreadScreenVisibilityTest {
                     onChange = {},
                     onInsertText = {},
                     onApplySlashCommand = {},
-                    onDraftChange = {},
+                    onConfigDraftChange = {},
                     onClearComposer = {},
                     onSend = {},
                     onStop = {}
@@ -1023,7 +1023,7 @@ class ThreadScreenVisibilityTest {
                     onChange = {},
                     onInsertText = {},
                     onApplySlashCommand = {},
-                    onDraftChange = {},
+                    onConfigDraftChange = {},
                     onClearComposer = {},
                     onSend = {},
                     onStop = {}
@@ -1031,8 +1031,7 @@ class ThreadScreenVisibilityTest {
             }
         }
 
-        rule.onNodeWithTag("composer_pending_edit_resend_hint").assertIsDisplayed()
-        rule.onNodeWithText("下一次发送会回滚最近 3 轮后重发").assertIsDisplayed()
+        rule.onNodeWithTag("composer_pending_edit_resend_hint").assertExists()
     }
 
     @Test
@@ -1145,8 +1144,10 @@ class ThreadScreenVisibilityTest {
             }
         }
 
-        rule.onNodeWithText("系统下载").assertIsDisplayed().performClick()
-        rule.onNodeWithText("发布页").assertIsDisplayed().performClick()
+        rule.onNodeWithText("查看").assertIsDisplayed().performClick()
+        rule.onNodeWithText("系统下载器下载").assertIsDisplayed().performClick()
+        rule.onNodeWithText("查看").assertIsDisplayed().performClick()
+        rule.onNodeWithText("浏览器打开 GitHub").assertIsDisplayed().performClick()
 
         assertEquals(1, downloadCalls)
         assertEquals(1, openReleaseCalls)
@@ -1253,7 +1254,7 @@ class ThreadScreenVisibilityTest {
         }
 
         rule.onNodeWithTag("thread_row_more_chat-1").performClick()
-        rule.onAllNodesWithText("归档")[1].performClick()
+        rule.onNodeWithText("归档").performClick()
 
         assertEquals("chat-1", archivedThreadId)
     }

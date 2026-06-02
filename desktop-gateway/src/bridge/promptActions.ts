@@ -16,6 +16,7 @@ import {
   markRuntimeTurnStarted,
   resolveRuntimeStatus,
 } from "./runtimeStatusRegistry.js";
+import { clearCurrentTurnStarted, markCurrentTurnStarted } from "./runtimeTurnTiming.js";
 import type {
   ThreadLifecycleStatus,
   ThreadRuntimeState,
@@ -62,6 +63,7 @@ export async function handlePromptSubmission({
   if (trimmed === "/compact") {
     state.transientOperation = "compact";
     state.currentTurnId = null;
+    clearCurrentTurnStarted(state);
     state.liveAssistantItemId = null;
     state.activeAssistantMessageId = null;
     state.snapshot.isGenerating = false;
@@ -93,6 +95,7 @@ export async function handlePromptSubmission({
   if (trimmed === "/rollback") {
     state.transientOperation = "rollback";
     state.currentTurnId = null;
+    clearCurrentTurnStarted(state);
     state.liveAssistantItemId = null;
     state.activeAssistantMessageId = null;
     state.snapshot.isGenerating = false;
@@ -153,6 +156,7 @@ export async function handlePromptSubmission({
   applyRuntimeOptions(state, options);
   const turnId = await appServer.turnStart(threadId, text, options);
   state.currentTurnId = turnId;
+  markCurrentTurnStarted(state, null, Date.now(), true);
   state.snapshot.isGenerating = true;
   markRuntimeTurnStarted(state, turnId);
   markRunningSignal(state);
@@ -174,6 +178,7 @@ export async function rollbackThreadTurns({
   const rollbackCount = normalizeRollbackCount(numTurns);
   state.transientOperation = "rollback";
   state.currentTurnId = null;
+  clearCurrentTurnStarted(state);
   state.liveAssistantItemId = null;
   state.activeAssistantMessageId = null;
   state.pendingApproval = null;

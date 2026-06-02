@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { GatewayMessagePayload } from "../protocol.js";
 import { mergeMessageBlocks } from "./messageMerging.js";
 import type { ThreadRuntimeState } from "./types.js";
+import { withLiveAssistantDuration } from "./runtimeTurnTiming.js";
 
 export function systemStatus(text: string, id: string = randomUUID()): GatewayMessagePayload {
   return {
@@ -28,7 +29,7 @@ export function appendOrMergeCodeMessage(
 ): void {
   const existing = state.snapshot.messages.find((message) => message.id === itemId);
   if (!existing) {
-    state.snapshot.messages = state.snapshot.messages.concat({
+    replaceOrAppendMessage(state, {
       id: itemId,
       role: "assistant",
       blocks: [
@@ -57,7 +58,7 @@ export function appendOrMergeMessage(
 ): void {
   const existing = state.snapshot.messages.find((message) => message.id === itemId);
   if (!existing) {
-    state.snapshot.messages = state.snapshot.messages.concat({ id: itemId, role, blocks: [block] });
+    replaceOrAppendMessage(state, { id: itemId, role, blocks: [block] });
     return;
   }
 
@@ -70,12 +71,13 @@ export function appendOrMergeMessage(
 }
 
 export function replaceOrAppendMessage(state: ThreadRuntimeState, message: GatewayMessagePayload): void {
+  const nextMessage = withLiveAssistantDuration(state, message);
   const index = state.snapshot.messages.findIndex((entry) => entry.id === message.id);
   if (index < 0) {
-    state.snapshot.messages = state.snapshot.messages.concat(message);
+    state.snapshot.messages = state.snapshot.messages.concat(nextMessage);
     return;
   }
-  replaceMessageAt(state, index, message);
+  replaceMessageAt(state, index, nextMessage);
 }
 
 export function renameMessageId(state: ThreadRuntimeState, fromId: string, toId: string): void {
@@ -90,12 +92,12 @@ export function renameMessageId(state: ThreadRuntimeState, fromId: string, toId:
   const toIndex = state.snapshot.messages.findIndex((message) => message.id === toId);
   const fromMessage = state.snapshot.messages[fromIndex];
   if (toIndex >= 0) {
-    replaceMessageAt(state, toIndex, mergeMessageBlocks(state.snapshot.messages[toIndex], fromMessage));
+    replaceMessageAt(state, toIndex, withLiveAssistantDuration(state, mergeMessageBlocks(state.snapshot.messages[toIndex], fromMessage)));
     state.snapshot.messages = state.snapshot.messages.filter((message) => message.id !== fromId);
     return;
   }
 
-  replaceMessageAt(state, fromIndex, { ...fromMessage, id: toId });
+  replaceMessageAt(state, fromIndex, withLiveAssistantDuration(state, { ...fromMessage, id: toId }));
 }
 
 export function hasTrailingSystemStatus(state: ThreadRuntimeState, value: string): boolean {

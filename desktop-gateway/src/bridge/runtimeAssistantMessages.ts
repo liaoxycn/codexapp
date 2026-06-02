@@ -9,7 +9,7 @@ export function ensureActiveAssistantMessage(state: ThreadRuntimeState, turnId: 
   if (state.snapshot.messages.some((message) => message.id === id)) {
     return;
   }
-  state.snapshot.messages = state.snapshot.messages.concat({
+  replaceOrAppendMessage(state, {
     id,
     role: "assistant",
     blocks: [{ kind: "reasoning", value: "正在思考" }],

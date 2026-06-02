@@ -12,6 +12,7 @@ import {
   markRuntimeIdle,
   resolveRuntimeStatus,
 } from "./runtimeStatusRegistry.js";
+import { clearCurrentTurnStarted } from "./runtimeTurnTiming.js";
 import type {
   ThreadLifecycleStatus,
   ThreadRuntimeState,
@@ -63,6 +64,7 @@ export async function finalizeTurnRuntimeState({
         hasRunningActivityLease(state));
     if (!nextTurnStarted) {
       state.currentTurnId = null;
+      clearCurrentTurnStarted(state);
       state.activeAssistantMessageId = null;
       state.liveAssistantItemId = null;
       state.transientOperation = null;
@@ -119,6 +121,7 @@ export async function finalizeCompactRuntimeState({
     }
 
     state.currentTurnId = null;
+    clearCurrentTurnStarted(state);
     state.activeAssistantMessageId = null;
     state.liveAssistantItemId = null;
     state.snapshot.isGenerating = false;

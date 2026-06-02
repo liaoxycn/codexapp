@@ -12,6 +12,7 @@ import {
 import { mergeThreadItem, replaceOrReuseLiveAssistantMessage } from "./runtimeMessages.js";
 import { clearRunningLease, markRunningSignal } from "./runningLease.js";
 import { markRuntimeTurnFinished, markRuntimeTurnStarted, resolveRuntimeStatus } from "./runtimeStatusRegistry.js";
+import { clearCurrentTurnStarted, markCurrentTurnStarted } from "./runtimeTurnTiming.js";
 import { touchThreadActivity } from "./summaries.js";
 import type { BridgeNotificationDeps } from "./notifications.js";
 import { asString } from "./appServerValues.js";
@@ -401,6 +402,7 @@ export function handleRealtimeNotification(
     markRuntimeTurnFinished(state, realtimeTurnId, "completed");
     if (state.currentTurnId === realtimeTurnId) {
       state.currentTurnId = null;
+      clearCurrentTurnStarted(state);
     }
     clearRunningLease(state);
     deps.updateSummaryStatus(threadId, resolveRuntimeStatus(state));
@@ -648,7 +650,9 @@ function markRuntimeActivity(
   turnId?: string | null
 ): void {
   if (turnId) {
+    const turnChanged = state.currentTurnId !== turnId;
     state.currentTurnId = turnId;
+    markCurrentTurnStarted(state, null, Date.now(), turnChanged);
     markRuntimeTurnStarted(state, turnId);
   }
   markRunningSignal(state);

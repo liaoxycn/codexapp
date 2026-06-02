@@ -70,6 +70,9 @@ export function upsertThreadState({
   const currentTurnId = retainRuntimeOverlay
     ? existing?.currentTurnId ?? activeTurnId
     : null;
+  const currentTurnStartedAtMs = retainRuntimeOverlay
+    ? existing?.currentTurnStartedAtMs ?? null
+    : null;
   const runningLeaseActive = existing ? hasRunningLease(existing) : false;
   const inferredIsGenerating = retainRuntimeOverlay
     ? Boolean(existing?.snapshot.isGenerating || activeTurnId != null || baseSnapshot.isGenerating || runningLeaseActive)
@@ -92,6 +95,7 @@ export function upsertThreadState({
     lastActivityAtMs,
     historyWindow,
     currentTurnId,
+    currentTurnStartedAtMs,
     activeAssistantMessageId: retainRuntimeOverlay ? existing?.activeAssistantMessageId ?? null : null,
     liveAssistantItemId: retainRuntimeOverlay ? existing?.liveAssistantItemId ?? null : null,
     transientOperation: retainRuntimeOverlay ? existing?.transientOperation ?? null : null,

@@ -46,7 +46,8 @@ export interface ThreadRuntimeState {
   isLocalCatalogEntry: boolean;
   lastActivityAtMs: number;
   historyWindow: number;
-  currentTurnId: string | null;
+  currentTurnId: string | null;
+  currentTurnStartedAtMs: number | null;
   activeAssistantMessageId: string | null;
   liveAssistantItemId: string | null;
   transientOperation: "compact" | "rollback" | "shell" | null;

@@ -21,6 +21,7 @@ import {
   markRuntimeTurnStarted,
   resolveRuntimeStatus,
 } from "./runtimeStatusRegistry.js";
+import { clearCurrentTurnStarted, markCurrentTurnStarted } from "./runtimeTurnTiming.js";
 import { touchThreadActivity } from "./summaries.js";
 import type { BridgeNotificationDeps } from "./notifications.js";
 
@@ -74,6 +75,7 @@ export function handleTurnStarted(
   }
 
   state.currentTurnId = turn.id;
+  markCurrentTurnStarted(state, turn.startedAt, Date.now(), true);
   markRuntimeTurnStarted(state, turn.id);
   markRunningSignal(state);
   touchThreadActivity(state, turn.startedAt);
@@ -130,6 +132,7 @@ export function handleHookRunUpdated(
   if (notification.method === "hook/started") {
     if (turnId) {
       state.currentTurnId = turnId;
+      markCurrentTurnStarted(state, null, Date.now(), true);
     }
     markRuntimeHookStarted(state, run.id);
     markRunningSignal(state);
@@ -176,6 +179,7 @@ export function handleThreadCompacted(
   }
 
   state.currentTurnId = null;
+  clearCurrentTurnStarted(state);
   state.liveAssistantItemId = null;
   state.activeAssistantMessageId = null;
   state.snapshot.isGenerating = false;
@@ -208,6 +212,7 @@ export function handleThreadGoalUpdated(
   if (isActiveGoalStatus(status)) {
     if (turnId) {
       state.currentTurnId = turnId;
+      markCurrentTurnStarted(state, goal?.updatedAt ?? Date.now(), Date.now(), true);
     }
     state.snapshot.isGenerating = true;
     markRuntimeTurnStarted(state, turnId ?? `goal-${threadId}`);
@@ -392,9 +397,11 @@ export function handleErrorNotification(
   state.snapshot.isGenerating = Boolean(willRetry);
   if (willRetry) {
     markRuntimeTurnStarted(state, asString((notification.params as Record<string, unknown>).turnId, `retry-${threadId}`));
+    markCurrentTurnStarted(state, null, Date.now(), true);
     markRunningSignal(state);
   } else {
     markRuntimeFailed(state);
+    clearCurrentTurnStarted(state);
     clearRunningLease(state);
   }
   deps.updateSummaryStatus(threadId, resolveRuntimeStatus(state));
