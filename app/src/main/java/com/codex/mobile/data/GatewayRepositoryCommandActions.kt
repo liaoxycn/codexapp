@@ -113,7 +113,13 @@ internal class GatewayRepositoryCommandActions(
             updateState { it.withSendFailure("发送失败，gateway 连接已断开") }
             return false
         }
-        updateState { it.withOptimisticPrompt(prompt) }
+        updateState {
+            if (newThreadDraft != null) {
+                it.startCreatingThread().withOptimisticPrompt(prompt)
+            } else {
+                it.withOptimisticPrompt(prompt)
+            }
+        }
         return true
     }
 

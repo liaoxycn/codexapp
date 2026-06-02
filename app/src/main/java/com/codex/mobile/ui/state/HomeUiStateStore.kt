@@ -20,6 +20,7 @@ internal class HomeUiStateStore(
     private val showComposerDetails = MutableStateFlow(false)
     private val composerFocusRequest = MutableStateFlow(0L)
     private val isNewThreadDraft = MutableStateFlow(true)
+    private val draftSubmissionInFlight = MutableStateFlow(false)
     private val newThreadDraft = MutableStateFlow(NewThreadDraft())
     private val appUpdate = MutableStateFlow(AppUpdateState())
 
@@ -27,23 +28,44 @@ internal class HomeUiStateStore(
         val showComposerDetails: Boolean,
         val composerFocusRequest: Long,
         val isNewThreadDraft: Boolean,
+        val draftSubmissionInFlight: Boolean,
         val newThreadDraft: NewThreadDraft,
         val appUpdate: AppUpdateState
     )
 
+    private data class DraftLocalState(
+        val isNewThreadDraft: Boolean,
+        val draftSubmissionInFlight: Boolean,
+        val newThreadDraft: NewThreadDraft,
+        val appUpdate: AppUpdateState
+    )
+
+    private val draftLocalState = combine(
+        isNewThreadDraft,
+        draftSubmissionInFlight,
+        newThreadDraft,
+        appUpdate
+    ) { draftMode, submittingDraft, draft, update ->
+        DraftLocalState(
+            isNewThreadDraft = draftMode,
+            draftSubmissionInFlight = submittingDraft,
+            newThreadDraft = draft,
+            appUpdate = update
+        )
+    }
+
     private val localState = combine(
         showComposerDetails,
         composerFocusRequest,
-        isNewThreadDraft,
-        newThreadDraft,
-        appUpdate
-    ) { expanded, focusRequest, draftMode, draft, update ->
+        draftLocalState
+    ) { expanded, focusRequest, draftState ->
         HomeLocalState(
             showComposerDetails = expanded,
             composerFocusRequest = focusRequest,
-            isNewThreadDraft = draftMode,
-            newThreadDraft = draft,
-            appUpdate = update
+            isNewThreadDraft = draftState.isNewThreadDraft,
+            draftSubmissionInFlight = draftState.draftSubmissionInFlight,
+            newThreadDraft = draftState.newThreadDraft,
+            appUpdate = draftState.appUpdate
         )
     }
 
@@ -57,6 +79,7 @@ internal class HomeUiStateStore(
             composerExpanded = local.showComposerDetails,
             composerFocusRequest = local.composerFocusRequest,
             isNewThreadDraft = local.isNewThreadDraft,
+            draftSubmissionInFlight = local.draftSubmissionInFlight,
             newThreadDraft = local.newThreadDraft,
             appUpdate = local.appUpdate
         )
@@ -68,6 +91,7 @@ internal class HomeUiStateStore(
             composerExpanded = showComposerDetails.value,
             composerFocusRequest = composerFocusRequest.value,
             isNewThreadDraft = isNewThreadDraft.value,
+            draftSubmissionInFlight = draftSubmissionInFlight.value,
             newThreadDraft = newThreadDraft.value,
             appUpdate = appUpdate.value
         )
@@ -89,12 +113,24 @@ internal class HomeUiStateStore(
         newThreadDraft.update { draft ->
             draft.copy(cwd = cwd?.trim().orEmpty())
         }
+        draftSubmissionInFlight.value = false
         isNewThreadDraft.value = true
         requestComposerFocus()
     }
 
     fun exitNewThreadDraft() {
+        draftSubmissionInFlight.value = false
         isNewThreadDraft.value = false
+    }
+
+    fun markDraftSubmissionStarted() {
+        draftSubmissionInFlight.value = true
+    }
+
+    fun syncRemoteSelection(remote: SessionRemoteState) {
+        if (draftSubmissionInFlight.value && remote.selectedThreadId.isNotBlank()) {
+            exitNewThreadDraft()
+        }
     }
 
     fun updateNewThreadDraft(transform: (NewThreadDraft) -> NewThreadDraft) {

@@ -73,7 +73,6 @@ fun CodexApp(
                 },
                 onRestartDesktop = viewModel::restartDesktop,
                 onDownloadUpdate = viewModel::downloadAppUpdate,
-                onInstallUpdate = viewModel::installAppUpdate,
             )
         }
     ) {

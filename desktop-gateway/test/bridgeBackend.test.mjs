@@ -170,6 +170,67 @@ test("bridge backend passes requested project cwd to app-server thread start", a
   assert.equal(created.groupLabel, "Project B");
 });
 
+test("bridge backend starts default new thread without inheriting selected project cwd", async () => {
+  const backend = new AppServerBridgeBackend();
+  const calls = [];
+  backend.threads.set("selected-project-thread", {
+    summary: {
+      id: "selected-project-thread",
+      title: "Project",
+      preview: "Project",
+      status: "idle",
+      updatedAt: 100,
+      groupKind: "project",
+      groupLabel: "SelectedProject",
+      cwd: "D:/Projects/SelectedProject",
+      archived: false,
+    },
+    snapshot: {
+      threads: [],
+      selectedThreadId: "selected-project-thread",
+      messages: [],
+      hasMoreHistory: false,
+      pendingApproval: null,
+      chips: [],
+      files: [],
+      slashCommands: [],
+      cwd: "D:/Projects/SelectedProject",
+      permissionSummary: "",
+      sessionConfig: {},
+      configOptions: fakeConfigOptions(),
+      desktopRestartRequired: false,
+      operationalNotices: [],
+      isGenerating: false,
+    },
+    thread: thread("selected-project-thread", { cwd: "D:/Projects/SelectedProject" }),
+    historyWindow: 25,
+    isLocalCatalogEntry: false,
+    subscribed: false,
+    lastActivityAtMs: 100000,
+  });
+  backend.currentThreadId = "selected-project-thread";
+  backend.appServer = {
+    threadStart: async (cwd, options) => {
+      calls.push([cwd, options]);
+      return startedThreadResponse("new-chat-thread", cwd, {
+        preview: "new chat thread",
+      });
+    },
+  };
+
+  const snapshot = await backend.createThread();
+  const created = snapshot.threads.find((item) => item.id === "new-chat-thread");
+
+  assert.equal(calls.length, 1);
+  assert.match(calls[0][0].replaceAll("\\", "/"), /\/Documents\/Codex\/\d{4}-\d{2}-\d{2}\/new-chat$/);
+  assert.equal(calls[0][1].cwd, calls[0][0]);
+  assert.notEqual(calls[0][0], "D:/Projects/SelectedProject");
+  assert.match(snapshot.cwd.replaceAll("\\", "/"), /\/Documents\/Codex\/\d{4}-\d{2}-\d{2}\/new-chat$/);
+  assert.equal(created.cwd, calls[0][0]);
+  assert.equal(created.groupKind, "chat");
+  assert.equal(created.groupLabel, "普通会话");
+});
+
 test("bridge backend exposes selected thread session config from app-server", async () => {
   const backend = new AppServerBridgeBackend();
   backend.appServer = {

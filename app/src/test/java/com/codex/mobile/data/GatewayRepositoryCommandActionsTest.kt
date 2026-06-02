@@ -138,6 +138,40 @@ class GatewayRepositoryCommandActionsTest {
         assertFalse(sentMessages.single().contains("\"threadId\":\"thread-1\""))
         assertTrue(sentMessages.single().contains("\"cwd\":\"D:/Projects/App\""))
         assertEquals(2, state.messages.size)
+        assertEquals("", state.selectedThreadId)
+        assertEquals("新会话", state.pendingThreadTitle)
+        assertTrue(state.isThreadSwitching)
+        assertTrue(state.isGenerating)
+    }
+
+    @Test
+    fun sendPromptForDefaultNewDraftDoesNotSendProjectCwd() {
+        var state = SessionRemoteState(
+            connectionStatus = ConnectionStatus.CONNECTED,
+            selectedThreadId = "thread-project",
+            cwd = "D:/Projects/SelectedProject",
+            gatewayConfig = GatewayConfig(url = "ws://10.0.2.2:8765/mobile")
+        )
+        val sentMessages = mutableListOf<String>()
+        val actions = GatewayRepositoryCommandActions(
+            commandSender = GatewayCommandSender(json) { payload ->
+                sentMessages += payload
+                true
+            },
+            readState = { state },
+            updateState = { transform -> state = transform(state) },
+            logDebug = {}
+        )
+
+        val accepted = actions.sendPrompt(
+            "hello ordinary chat",
+            NewThreadDraft(model = "gpt-5", reasoningEffort = "high")
+        )
+
+        assertTrue(accepted)
+        assertTrue(sentMessages.single().contains("\"newThread\":true"))
+        assertFalse(sentMessages.single().contains("\"threadId\":\"thread-project\""))
+        assertFalse(sentMessages.single().contains("\"cwd\""))
     }
 
     @Test

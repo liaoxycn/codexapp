@@ -1,17 +1,14 @@
 package com.codex.mobile.update
 
-import android.Manifest
-import android.content.ActivityNotFoundException
+import android.app.DownloadManager
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.provider.Settings
-import androidx.core.content.FileProvider
+import android.os.Environment
 import com.codex.mobile.model.AppUpdateState
 import com.codex.mobile.model.AppUpdateStatus
-import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -25,6 +22,8 @@ internal class AppUpdateManager(
     private val client: OkHttpClient = OkHttpClient(),
     private val json: Json = Json { ignoreUnknownKeys = true }
 ) {
+    fun consumeStartupCheck(): Boolean = AppUpdateStartupGate.consume()
+
     suspend fun checkLatest(): AppUpdateState = withContext(Dispatchers.IO) {
         val localVersion = context.localVersionName()
         runCatching {
@@ -83,88 +82,30 @@ internal class AppUpdateManager(
         }
     }
 
-    suspend fun download(
-        available: AppUpdateState,
-        onProgress: (AppUpdateState) -> Unit
-    ): AppUpdateState = withContext(Dispatchers.IO) {
+    fun enqueueSystemDownload(available: AppUpdateState): AppUpdateState {
         if (available.downloadUrl.isBlank()) {
-            return@withContext available.copy(status = AppUpdateStatus.ERROR, message = "下载地址为空")
+            return available.copy(status = AppUpdateStatus.ERROR, message = "下载地址为空")
         }
-        val started = available.copy(status = AppUpdateStatus.DOWNLOADING, downloadedBytes = 0L)
-        onProgress(started)
-        runCatching {
-            val request = Request.Builder().url(available.downloadUrl).build()
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    return@withContext available.copy(
-                        status = AppUpdateStatus.ERROR,
-                        message = "下载失败：HTTP ${response.code}"
-                    )
-                }
-                val body = response.body ?: return@withContext available.copy(
-                    status = AppUpdateStatus.ERROR,
-                    message = "下载内容为空"
-                )
-                val total = body.contentLength().takeIf { it > 0L } ?: available.totalBytes
-                val apkFile = File(context.getExternalFilesDir("updates") ?: context.cacheDir, safeApkName(available))
-                apkFile.parentFile?.mkdirs()
-                body.byteStream().use { input ->
-                    apkFile.outputStream().use { output ->
-                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                        var downloaded = 0L
-                        while (true) {
-                            val read = input.read(buffer)
-                            if (read == -1) break
-                            output.write(buffer, 0, read)
-                            downloaded += read
-                            onProgress(
-                                available.copy(
-                                    status = AppUpdateStatus.DOWNLOADING,
-                                    downloadedBytes = downloaded,
-                                    totalBytes = total
-                                )
-                            )
-                        }
-                    }
-                }
-                available.copy(
-                    status = AppUpdateStatus.READY_TO_INSTALL,
-                    downloadedApkPath = apkFile.absolutePath,
-                    downloadedBytes = apkFile.length(),
-                    totalBytes = total
-                )
-            }
-        }.getOrElse { error ->
-            available.copy(status = AppUpdateStatus.ERROR, message = error.message ?: "下载失败")
-        }
-    }
-
-    fun install(state: AppUpdateState): AppUpdateState {
-        val apkFile = File(state.downloadedApkPath)
-        if (!apkFile.exists()) {
-            return state.copy(status = AppUpdateStatus.ERROR, message = "APK 文件不存在")
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
-            val intent = Intent(
-                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                Uri.parse("package:${context.packageName}")
-            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
-            return state.copy(
-                status = AppUpdateStatus.INSTALL_PERMISSION_REQUIRED,
-                message = "请允许安装未知应用后再次点击安装"
+        val manager = context.getSystemService(DownloadManager::class.java)
+            ?: return available.copy(status = AppUpdateStatus.ERROR, message = "系统下载器不可用")
+        return runCatching {
+            val safeName = safeApkName(available)
+            val request = DownloadManager.Request(Uri.parse(available.downloadUrl))
+                .setTitle("Codex Mobile ${available.latestVersion}")
+                .setDescription(safeName)
+                .setMimeType(APK_MIME_TYPE)
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, safeName)
+                .setAllowedOverMetered(true)
+                .setAllowedOverRoaming(true)
+            val id = manager.enqueue(request)
+            available.copy(
+                status = AppUpdateStatus.DOWNLOAD_QUEUED,
+                downloadId = id,
+                message = "已交给系统下载器"
             )
-        }
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apkFile)
-        val intent = Intent(Intent.ACTION_VIEW)
-            .setDataAndType(uri, APK_MIME_TYPE)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        return try {
-            context.startActivity(intent)
-            state
-        } catch (error: ActivityNotFoundException) {
-            state.copy(status = AppUpdateStatus.ERROR, message = "未找到系统安装器")
+        }.getOrElse { error ->
+            available.copy(status = AppUpdateStatus.ERROR, message = error.message ?: "启动系统下载失败")
         }
     }
 
@@ -176,6 +117,16 @@ internal class AppUpdateManager(
     private companion object {
         const val LATEST_RELEASE_URL = "https://api.github.com/repos/liaoxycn/CodexMobileApp/releases/latest"
         const val APK_MIME_TYPE = "application/vnd.android.package-archive"
+    }
+}
+
+internal object AppUpdateStartupGate {
+    private val pending = AtomicBoolean(true)
+
+    fun consume(): Boolean = pending.compareAndSet(true, false)
+
+    fun resetForTest() {
+        pending.set(true)
     }
 }
 

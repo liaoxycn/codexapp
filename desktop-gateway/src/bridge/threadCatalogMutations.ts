@@ -1,4 +1,6 @@
-import process from "node:process";
+import { mkdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import {
   buildRuntimeSummaries,
 } from "./runtimeSummaryState.js";
@@ -15,11 +17,8 @@ export async function createCatalogThread(
   cwd?: string,
   options: ThreadStartOptions = {}
 ): Promise<ClientSnapshot> {
-  const currentThreadId = deps.getCurrentThreadId();
-  const selectedCwd = deps.threads.get(currentThreadId)?.thread?.cwd
-    ?? deps.threads.get(currentThreadId)?.snapshot.cwd
-    ?? process.cwd();
-  const targetCwd = options.cwd?.trim() || cwd?.trim() || selectedCwd;
+  const explicitCwd = options.cwd?.trim() || cwd?.trim();
+  const targetCwd = explicitCwd || createDesktopChatCwd();
 
   const started = await deps.appServer.threadStart(targetCwd, {
     ...options,
@@ -46,6 +45,17 @@ export async function createCatalogThread(
   deps.syncSelectedThread(threadId);
   deps.emitChanged();
   return deps.getSnapshot(threadId);
+}
+
+function createDesktopChatCwd(now = new Date()): string {
+  const date = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+  const cwd = join(homedir(), "Documents", "Codex", date, "new-chat");
+  mkdirSync(cwd, { recursive: true });
+  return cwd;
 }
 
 export async function forkCatalogThread(

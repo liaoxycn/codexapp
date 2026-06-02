@@ -5,12 +5,33 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#111111"
-        android:pathData="M26,24h56a8,8 0 0 1 8,8v44a8,8 0 0 1 -8,8H26a8,8 0 0 1 -8,-8V32a8,8 0 0 1 8,-8z" />
+        android:fillColor="#1F2937"
+        android:pathData="M20,22h68a10,10 0,0 1,10 10v44a10,10 0,0 1,-10 10H20a10,10 0,0 1,-10 -10V32a10,10 0,0 1,10 -10z" />
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M38,40c0,-4.4 3.6,-8 8,-8h16c4.4,0 8,3.6 8,8v28c0,4.4 -3.6,8 -8,8H46c-4.4,0 -8,-3.6 -8,-8V40z" />
+        android:fillColor="#2DD4BF"
+        android:fillAlpha="0.18"
+        android:pathData="M22,24h66a8,8 0,0 1,8 8v8H14v-8a8,8 0,0 1,8 -8z" />
     <path
-        android:fillColor="#111111"
-        android:pathData="M48,46h12a4,4 0 0 1 0,8H48a4,4 0 0 1 0,-8zm0,14h16a4,4 0 0 1 0,8H48a4,4 0 0 1 0,-8z" />
+        android:fillColor="#0F172A"
+        android:pathData="M24,34h60a8,8 0,0 1,8 8v32a8,8 0,0 1,-8 8H24a8,8 0,0 1,-8 -8V42a8,8 0,0 1,8 -8z" />
+    <path
+        android:fillColor="#38BDF8"
+        android:fillAlpha="0.28"
+        android:pathData="M26,38h58a4,4 0,0 1,4 4v8H22v-8a4,4 0,0 1,4 -4z" />
+    <path
+        android:fillColor="#2DD4BF"
+        android:pathData="M33,47a4,4 0,1 0,0.1 0M45,47a4,4 0,1 0,0.1 0M57,47a4,4 0,1 0,0.1 0" />
+    <path
+        android:fillColor="#F8FAFC"
+        android:pathData="M37,62l10,-8a4,4 0,0 1,5.1 6.2L45.9,65l6.2,4.8A4,4 0,0 1,47 76l-10,-8a4,4 0,0 1,0 -6z" />
+    <path
+        android:fillColor="#2DD4BF"
+        android:pathData="M58,73h18a4,4 0,0 1,0 8H58a4,4 0,0 1,0 -8z" />
+    <path
+        android:fillColor="#F8FAFC"
+        android:pathData="M68,54c4.4,0 8.1,1.5 11,4.2a4,4 0,0 1,-5.4 5.9A7.9,7.9 0,0 0,68 62c-5,0 -8.5,3.6 -8.5,8s3.5,8 8.5,8c2.4,0 4.3,-0.7 5.8,-2.2a4,4 0,0 1,5.6 5.7C76.5,84.4 72.5,86 68,86c-9.8,0 -17,-7 -17,-16s7.2,-16 17,-16z" />
+    <path
+        android:fillColor="#38BDF8"
+        android:fillAlpha="0.22"
+        android:pathData="M18,34l70,48H78L16,39v-2a3,3 0,0 1,2 -3z" />
 </vector>

@@ -15,4 +15,15 @@ class AppUpdateManagerTest {
         assertTrue(compareVersions("0.1.8", "0.1.8") == 0)
         assertTrue(compareVersions("0.1.8", "0.1.9") < 0)
     }
+
+    @Test
+    fun startupGateAllowsOnlyOneCheckPerProcess() {
+        AppUpdateStartupGate.resetForTest()
+
+        val first = AppUpdateStartupGate.consume()
+        val second = AppUpdateStartupGate.consume()
+
+        assertTrue(first)
+        assertTrue(!second)
+    }
 }

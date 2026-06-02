@@ -76,6 +76,10 @@ async function handleSendPrompt(
   message: GatewaySendPromptMessage,
   handlers: ClientMessageHandlers
 ): Promise<void> {
+  if (message.newThread) {
+    context.selectionVersion += 1;
+    context.selectedThreadId = "";
+  }
   await handlers.runBackendAction(context, async () => {
     let requestedThreadId = message.threadId?.trim() || context.selectedThreadId;
     if (message.newThread || !requestedThreadId) {

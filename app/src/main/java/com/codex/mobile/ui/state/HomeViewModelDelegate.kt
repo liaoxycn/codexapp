@@ -33,7 +33,7 @@ internal class HomeViewModelDelegate(
         resendPrompt = repository::resendPrompt,
         onPromptAccepted = { wasDraft ->
             if (wasDraft) {
-                uiStateStore.exitNewThreadDraft()
+                uiStateStore.markDraftSubmissionStarted()
             }
         }
     )
@@ -49,10 +49,11 @@ internal class HomeViewModelDelegate(
 
     init {
         repositoryCoordinator.start()
-        checkAppUpdate()
+        checkAppUpdateOnStartup()
         scope.launch {
             repository.state.collect { remote ->
                 uiStateStore.syncDraftDefaults(remote)
+                uiStateStore.syncRemoteSelection(remote)
             }
         }
     }
@@ -193,19 +194,15 @@ internal class HomeViewModelDelegate(
         }
     }
 
-    fun downloadAppUpdate() {
-        val current = uiStateStore.state.value.appUpdate
-        if (current.status != AppUpdateStatus.AVAILABLE && current.status != AppUpdateStatus.ERROR) return
-        scope.launch {
-            val next = appUpdateManager.download(current) { progress ->
-                uiStateStore.updateAppUpdate(progress)
-            }
-            uiStateStore.updateAppUpdate(next)
+    private fun checkAppUpdateOnStartup() {
+        if (appUpdateManager.consumeStartupCheck()) {
+            checkAppUpdate()
         }
     }
 
-    fun installAppUpdate() {
-        val next = appUpdateManager.install(uiStateStore.state.value.appUpdate)
-        uiStateStore.updateAppUpdate(next)
+    fun downloadAppUpdate() {
+        val current = uiStateStore.state.value.appUpdate
+        if (current.status != AppUpdateStatus.AVAILABLE && current.status != AppUpdateStatus.ERROR) return
+        uiStateStore.updateAppUpdate(appUpdateManager.enqueueSystemDownload(current))
     }
 }

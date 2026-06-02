@@ -8,7 +8,8 @@ import { asString, asTextInputEntries } from "./appServerValues.js";
 import type { ThreadRuntimeState } from "./types.js";
 
 interface DesktopThreadVisibilityState {
-  visibleThreadIds: ReadonlySet<string>;
+  workspaceRoots: ReadonlySet<string>;
+  projectlessThreadIds: ReadonlySet<string>;
   importedThreadIds: ReadonlySet<string>;
 }
 
@@ -111,8 +112,12 @@ export function isDesktopMainListThread(
   if (source === "appServer" || source === undefined) {
     return true;
   }
-  if (source === "vscode" && desktopVisibility && desktopVisibility.visibleThreadIds.size > 0) {
-    return desktopVisibility.visibleThreadIds.has(thread.id);
+  if (source === "vscode" && desktopVisibility) {
+    return (
+      desktopVisibility.projectlessThreadIds.has(thread.id) ||
+      isDesktopChatWorkingDirectory(toPathSegments(thread.cwd)) ||
+      isUnderDesktopWorkspaceRoot(thread.cwd, desktopVisibility.workspaceRoots)
+    );
   }
   return true;
 }
@@ -122,18 +127,27 @@ function readDesktopThreadVisibility(): DesktopThreadVisibilityState | null {
     return cachedDesktopVisibility;
   }
   const codexHome = join(homedir(), ".codex");
+  const statePath = join(codexHome, ".codex-global-state.json");
+  const state = readJsonObject(statePath);
   cachedDesktopVisibility = {
-    visibleThreadIds: readDesktopHeartbeatThreadIds(join(codexHome, ".codex-global-state.json")),
+    workspaceRoots: readDesktopWorkspaceRoots(state),
+    projectlessThreadIds: readDesktopProjectlessThreadIds(state),
     importedThreadIds: readImportedThreadIds(join(codexHome, "external_agent_session_imports.json")),
   };
   return cachedDesktopVisibility;
 }
 
-function readDesktopHeartbeatThreadIds(path: string): ReadonlySet<string> {
-  const state = readJsonObject(path);
-  const persisted = getObject(state["electron-persisted-atom-state"]);
-  const permissions = getObject(persisted["heartbeat-thread-permissions-by-id"]);
-  return new Set(Object.keys(permissions));
+function readDesktopWorkspaceRoots(state: Record<string, unknown>): ReadonlySet<string> {
+  const roots = [
+    ...readStringArray(state["project-order"]),
+    ...readStringArray(state["electron-saved-workspace-roots"]),
+    ...readStringArray(state["active-workspace-roots"]),
+  ];
+  return new Set(roots.map(normalizePath).filter(Boolean));
+}
+
+function readDesktopProjectlessThreadIds(state: Record<string, unknown>): ReadonlySet<string> {
+  return new Set(readStringArray(state["projectless-thread-ids"]));
 }
 
 function readImportedThreadIds(path: string): ReadonlySet<string> {
@@ -169,6 +183,10 @@ function getObject(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 function buildThreadSubtitle(thread: AppServerThread): string {
@@ -207,8 +225,7 @@ function extractThreadItemText(item: AppServerThread["turns"][number]["items"][n
 }
 
 function deriveThreadGrouping(thread: AppServerThread): { kind: "project" | "chat"; label: string } {
-  const cwd = thread.cwd.replaceAll("\\", "/");
-  const segments = cwd.split("/").filter(Boolean);
+  const segments = thread.cwd.replaceAll("\\", "/").split("/").filter(Boolean);
   const leaf = segments.at(-1) ?? "";
   if (leaf.length === 0 || isDesktopChatWorkingDirectory(segments)) {
     return { kind: "chat", label: "普通会话" };
@@ -228,6 +245,27 @@ function isDesktopChatWorkingDirectory(segments: string[]): boolean {
   }
   const dateSegment = segments[codexIndex + 1] ?? "";
   return /^\d{4}-\d{2}-\d{2}$/.test(dateSegment);
+}
+
+function isUnderDesktopWorkspaceRoot(cwd: string, workspaceRoots: ReadonlySet<string>): boolean {
+  const normalizedCwd = normalizePath(cwd);
+  if (!normalizedCwd) {
+    return false;
+  }
+  for (const root of workspaceRoots) {
+    if (normalizedCwd === root || normalizedCwd.startsWith(`${root}/`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function toPathSegments(path: string): string[] {
+  return normalizePath(path).split("/").filter(Boolean);
+}
+
+function normalizePath(path: string): string {
+  return path.trim().replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
 }
 
 function buildThreadGitInfo(thread: AppServerThread): { gitBranch?: string; gitSha?: string } {

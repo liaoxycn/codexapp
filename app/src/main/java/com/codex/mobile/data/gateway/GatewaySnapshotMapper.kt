@@ -78,7 +78,7 @@ internal fun GatewaySnapshotMessage.applyTo(
         selectedThreadId = selectedThreadId ?: threads.firstOrNull()?.id.orEmpty(),
         pendingThreadTitle = null,
         isThreadSwitching = false,
-        messages = messages.toThreadMessages(),
+        messages = previous.messages.mergeSnapshotMessages(messages.toThreadMessages()),
         hasMoreHistory = hasMoreHistory,
         isLoadingOlder = false,
         pendingApproval = pendingApproval,
@@ -127,7 +127,11 @@ internal fun GatewaySnapshotPatchMessage.applyTo(
         },
         pendingThreadTitle = null,
         isThreadSwitching = false,
-        messages = if ("messages" in changedFields) messages.orEmpty().toThreadMessages() else previous.messages,
+        messages = if ("messages" in changedFields) {
+            previous.messages.mergeSnapshotMessages(messages.orEmpty().toThreadMessages())
+        } else {
+            previous.messages
+        },
         hasMoreHistory = if ("hasMoreHistory" in changedFields) hasMoreHistory == true else previous.hasMoreHistory,
         isLoadingOlder = false,
         pendingApproval = if ("pendingApproval" in changedFields) pendingApproval else previous.pendingApproval,
@@ -213,6 +217,56 @@ internal fun List<GatewayMessagePayload>.toThreadMessages(): List<ThreadMessage>
             isFinal = message.isFinal
         )
     }
+}
+
+private fun List<ThreadMessage>.mergeSnapshotMessages(
+    snapshotMessages: List<ThreadMessage>
+): List<ThreadMessage> {
+    if (isEmpty() || snapshotMessages.isEmpty()) {
+        return snapshotMessages.dedupeAdjacentDuplicateUserMessages()
+    }
+    if (none { it.isOptimisticUserMessage() }) {
+        return snapshotMessages.dedupeAdjacentDuplicateUserMessages()
+    }
+    val snapshotUserTexts = snapshotMessages
+        .asSequence()
+        .filter { it.role == MessageRole.USER }
+        .map { it.normalizedText() }
+        .filter { it.isNotBlank() }
+        .toSet()
+    val carriedOptimisticMessages = filter { message ->
+        message.isOptimisticUserMessage() && message.normalizedText() !in snapshotUserTexts
+    }
+    return (carriedOptimisticMessages + snapshotMessages).dedupeAdjacentDuplicateUserMessages()
+}
+
+private fun ThreadMessage.isOptimisticUserMessage(): Boolean {
+    return role == MessageRole.USER && id.startsWith("user-")
+}
+
+private fun List<ThreadMessage>.dedupeAdjacentDuplicateUserMessages(): List<ThreadMessage> {
+    val deduped = mutableListOf<ThreadMessage>()
+    for (message in this) {
+        val previous = deduped.lastOrNull()
+        if (
+            previous != null &&
+            previous.role == MessageRole.USER &&
+            message.role == MessageRole.USER &&
+            previous.normalizedText() == message.normalizedText()
+        ) {
+            deduped[deduped.lastIndex] = message
+        } else {
+            deduped += message
+        }
+    }
+    return deduped
+}
+
+private fun ThreadMessage.normalizedText(): String {
+    return blocks
+        .filterIsInstance<MessageBlock.Text>()
+        .joinToString("\n") { it.value.trim() }
+        .trim()
 }
 
 internal fun List<GatewayChipPayload>.toComposerChips(): List<ComposerChip> {

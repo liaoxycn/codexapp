@@ -108,8 +108,9 @@ codexapp/
 │  │     │  ├─ TopBar.kt                 顶部栏与 header icon button
 │  │     │  └─ ThreadStatusIndicators.kt 线程状态点、状态文本、状态标签/颜色
 │  │     └─ theme/                       Compose 主题
-│  │  ├─ update/                         GitHub release 更新检查、APK 下载、系统安装器拉起
-│  ├─ src/main/res/xml/file_paths.xml    APK 更新安装 FileProvider 路径
+│  │  ├─ update/                         GitHub release 更新检查、系统下载器下载 APK
+│  ├─ src/main/res/drawable/             Android 启动器图标前景等矢量资源
+│  ├─ src/main/res/mipmap-anydpi-v26/    Android adaptive icon 配置
 │  └─ build/                             Android 构建输出，默认不提交
 ├─ desktop-gateway/                      桌面转发层，连接 Android App 与本机 codex app-server
 │  ├─ src/

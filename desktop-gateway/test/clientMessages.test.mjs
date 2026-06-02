@@ -423,6 +423,35 @@ test("handleClientMessage creates thread before first draft prompt", async () =>
   assert.equal(snapshots.at(-1).selectedThreadId, "thread-created");
 });
 
+test("handleClientMessage invalidates stale selection before creating draft thread", async () => {
+  const context = createContext({ authenticated: true, selectedThreadId: "thread-old", selectionVersion: 4 });
+  const createCalls = [];
+  const selectedDuringCreate = [];
+  const { handlers, backend, snapshots } = createHandlers({ backend: createBackend() });
+  backend.createThread = async (cwd, options) => {
+    selectedDuringCreate.push(context.selectedThreadId);
+    createCalls.push([cwd, options]);
+    return createSnapshot({ selectedThreadId: "thread-created" });
+  };
+  backend.sendPrompt = async (threadId) => createSnapshot({ selectedThreadId: threadId });
+
+  await handleClientMessage(
+    context,
+    JSON.stringify({
+      type: "send_prompt",
+      text: "hello draft",
+      newThread: true,
+    }),
+    handlers
+  );
+
+  assert.equal(context.selectionVersion, 6);
+  assert.deepEqual(selectedDuringCreate, [""]);
+  assert.equal(context.selectedThreadId, "thread-created");
+  assert.equal(snapshots.at(-1).selectedThreadId, "thread-created");
+  assert.equal(createCalls.length, 1);
+});
+
 test("handleClientMessage clears selection after archive_thread", async () => {
   const context = createContext({ authenticated: true, selectedThreadId: "thread-1" });
   const { handlers, backend, snapshots } = createHandlers({ backend: createBackend() });

@@ -70,9 +70,24 @@ test("visible thread summaries match Desktop main list visibility", () => {
         cwd: "D:/Data/Documents/md2html",
         source: "vscode",
       }),
+      thread("desktop-project-second", {
+        name: "写一个1",
+        cwd: "D:/Data/Documents/md2html",
+        source: "vscode",
+      }),
+      thread("desktop-codexapp-short", {
+        name: "hello",
+        cwd: "D:/Projects/home/codexapp",
+        source: "vscode",
+      }),
       thread("desktop-chat", {
         name: "查看深圳天气",
         cwd: "C:/Users/lxy/Documents/Codex/2026-05-30/new-chat",
+        source: "vscode",
+      }),
+      thread("desktop-projectless", {
+        name: "回复一下",
+        cwd: "C:/Users/lxy/Documents/Codex/2026-06-01/codex-desktop",
         source: "vscode",
       }),
       thread("mobile-thread", {
@@ -95,7 +110,12 @@ test("visible thread summaries match Desktop main list visibility", () => {
     ],
     {
       desktopVisibility: {
-        visibleThreadIds: new Set(["desktop-project", "desktop-chat", "placeholder"]),
+        workspaceRoots: new Set([
+          "d:/data/documents/md2html",
+          "d:/projects/home/codexapp",
+          "d:/data/documents/new project",
+        ]),
+        projectlessThreadIds: new Set(["desktop-projectless"]),
         importedThreadIds: new Set(["imported-openmanus"]),
       },
     }
@@ -103,7 +123,14 @@ test("visible thread summaries match Desktop main list visibility", () => {
 
   assert.deepEqual(
     summaries.map((item) => item.id),
-    ["desktop-project", "desktop-chat", "mobile-thread"]
+    [
+      "desktop-project",
+      "desktop-project-second",
+      "desktop-codexapp-short",
+      "desktop-chat",
+      "desktop-projectless",
+      "mobile-thread",
+    ]
   );
 });
 

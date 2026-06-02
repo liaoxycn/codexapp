@@ -165,7 +165,7 @@ gateway 负责把 Codex App Server JSON-RPC 压平成移动端 snapshot：
 
 当前 `ServerNotification` 分发要求：schema 里的通知 method 必须在 `desktop-gateway/src/bridge/notifications.ts` 显式处理或显式 no-op。
 
-会话目录对齐 Codex Desktop：`thread/list` 不显式传 `sourceKinds`，使用 app-server 默认交互会话来源，且只请求 `archived=false`。gateway 再按 Desktop 主列表可见性过滤：排除 `cli/exec/unknown/custom`、外部导入线程、`<environment_context>` 占位线程，以及未进入 Desktop `heartbeat-thread-permissions-by-id` 索引的 `vscode` 历史线程；保留 `appServer` 手机新建线程。`cwd` 属于 Desktop 合成普通会话目录时，例如 `Codex/YYYY-MM-DD/new-chat` 或 `Codex/YYYY-MM-DD/<session>`，归为 `groupKind="chat"`、`groupLabel="普通会话"`，不能归到项目 `new-chat`。
+会话目录对齐 Codex Desktop：`thread/list` 不显式传 `sourceKinds`，使用 app-server 默认交互会话来源，且只请求 `archived=false`。gateway 再按 Desktop 主列表可见性过滤：排除 `cli/exec/unknown/custom`、外部导入线程、`<environment_context>` 占位线程；`vscode` 会话保留规则对齐 Desktop 本地状态：会话 `cwd` 位于 `project-order` / `electron-saved-workspace-roots` / `active-workspace-roots` 的项目根下，或属于 `projectless-thread-ids`，或属于 Desktop 合成普通会话目录时保留；保留 `appServer` 手机新建线程。`cwd` 属于 Desktop 合成普通会话目录时，例如 `Codex/YYYY-MM-DD/new-chat` 或 `Codex/YYYY-MM-DD/<session>`，归为 `groupKind="chat"`、`groupLabel="普通会话"`，不能归到项目 `new-chat`。
 
 ## 高频人类流程测试清单
 
@@ -181,7 +181,7 @@ gateway 负责把 Codex App Server JSON-RPC 压平成移动端 snapshot：
 8. 归档/fork/重命名：归档和重命名在目录操作；fork 在消息/turn 操作，分叉后选中新会话。
 9. 断线重连：断开 gateway 后重连，不丢当前线程和草稿。
 10. patch 降级：制造 patch revision 不匹配，应自动请求 `forceSnapshot`，下一次 full snapshot 恢复。
-11. App 更新：本地版本低于 GitHub latest release 时显示更新提示；下载显示进度；下载完成后用 Android 系统安装器安装 APK。
+11. App 更新：进程冷启动时检查一次 GitHub latest release；本地版本低时显示更新提示；点击后交给 Android 系统下载器下载 APK，App 内不显示下载进度。
 
 ## 自测命令
 

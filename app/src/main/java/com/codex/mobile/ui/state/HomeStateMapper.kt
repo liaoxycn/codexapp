@@ -13,6 +13,7 @@ internal fun SessionRemoteState.toHomeState(
     composerExpanded: Boolean,
     composerFocusRequest: Long,
     isNewThreadDraft: Boolean,
+    draftSubmissionInFlight: Boolean,
     newThreadDraft: NewThreadDraft,
     appUpdate: AppUpdateState = AppUpdateState()
 ): HomeUiState = HomeUiState(
@@ -20,12 +21,12 @@ internal fun SessionRemoteState.toHomeState(
     selectedThreadId = if (isNewThreadDraft) "" else selectedThreadId,
     pendingThreadTitle = if (isNewThreadDraft) null else pendingThreadTitle,
     isThreadSwitching = if (isNewThreadDraft) false else isThreadSwitching,
-    messages = if (isNewThreadDraft) emptyList() else messages,
+    messages = if (isNewThreadDraft && !draftSubmissionInFlight) emptyList() else messages,
     hasMoreHistory = if (isNewThreadDraft) false else hasMoreHistory,
     isLoadingOlder = if (isNewThreadDraft) false else isLoadingOlder,
     composerText = composer,
     composerFocusRequest = composerFocusRequest,
-    isGenerating = if (isNewThreadDraft) false else isGenerating,
+    isGenerating = if (isNewThreadDraft && !draftSubmissionInFlight) false else isGenerating,
     showComposerDetails = composerExpanded,
     chips = if (isNewThreadDraft) newThreadDraft.toComposerChips() else chips,
     files = if (isNewThreadDraft) {

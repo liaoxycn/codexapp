@@ -15,6 +15,9 @@ import com.codex.mobile.model.ComposerChipIcon
 import com.codex.mobile.model.ConnectionStatus
 import com.codex.mobile.model.GatewayConfig
 import com.codex.mobile.model.MessageBlock
+import com.codex.mobile.model.MessageRole
+import com.codex.mobile.model.SessionRemoteState
+import com.codex.mobile.model.ThreadMessage
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -163,6 +166,72 @@ class GatewaySnapshotMapperTest {
         assertEquals("README.md", next.files.single().label)
         assertEquals(listOf("/compact"), next.slashCommands)
         assertEquals("D:/Projects/home/codexapp", next.cwd)
+    }
+
+    @Test
+    fun snapshotPatchDropsReplacedOptimisticUserMessage() {
+        val previous = SessionRemoteState(
+            snapshotRevision = 1L,
+            messages = listOf(
+                ThreadMessage(
+                    id = "user-42",
+                    role = MessageRole.USER,
+                    blocks = listOf(MessageBlock.Text("hello"))
+                ),
+                ThreadMessage(
+                    id = "assistant-pending",
+                    role = MessageRole.ASSISTANT,
+                    blocks = listOf(MessageBlock.Status("正在生成…"))
+                )
+            )
+        )
+        val patch = GatewaySnapshotPatchMessage(
+            baseRevision = 1L,
+            revision = 2L,
+            changed = listOf("messages"),
+            messages = listOf(
+                com.codex.mobile.data.gateway.GatewayMessagePayload(
+                    id = "turn-user-real",
+                    role = "user",
+                    blocks = listOf(GatewayBlockPayload(kind = "text", value = "hello"))
+                )
+            )
+        )
+
+        val next = patch.applyTo(previous)
+
+        assertEquals(listOf("turn-user-real"), next.messages.map { it.id })
+    }
+
+    @Test
+    fun snapshotPatchCollapsesAdjacentDuplicateUserMessages() {
+        val previous = SessionRemoteState(snapshotRevision = 1L)
+        val patch = GatewaySnapshotPatchMessage(
+            baseRevision = 1L,
+            revision = 2L,
+            changed = listOf("messages"),
+            messages = listOf(
+                com.codex.mobile.data.gateway.GatewayMessagePayload(
+                    id = "user-optimistic-like",
+                    role = "user",
+                    blocks = listOf(GatewayBlockPayload(kind = "text", value = "same prompt"))
+                ),
+                com.codex.mobile.data.gateway.GatewayMessagePayload(
+                    id = "user-real",
+                    role = "user",
+                    blocks = listOf(GatewayBlockPayload(kind = "text", value = "same prompt"))
+                ),
+                com.codex.mobile.data.gateway.GatewayMessagePayload(
+                    id = "assistant-live",
+                    role = "assistant",
+                    blocks = listOf(GatewayBlockPayload(kind = "status", value = "思考中"))
+                )
+            )
+        )
+
+        val next = patch.applyTo(previous)
+
+        assertEquals(listOf("user-real", "assistant-live"), next.messages.map { it.id })
     }
 
     @Test

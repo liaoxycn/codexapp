@@ -41,9 +41,9 @@ internal fun DrawerContent(
     onUnarchiveThread: (String) -> Unit,
     onRestartDesktop: () -> Unit,
     onDownloadUpdate: () -> Unit = {},
-    onInstallUpdate: () -> Unit = {}
 ) {
     var renamingThread by remember { mutableStateOf<ThreadSummary?>(null) }
+    var confirmingDesktopRestart by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val sectionsState = rememberDrawerSectionsState(
@@ -61,6 +61,14 @@ internal fun DrawerContent(
             onDismiss = { renamingThread = null },
             onConfirm = { name ->
                 onRenameThread(thread.id, name)
+            }
+        )
+    }
+    if (confirmingDesktopRestart) {
+        RestartDesktopConfirmDialog(
+            onDismiss = { confirmingDesktopRestart = false },
+            onConfirm = {
+                onRestartDesktop()
             }
         )
     }
@@ -95,15 +103,11 @@ internal fun DrawerContent(
             },
             onRestartDesktop = {
                 clearDrawerInput()
-                onRestartDesktop()
+                confirmingDesktopRestart = true
             },
             onDownloadUpdate = {
                 clearDrawerInput()
                 onDownloadUpdate()
-            },
-            onInstallUpdate = {
-                clearDrawerInput()
-                onInstallUpdate()
             },
         )
         Spacer(Modifier.height(10.dp))
