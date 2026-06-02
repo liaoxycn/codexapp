@@ -32,6 +32,9 @@ internal fun selectedThreadNeedsLiveRefresh(snapshot: SessionRemoteState): Boole
     if (snapshot.isThreadSwitching) {
         return true
     }
+    if (snapshot.isGenerating || snapshot.pendingApproval != null) {
+        return snapshot.selectedThreadId.isNotBlank()
+    }
     val selectedThread = snapshot.threads.firstOrNull { it.id == snapshot.selectedThreadId } ?: return false
     return selectedThread.status == ThreadStatus.RUNNING || selectedThread.status == ThreadStatus.NEEDS_APPROVAL
 }

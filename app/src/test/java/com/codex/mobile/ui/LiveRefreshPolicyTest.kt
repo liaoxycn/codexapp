@@ -14,9 +14,23 @@ import org.junit.Test
 
 class LiveRefreshPolicyTest {
     @Test
-    fun doesNotPollIdleThreadAfterSnapshotSync() {
+    fun keepsPollingWhenSelectedThreadHasTopLevelGeneratingSignal() {
         val snapshot = connectedSnapshot(
             selectedThreadId = "thread-1",
+            threads = listOf(summary("thread-1", ThreadStatus.IDLE)),
+            isGenerating = true,
+            pendingApproval = "stale approval"
+        )
+
+        assertTrue(selectedThreadNeedsLiveRefresh(snapshot))
+        assertTrue(shouldPollLiveRefresh(snapshot))
+        assertTrue(shouldContinueLiveRefresh(snapshot, "thread-1"))
+    }
+
+    @Test
+    fun doesNotPollTopLevelGeneratingWithoutSelectedThread() {
+        val snapshot = connectedSnapshot(
+            selectedThreadId = "",
             threads = listOf(summary("thread-1", ThreadStatus.IDLE)),
             isGenerating = true,
             pendingApproval = "stale approval"
