@@ -139,9 +139,10 @@ fun CodexApp(
                 )
             }
             OperationalNoticeOverlay(notices = state.operationalNotices)
+            val globalLoadingText = resolveGlobalLoadingText(state)
             GlobalLoadingOverlay(
-                visible = state.isForkingThread || state.pendingSelectionThreadId != null,
-                text = if (state.isForkingThread) "正在生成分叉会话" else "正在切换会话"
+                visible = globalLoadingText != null,
+                text = globalLoadingText.orEmpty()
             )
         }
     }
