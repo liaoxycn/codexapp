@@ -1,1 +1,1 @@
-收口更新提示动作语义\n- 抽屉更新提示只保留真实可执行动作，移除假按钮感\n- 下载排队/已打开发布页状态改为纯状态文案\n- 更新失败时点击可直达 GitHub 发布页\n- 补充定向 Android UI 测试覆盖更新提示点击语义
+收口发布流水线 Node 运行时风险\n- release workflow 升级 checkout/setup-node/setup-java/download/upload/gh-release action 主版本\n- 去掉 setup-android action，改为 shell 方式初始化 Android SDK\n- 目标是消除 GitHub Actions 中的 Node 20 deprecated 告警，提高后续发版稳定性
