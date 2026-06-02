@@ -16,8 +16,10 @@ async function main() {
     await runRelease(logger);
   } catch (error) {
     await logger.log(`ERROR ${error.stack || error.message}`);
+    await logger.log("externalExitCode=0 reason=internal-error-recorded");
     console.error(`[github-release] internal error recorded; see ${logger.relativePath}`);
   } finally {
+    await logger.log("externalExitCode=0");
     await logger.log("END");
     console.log(`[github-release] log: ${logger.relativePath}`);
   }
@@ -78,6 +80,7 @@ async function runRelease(logger) {
   });
 
   await logger.log(`push result branch=${branchPushed ? "ok" : "failed"} tag=${tagPushed ? "ok" : "failed"}`);
+  await logger.log(`githubActionsTrigger=${tagPushed ? "attempted" : "not-confirmed"}`);
   console.log(`[github-release] branch push: ${branchPushed ? "ok" : "failed, recorded in log"}`);
   console.log(`[github-release] tag push/action trigger: ${tagPushed ? "ok" : "failed after retries, recorded in log"}`);
   console.log("[github-release] not waiting for workflow completion");
