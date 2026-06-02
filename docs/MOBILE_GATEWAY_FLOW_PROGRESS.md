@@ -217,3 +217,4 @@
 | Gateway 动作 trace | 移动端远程动作统一带 trace id、类型、状态和耗时日志。 | 我点击刷新、切换、发送、分叉、归档等按钮；如果状态异常，可以用抽屉诊断里的 trace id 对照 gateway 日志。 | 旧日志分散，排查“来回跳/状态闪空闲”缺少统一动作边界。已在 backend action 和手动 refresh 管线加入 trace，并随 snapshot 下发最后动作状态。 |
 | Gateway 入站日志摘要 | gateway 日志可用于排障，但不泄露 prompt 原文。 | 我查看 gateway 日志，只看到 `type/thread/textLen/numTurns` 等路由摘要，不会把输入内容或 pair token 原样打印出来。 | 旧日志直接输出完整 websocket payload，排障信息太吵，也可能暴露用户输入。已改成结构化摘要，并补测试验证 prompt 与 token 不进入日志摘要。 |
 | 发布前检查脚本 | 发布前可一键串联核心检查。 | 我准备发包前运行 `node scripts/pre-release-check.mjs`；需要真机安装再加 `--dev-run`。 | 之前发布检查命令散落在文档和历史记录里，容易漏跑。已新增脚本并同步项目 wiki；本轮仍按项目要求单独执行 `node scripts/dev-run.mjs`。 |
+| 诊断行过期收口 | 最近动作诊断提示应按时间自动消失。 | 我点刷新/切换后打开抽屉；我期望 5 秒内能看到 trace，超过 5 秒即使没有新 snapshot 推送，也自动恢复干净列表。 | 发现旧实现直接在 Compose 中读 `System.currentTimeMillis()`，没有状态时钟，若远端不再推送状态，成功动作诊断行可能停留到下一次重组。已新增诊断时钟，在动作过期点主动触发重组隐藏，失败/运行中/切换中仍持续显示。 |

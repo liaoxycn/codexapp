@@ -23,7 +23,9 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,6 +43,7 @@ import com.codex.mobile.model.AppUpdateStatus
 import com.codex.mobile.model.ConnectionStatus
 import com.codex.mobile.model.StateDiagnostics
 import com.codex.mobile.ui.theme.CodexTheme
+import kotlinx.coroutines.delay
 
 @Composable
 internal fun DrawerHeader(
@@ -106,11 +109,29 @@ internal fun DrawerHeader(
                 state = appUpdate,
                 onDownload = onDownloadUpdate,
             )
-            if (shouldShowDiagnostics(diagnostics, nowMillis = System.currentTimeMillis())) {
+            val diagnosticsNowMillis = rememberDiagnosticsClock(diagnostics)
+            if (shouldShowDiagnostics(diagnostics, nowMillis = diagnosticsNowMillis)) {
                 DiagnosticsRow(diagnostics = diagnostics)
             }
         }
     }
+}
+
+@Composable
+private fun rememberDiagnosticsClock(diagnostics: StateDiagnostics): Long {
+    var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val expireAt = diagnostics.actionFinishedAt
+        .takeIf { it > 0L && diagnostics.actionStatus != "failed" && diagnostics.actionType in diagnosticActionTypes }
+        ?.plus(5_000L)
+        ?: 0L
+    LaunchedEffect(expireAt) {
+        nowMillis = System.currentTimeMillis()
+        if (expireAt > nowMillis) {
+            delay(expireAt - nowMillis + 50L)
+            nowMillis = System.currentTimeMillis()
+        }
+    }
+    return nowMillis
 }
 
 internal fun shouldShowDiagnostics(
