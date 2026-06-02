@@ -11,6 +11,7 @@ data class HomeUiState(
     val isLoadingOlder: Boolean,
     val composerText: String,
     val composerFocusRequest: Long,
+    val pendingEditResend: PendingEditResendState? = null,
     val isGenerating: Boolean,
     val isManualRefreshing: Boolean,
     val showComposerDetails: Boolean,
@@ -66,4 +67,9 @@ data class GatewayConfigDefaults(
     val model: String = "",
     val reasoningEffort: String = "",
     val sandboxMode: String = ""
+)
+
+data class PendingEditResendState(
+    val threadId: String,
+    val rollbackNumTurns: Int
 )

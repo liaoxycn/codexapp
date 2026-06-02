@@ -1,6 +1,7 @@
 package com.codexapp.ui.state
 
 import com.codexapp.model.NewThreadDraft
+import com.codexapp.model.PendingEditResendState
 
 internal class ComposerActionHandler(
     private val composerSession: ComposerSession,
@@ -12,6 +13,14 @@ internal class ComposerActionHandler(
     private val onPromptAccepted: (Boolean) -> Unit = {}
 ) {
     private var pendingEditResend: PendingEditResend? = null
+
+    fun pendingEditResendState(): PendingEditResendState? {
+        val pending = pendingEditResend ?: return null
+        return PendingEditResendState(
+            threadId = pending.threadId,
+            rollbackNumTurns = pending.rollbackNumTurns
+        )
+    }
 
     fun updateComposer(text: String) {
         composerSession.replace(text, selectedThreadId())

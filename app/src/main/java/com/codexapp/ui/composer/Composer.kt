@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -16,7 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.Text
 import com.codexapp.model.HomeUiState
 import com.codexapp.ui.theme.CodexTheme
 
@@ -70,6 +73,7 @@ internal fun Composer(
             .windowInsetsPadding(WindowInsets.navigationBars)
             .padding(horizontal = 14.dp, vertical = 8.dp)
     ) {
+        ComposerPendingEditResendHint(state = state)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -111,4 +115,19 @@ internal fun Composer(
             )
         }
     }
+}
+
+@Composable
+private fun ComposerPendingEditResendHint(state: HomeUiState) {
+    val pending = state.pendingEditResend ?: return
+    Text(
+        text = "已进入编辑后重发，下一次发送会回滚最近 ${pending.rollbackNumTurns} 轮后重发",
+        color = CodexTheme.colors.textSecondary,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 8.dp, end = 8.dp, bottom = 6.dp)
+            .testTag("composer_pending_edit_resend_hint")
+    )
 }

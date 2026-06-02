@@ -3,6 +3,7 @@ package com.codexapp.ui
 import com.codexapp.model.ConnectionStatus
 import com.codexapp.model.MessageBlock
 import com.codexapp.model.MessageRole
+import com.codexapp.model.PendingEditResendState
 import com.codexapp.model.SessionRemoteState
 import com.codexapp.model.ThreadMessage
 import com.codexapp.model.ThreadStatus
@@ -97,6 +98,34 @@ class HomeUiStateStoreTest {
             yield()
 
             assertEquals(1L, store.state.value.composerFocusRequest)
+            collector.cancel()
+            scope.coroutineContext[Job]?.cancel()
+        }
+    }
+
+    @Test
+    fun pendingEditResendStateFlowsIntoHomeUiState() {
+        runBlocking {
+            val remoteState = MutableStateFlow(SessionRemoteState(selectedThreadId = "thread-1"))
+            val composerText = MutableStateFlow("")
+            val scope = CoroutineScope(Dispatchers.Unconfined + Job())
+            val store = HomeUiStateStore(
+                remoteState = remoteState,
+                composerText = composerText,
+                scope = scope
+            )
+            val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) { store.state.collect {} }
+
+            store.setPendingEditResend(PendingEditResendState(threadId = "thread-1", rollbackNumTurns = 3))
+            yield()
+
+            assertEquals(3, store.state.value.pendingEditResend?.rollbackNumTurns)
+            assertEquals("thread-1", store.state.value.pendingEditResend?.threadId)
+
+            store.setPendingEditResend(null)
+            yield()
+
+            assertEquals(null, store.state.value.pendingEditResend)
             collector.cancel()
             scope.coroutineContext[Job]?.cancel()
         }

@@ -5,6 +5,7 @@ import com.codexapp.model.AppUpdateState
 import com.codexapp.model.ComposerChip
 import com.codexapp.model.ComposerChipIcon
 import com.codexapp.model.NewThreadDraft
+import com.codexapp.model.PendingEditResendState
 import com.codexapp.model.SessionConfig
 import com.codexapp.model.SessionRemoteState
 
@@ -12,6 +13,7 @@ internal fun SessionRemoteState.toHomeState(
     composer: String,
     composerExpanded: Boolean,
     composerFocusRequest: Long,
+    pendingEditResend: PendingEditResendState?,
     isNewThreadDraft: Boolean,
     draftSubmissionInFlight: Boolean,
     isForkingThread: Boolean,
@@ -28,6 +30,7 @@ internal fun SessionRemoteState.toHomeState(
     isLoadingOlder = if (isNewThreadDraft) false else isLoadingOlder,
     composerText = composer,
     composerFocusRequest = composerFocusRequest,
+    pendingEditResend = pendingEditResend,
     isGenerating = if (isNewThreadDraft && !draftSubmissionInFlight) false else isGenerating,
     showComposerDetails = composerExpanded,
     chips = if (isNewThreadDraft) newThreadDraft.toComposerChips() else chips,

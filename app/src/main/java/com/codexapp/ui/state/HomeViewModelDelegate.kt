@@ -145,6 +145,7 @@ internal class HomeViewModelDelegate(
 
     fun clearComposer() {
         composerActions.clearComposer()
+        uiStateStore.setPendingEditResend(composerActions.pendingEditResendState())
     }
 
     fun insertShellTemplate() {
@@ -153,11 +154,13 @@ internal class HomeViewModelDelegate(
 
     fun replaceComposer(text: String) {
         composerActions.replaceComposer(text)
+        uiStateStore.setPendingEditResend(composerActions.pendingEditResendState())
         uiStateStore.requestComposerFocus()
     }
 
     fun editAndResendUserMessage(text: String, rollbackNumTurns: Int) {
         composerActions.editAndResendText(text, rollbackNumTurns)
+        uiStateStore.setPendingEditResend(composerActions.pendingEditResendState())
         uiStateStore.requestComposerFocus()
     }
 
@@ -169,6 +172,7 @@ internal class HomeViewModelDelegate(
 
     fun send() {
         composerActions.send()
+        uiStateStore.setPendingEditResend(composerActions.pendingEditResendState())
     }
 
     fun stopGenerating() {

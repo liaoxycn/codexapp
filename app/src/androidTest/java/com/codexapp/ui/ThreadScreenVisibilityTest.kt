@@ -35,6 +35,7 @@ import com.codexapp.model.MessageBlock
 import com.codexapp.model.MessageRole
 import com.codexapp.model.NewThreadDraft
 import com.codexapp.model.OperationalNotice
+import com.codexapp.model.PendingEditResendState
 import com.codexapp.model.ThreadMessage
 import com.codexapp.model.ThreadGroupKind
 import com.codexapp.model.ThreadStatus
@@ -993,6 +994,41 @@ class ThreadScreenVisibilityTest {
     }
 
     @Test
+    fun composerShowsPendingEditResendHint() {
+        rule.setContent {
+            CodexTheme {
+                Composer(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(
+                        composerText = "please inspect build failure",
+                        pendingEditResend = PendingEditResendState(
+                            threadId = "t1",
+                            rollbackNumTurns = 3
+                        )
+                    ),
+                    compactMode = false,
+                    activePanel = ComposerPanel.NONE,
+                    onActivePanelChange = {},
+                    onToggleDetails = {},
+                    onCloseDetails = {},
+                    onChange = {},
+                    onInsertText = {},
+                    onApplySlashCommand = {},
+                    onClearComposer = {},
+                    onSend = {},
+                    onStop = {}
+                )
+            }
+        }
+
+        rule.onNodeWithTag("composer_pending_edit_resend_hint").assertIsDisplayed()
+        rule.onNodeWithText("下一次发送会回滚最近 3 轮后重发").assertIsDisplayed()
+    }
+
+    @Test
     fun projectDrawerActionCreatesThreadWithProjectCwd() {
         var createdCwd: String? = null
         rule.setContent {
@@ -1237,6 +1273,7 @@ class ThreadScreenVisibilityTest {
         isLoadingOlder = isLoadingOlder,
         composerText = "",
         composerFocusRequest = 0L,
+        pendingEditResend = null,
         isGenerating = false,
         isManualRefreshing = false,
         showComposerDetails = false,

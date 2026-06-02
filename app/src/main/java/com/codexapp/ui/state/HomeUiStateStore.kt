@@ -3,6 +3,7 @@ package com.codexapp.ui.state
 import com.codexapp.model.HomeUiState
 import com.codexapp.model.AppUpdateState
 import com.codexapp.model.NewThreadDraft
+import com.codexapp.model.PendingEditResendState
 import com.codexapp.model.SessionRemoteState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +23,7 @@ internal class HomeUiStateStore(
     private val isNewThreadDraft = MutableStateFlow(true)
     private val draftSubmissionInFlight = MutableStateFlow(false)
     private val forkingThreadId = MutableStateFlow<String?>(null)
+    private val pendingEditResend = MutableStateFlow<PendingEditResendState?>(null)
     private val newThreadDraft = MutableStateFlow(NewThreadDraft())
     private val appUpdate = MutableStateFlow(AppUpdateState())
 
@@ -31,6 +33,7 @@ internal class HomeUiStateStore(
         val isNewThreadDraft: Boolean,
         val draftSubmissionInFlight: Boolean,
         val forkingThreadId: String?,
+        val pendingEditResend: PendingEditResendState?,
         val newThreadDraft: NewThreadDraft,
         val appUpdate: AppUpdateState
     )
@@ -39,23 +42,42 @@ internal class HomeUiStateStore(
         val isNewThreadDraft: Boolean,
         val draftSubmissionInFlight: Boolean,
         val forkingThreadId: String?,
+        val pendingEditResend: PendingEditResendState?,
         val newThreadDraft: NewThreadDraft,
         val appUpdate: AppUpdateState
     )
+
+    private data class EditResendDraftState(
+        val pendingEditResend: PendingEditResendState?,
+        val newThreadDraft: NewThreadDraft,
+        val appUpdate: AppUpdateState
+    )
+
+    private val editResendDraftState = combine(
+        pendingEditResend,
+        newThreadDraft,
+        appUpdate
+    ) { editResend, draft, update ->
+        EditResendDraftState(
+            pendingEditResend = editResend,
+            newThreadDraft = draft,
+            appUpdate = update
+        )
+    }
 
     private val draftLocalState = combine(
         isNewThreadDraft,
         draftSubmissionInFlight,
         forkingThreadId,
-        newThreadDraft,
-        appUpdate
-    ) { draftMode, submittingDraft, forkingId, draft, update ->
+        editResendDraftState
+    ) { draftMode, submittingDraft, forkingId, editResendState ->
         DraftLocalState(
             isNewThreadDraft = draftMode,
             draftSubmissionInFlight = submittingDraft,
             forkingThreadId = forkingId,
-            newThreadDraft = draft,
-            appUpdate = update
+            pendingEditResend = editResendState.pendingEditResend,
+            newThreadDraft = editResendState.newThreadDraft,
+            appUpdate = editResendState.appUpdate
         )
     }
 
@@ -70,6 +92,7 @@ internal class HomeUiStateStore(
             isNewThreadDraft = draftState.isNewThreadDraft,
             draftSubmissionInFlight = draftState.draftSubmissionInFlight,
             forkingThreadId = draftState.forkingThreadId,
+            pendingEditResend = draftState.pendingEditResend,
             newThreadDraft = draftState.newThreadDraft,
             appUpdate = draftState.appUpdate
         )
@@ -84,6 +107,7 @@ internal class HomeUiStateStore(
             composer = text,
             composerExpanded = local.showComposerDetails,
             composerFocusRequest = local.composerFocusRequest,
+            pendingEditResend = local.pendingEditResend,
             isNewThreadDraft = local.isNewThreadDraft,
             draftSubmissionInFlight = local.draftSubmissionInFlight,
             isForkingThread = local.forkingThreadId != null,
@@ -97,6 +121,7 @@ internal class HomeUiStateStore(
             composer = composerText.value,
             composerExpanded = showComposerDetails.value,
             composerFocusRequest = composerFocusRequest.value,
+            pendingEditResend = pendingEditResend.value,
             isNewThreadDraft = isNewThreadDraft.value,
             draftSubmissionInFlight = draftSubmissionInFlight.value,
             isForkingThread = forkingThreadId.value != null,
@@ -115,6 +140,10 @@ internal class HomeUiStateStore(
 
     fun requestComposerFocus() {
         composerFocusRequest.update { it + 1L }
+    }
+
+    fun setPendingEditResend(update: PendingEditResendState?) {
+        pendingEditResend.value = update
     }
 
     fun startNewThreadDraft(cwd: String? = null) {
