@@ -1,1 +1,1 @@
-收口发布流水线 Node 运行时风险\n- release workflow 升级 checkout/setup-node/setup-java/download/upload/gh-release action 主版本\n- 去掉 setup-android action，改为 shell 方式初始化 Android SDK\n- 目标是消除 GitHub Actions 中的 Node 20 deprecated 告警，提高后续发版稳定性
+修复 release workflow Android SDK 初始化\n- 处理 sdkmanager license 管道在 pipefail 下的 SIGPIPE 失败\n- 继续验证 Node 24 action 升级后的发布链路\n- 目标是消除 Node 20 deprecated 告警且恢复稳定发包
