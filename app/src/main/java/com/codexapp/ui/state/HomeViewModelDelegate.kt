@@ -245,12 +245,12 @@ internal class HomeViewModelDelegate(
     fun downloadAppUpdate() {
         val current = uiStateStore.state.value.appUpdate
         if (current.status != AppUpdateStatus.AVAILABLE) return
-        uiStateStore.updateAppUpdate(appUpdateManager.enqueueSystemDownload(current))
+        appUpdateManager.enqueueSystemDownload(current)
     }
 
     fun openAppUpdateReleasePage() {
         val current = uiStateStore.state.value.appUpdate
         if (current.releasePageUrl.isBlank() && current.latestVersion.isBlank()) return
-        uiStateStore.updateAppUpdate(appUpdateManager.openReleasePage(current, "已打开 GitHub 发布页"))
+        appUpdateManager.openReleasePage(current)
     }
 }
