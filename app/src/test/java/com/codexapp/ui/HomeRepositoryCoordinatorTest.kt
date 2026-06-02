@@ -9,8 +9,12 @@ import com.codexapp.model.ThreadStatus
 import com.codexapp.model.ThreadSummary
 import com.codexapp.ui.state.ComposerSession
 import com.codexapp.ui.state.HomeRepositoryCoordinator
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
@@ -112,8 +116,95 @@ class HomeRepositoryCoordinatorTest {
         }
     }
 
+    @Test
+    fun disconnectedSnapshotSchedulesSingleReconnect() = runBlocking {
+        val repository = FakeSessionRepository(
+            initial = SessionRemoteState(
+                gatewayConfig = GatewayConfig(url = "ws://saved-gateway", pairToken = "pair"),
+                connectionStatus = ConnectionStatus.DISCONNECTED
+            )
+        )
+        val scope = CoroutineScope(coroutineContext + SupervisorJob())
+        val coordinator = HomeRepositoryCoordinator(
+            repository = repository,
+            scope = scope,
+            composerSession = ComposerSession(initialThreadId = "")
+        )
+
+        coordinator.start()
+        repeat(2) { yield() }
+        delay(1_650L)
+
+        assertEquals(
+            listOf(
+                GatewayConfig(url = "ws://saved-gateway", pairToken = "pair"),
+                GatewayConfig(url = "ws://saved-gateway", pairToken = "pair")
+            ),
+            repository.connectCalls
+        )
+        scope.cancel()
+    }
+
+    @Test
+    fun manualDisconnectPreventsAutoReconnect() = runBlocking {
+        val repository = FakeSessionRepository(
+            initial = SessionRemoteState(
+                gatewayConfig = GatewayConfig(url = "ws://saved-gateway", pairToken = "pair"),
+                connectionStatus = ConnectionStatus.DISCONNECTED
+            )
+        )
+        val scope = CoroutineScope(coroutineContext + SupervisorJob())
+        val coordinator = HomeRepositoryCoordinator(
+            repository = repository,
+            scope = scope,
+            composerSession = ComposerSession(initialThreadId = "")
+        )
+
+        coordinator.start()
+        repeat(2) { yield() }
+        coordinator.onManualDisconnect()
+        delay(1_650L)
+
+        assertEquals(
+            listOf(GatewayConfig(url = "ws://saved-gateway", pairToken = "pair")),
+            repository.connectCalls
+        )
+        scope.cancel()
+    }
+
+    @Test
+    fun manualConnectCancelsPendingAutoReconnect() = runBlocking {
+        val repository = FakeSessionRepository(
+            initial = SessionRemoteState(
+                gatewayConfig = GatewayConfig(url = "ws://saved-gateway", pairToken = "pair"),
+                connectionStatus = ConnectionStatus.DISCONNECTED
+            ),
+            connectBlocker = CompletableDeferred()
+        )
+        val scope = CoroutineScope(coroutineContext + SupervisorJob())
+        val coordinator = HomeRepositoryCoordinator(
+            repository = repository,
+            scope = scope,
+            composerSession = ComposerSession(initialThreadId = "")
+        )
+
+        coordinator.start()
+        yield()
+        coordinator.onManualConnect()
+        delay(1_650L)
+        repository.connectBlocker?.complete(Unit)
+        yield()
+
+        assertEquals(
+            listOf(GatewayConfig(url = "ws://saved-gateway", pairToken = "pair")),
+            repository.connectCalls
+        )
+        scope.cancel()
+    }
+
     private class FakeSessionRepository(
-        initial: SessionRemoteState
+        initial: SessionRemoteState,
+        val connectBlocker: CompletableDeferred<Unit>? = null
     ) : SessionRepository {
         val snapshot = MutableStateFlow(initial)
         val connectCalls = mutableListOf<GatewayConfig>()
@@ -123,6 +214,7 @@ class HomeRepositoryCoordinatorTest {
 
         override suspend fun connect(config: GatewayConfig) {
             connectCalls += config
+            connectBlocker?.await()
         }
 
         override suspend fun disconnect() = Unit

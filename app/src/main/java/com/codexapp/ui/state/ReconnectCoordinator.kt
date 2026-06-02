@@ -14,6 +14,8 @@ internal class ReconnectCoordinator {
 
     fun onManualConnect() {
         manualDisconnect = false
+        reconnectJob?.cancel()
+        reconnectJob = null
     }
 
     fun onManualDisconnect() {
