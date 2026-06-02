@@ -17,6 +17,7 @@ const options = parseArgs(
     Remote: "origin",
     Branch: "",
     RunChecks: false,
+    PushRetries: 3,
   },
   { booleanKeys: ["RunChecks"] }
 );
@@ -28,7 +29,7 @@ async function main() {
   const branch = options.Branch || await currentBranch();
   const notes = await resolveNotes();
 
-  await ensureNoExistingTag(tag, options.Remote);
+  await ensureNoExistingTag(tag, options.Remote, options.PushRetries);
   if (options.RunChecks) {
     await runChecked(process.execPath, [path.join(scriptDir, "pre-release-check.mjs")], {
       cwd: root,
@@ -44,15 +45,41 @@ async function main() {
     cwd: root,
     displayName: "git commit",
   });
-  await runChecked("git", ["push", options.Remote, branch], { cwd: root, displayName: "git push branch" });
+  await runCheckedWithRetry("git", ["push", options.Remote, branch], {
+    cwd: root,
+    displayName: "git push branch",
+    attempts: options.PushRetries,
+  });
   await runChecked("git", ["tag", "-a", tag, "-m", options.CommitMessage || `Release ${tag}`], {
     cwd: root,
     displayName: "git tag",
   });
-  await runChecked("git", ["push", options.Remote, tag], { cwd: root, displayName: "git push tag" });
+  await runCheckedWithRetry("git", ["push", options.Remote, tag], {
+    cwd: root,
+    displayName: "git push tag",
+    attempts: options.PushRetries,
+  });
 
   console.log(`[github-release] pushed ${branch} and ${tag}`);
   console.log("[github-release] tag push triggers GitHub Actions release build; not waiting for workflow completion");
+}
+
+async function runCheckedWithRetry(file, args, { attempts, displayName, cwd }) {
+  const total = Math.max(1, Number.isInteger(attempts) ? attempts : 1);
+  let lastError;
+  for (let attempt = 1; attempt <= total; attempt += 1) {
+    try {
+      await runChecked(file, args, { cwd, displayName });
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt >= total) {
+        break;
+      }
+      console.warn(`[github-release] ${displayName} failed, retry ${attempt + 1}/${total}: ${error.message}`);
+    }
+  }
+  throw lastError;
 }
 
 function validateOptions() {
@@ -98,18 +125,36 @@ async function currentBranch() {
   return branch;
 }
 
-async function ensureNoExistingTag(tag, remote) {
+async function ensureNoExistingTag(tag, remote, attempts) {
   const local = await runCapture("git", ["rev-parse", "-q", "--verify", `refs/tags/${tag}`], { cwd: root });
   if (local.code === 0) {
     throw new Error(`Local tag already exists: ${tag}`);
   }
-  const remoteTag = await runCapture("git", ["ls-remote", "--tags", remote, tag], { cwd: root });
-  if (remoteTag.code !== 0) {
-    throw new Error(remoteTag.stderr || `Failed to query remote tag ${tag}`);
-  }
+  const remoteTag = await runCaptureWithRetry("git", ["ls-remote", "--tags", remote, tag], {
+    cwd: root,
+    displayName: "git query remote tag",
+    attempts,
+  });
   if (remoteTag.stdout.trim()) {
     throw new Error(`Remote tag already exists: ${tag}`);
   }
+}
+
+async function runCaptureWithRetry(file, args, { attempts, displayName, cwd }) {
+  const total = Math.max(1, Number.isInteger(attempts) ? attempts : 1);
+  let lastResult;
+  for (let attempt = 1; attempt <= total; attempt += 1) {
+    const result = await runCapture(file, args, { cwd });
+    if (result.code === 0) {
+      return result;
+    }
+    lastResult = result;
+    if (attempt < total) {
+      const detail = (result.stderr || result.stdout || `exit ${result.code}`).trim();
+      console.warn(`[github-release] ${displayName} failed, retry ${attempt + 1}/${total}: ${detail}`);
+    }
+  }
+  throw new Error(lastResult?.stderr || lastResult?.stdout || `${displayName} failed`);
 }
 
 async function updateAndroidVersion(version, versionCode) {

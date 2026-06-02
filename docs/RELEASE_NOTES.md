@@ -1,8 +1,6 @@
 ## 本次更新
-- 增加移动端状态诊断折叠行，可查看会话选择、运行态、snapshot revision 和 action trace。
-- gateway 增加远程动作 trace 与入站日志摘要，提升状态同步问题排查能力且不输出 prompt 原文。
-- 新增发布前检查脚本和 GitHub 发包脚本，发布说明改为读取 docs/RELEASE_NOTES.md。
-- 收口新会话默认 chip、归档会话测试和历史窗口断言，减少旧逻辑回流风险。
+- 发布脚本增加 git push 分支/tag 和远端 tag 查询自动重试，降低 GitHub 网络 reset 时的人工介入。
+- 阶段性发包规范补充 PushRetries 参数，明确脚本触发 Actions 后不等待结果。
 
 ## Release 产物
 - CodexMobile.apk
