@@ -1,4 +1,1 @@
-## 本次更新
-- 修复 App live refresh 执行器为空实现的问题，运行中/审批中的当前会话会按 2.5 秒间隔受控刷新。
-- 会话切换、断开连接、会话空闲或目标变化时立即停止 live refresh，避免刷新旧会话造成跳转抖动。
-- 新增 live refresh 执行器单测，覆盖轮询、停止和防重复启动。
+统一项目命名为 codexapp\n- GitHub 仓库改为 codexapp\n- App 显示名、APK 名、release 链接统一为 codexapp\n- desktop-gateway 包名与 app-server clientInfo 统一为 codexapp 标识\n- Android applicationId、namespace、源码包路径迁移到 com.codexapp\n- 同步更新 README、wiki、设计文档与发布配置

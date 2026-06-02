@@ -196,7 +196,7 @@ codexapp/
 ├─ artifacts/                            构建或发布过程产生的临时成果物，默认不提交
 ├─ build/                                Gradle 根构建输出，默认不提交
 ├─ gradle/                               Gradle Wrapper 配置
-└─ stitch_codex_mobile_shell/            外部/辅助资源目录，改动前先确认用途
+└─ stitch_codexapp/            外部/辅助资源目录，改动前先确认用途
 ```
 
 ## 资料归档规则

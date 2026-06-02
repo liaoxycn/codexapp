@@ -22,7 +22,7 @@
 | 信息流文本选择 | 去掉消息复制按钮，改为像网页文本一样长按自由选择。 | 我阅读用户/助手/状态消息时，长按文本选择需要复制的片段；界面不再出现整条复制按钮。 | 原信息流有复制按钮，只能整条复制，占空间，也不符合用户想自由选择片段的诉求。 | 已移除用户菜单、助手消息、系统消息复制按钮；文本、markdown、reasoning、inline status 包装 `SelectionContainer`；Compose 测试已改为断言复制入口不存在。 |
 | 消息流 turn 级操作按钮 | 信息流操作按钮只挂在每个 turn 的可操作末尾消息上。 | 我阅读一个 turn 内的多段回复或多条用户输入时，只应在最终用户消息看到编辑/重发，只应在最终助手回复看到分叉；按钮应轻量贴边，不再挤占整列正文空间。 | 旧实现只要消息带 `rollbackNumTurns`/`forkNumTurns` 就显示按钮，导致同一 turn 内多条消息右侧都出现三点；按钮 32dp 独立占位，压缩右侧阅读空间。 | 新增 turn 边界判断，只在连续同角色消息的最后一条显示对应操作；按钮缩为 24dp，气泡/正文只预留 22dp 轻量空间；新增 Android 回归测试覆盖同 turn 多条用户/助手消息只末尾显示按钮。 |
 | turn 过程信息折叠 | 移动端消息流对齐 Desktop：执行过程增量输出，最终回复产出后默认收起过程，最终回复全文显示。 | 我发送一个长任务；运行中我能持续看到 reasoning、命令、状态和流式 assistant 文本。等 turn 真正结束并出现最终回复后，我期望最终回复成为主内容且完整显示，不再需要底部“展开/收起”；过程信息移动到最终回复顶部的“已处理 X 项”入口，点开才展开详情。 | 旧移动端把过程消息和最终回复按消息数组平铺，完成后过程仍占据大量屏幕空间；如果把过程直接隐藏，又会导致运行中无法看增量进度。后续发现最终回复底部仍有“展开/收起全文”，和 turn 顶部过程展开入口重复；再复测发现运行中已有 assistant 文本时会被误判成最终回复，导致过程提前收起；根因是移动端用“有 assistant 文本”推断最终回复，协议没有显式最终标记，`isGenerating` 又可能短暂不同步。 | gateway 新增 `isFinal`，只在 app-server turn `completedAt` 存在或 `status` 为终态时标记 assistant 文本为最终回复；Android 协议/模型同步该字段，`toTurnMessageItems` 只在 `isFinal=true` 时收起过程。未最终完成时，即使已有流式 assistant 文本且全局生成态短暂为空闲，也保持过程信息平铺增量显示；新增单测覆盖运行中流式文本不折叠、完成后折叠、跨 turn 不串、协议最终标记透传。 |
-| App 更新检查 | App 冷启动后异步检查 GitHub Releases，有新版本时在抽屉顶部提示，下载交给系统默认下载器。 | 我打开 App，进程冷启动时自动查询 `liaoxycn/CodexMobileApp` 最新 release；后台切走再切回不应重复检查。若 release 版本大于本地版本，我打开抽屉应在 gateway 状态下方看到小号警告色更新提示；点击后优先交给系统下载器；若系统下载器不可用或启动失败，应自动打开浏览器跳转 GitHub latest release 页面。 | 旧实现放在 ViewModel init，后台恢复导致 Activity/ViewModel 重建时可能重复检查；下载用 App 内 OkHttp 写文件并显示进度，完成后再拉安装器，容易触发“安装未知应用”授权页。后续发现仅返回下载错误仍不够，部分设备/权限环境下系统下载器可能不可用。 | 新增进程级 `AppUpdateStartupGate`，只允许冷启动检查一次；下载改为 `DownloadManager.enqueue`，保存到公共 Downloads，通知由系统下载器显示；移除 App 内下载进度、FileProvider、`REQUEST_INSTALL_PACKAGES` 和安装入口；系统下载器不可用、下载地址为空或 enqueue 异常时，自动用 `ACTION_VIEW` 打开 GitHub latest release 页面；单测覆盖版本比较和启动闸门。 |
+| App 更新检查 | App 冷启动后异步检查 GitHub Releases，有新版本时在抽屉顶部提示，下载交给系统默认下载器。 | 我打开 App，进程冷启动时自动查询 `liaoxycn/codexapp` 最新 release；后台切走再切回不应重复检查。若 release 版本大于本地版本，我打开抽屉应在 gateway 状态下方看到小号警告色更新提示；点击后优先交给系统下载器；若系统下载器不可用或启动失败，应自动打开浏览器跳转 GitHub latest release 页面。 | 旧实现放在 ViewModel init，后台恢复导致 Activity/ViewModel 重建时可能重复检查；下载用 App 内 OkHttp 写文件并显示进度，完成后再拉安装器，容易触发“安装未知应用”授权页。后续发现仅返回下载错误仍不够，部分设备/权限环境下系统下载器可能不可用。 | 新增进程级 `AppUpdateStartupGate`，只允许冷启动检查一次；下载改为 `DownloadManager.enqueue`，保存到公共 Downloads，通知由系统下载器显示；移除 App 内下载进度、FileProvider、`REQUEST_INSTALL_PACKAGES` 和安装入口；系统下载器不可用、下载地址为空或 enqueue 异常时，自动用 `ACTION_VIEW` 打开 GitHub latest release 页面；单测覆盖版本比较和启动闸门。 |
 | 信息流上滑刷新 | 消息流滚到底部后继续上滑应触发当前会话刷新。 | 我在信息流底部继续向上滑动；我期望看到刷新提示并刷新当前会话，不需要去抽屉点刷新。 | 旧实现只在底部 overscroll 后的 `onPostFling` 触发刷新；前面收窄消息列表底部空白后，普通拖拽松手经常没有 fling 回调，表现为提示不稳定或完全不刷新。 | 上滑距离达到阈值后立即触发一次刷新，不再依赖 fling；增加短时去重避免连续触发；新增单测覆盖到达阈值触发、生成中/刷新中/已触发时不重复触发。 |
 | 顶部下拉加载历史 | 消息流滚到顶部后继续下拉，应加载更早历史消息。 | 我进入长会话，滚到最顶部，再继续向下拉；我期望出现“加载更早消息”，旧消息插入后当前阅读锚点保持稳定。 | 前面改底部上滑刷新后，消息列表 nested scroll 只接了底部刷新；历史加载仍是旧的“到顶并停止后自动触发”，没有真正监听顶部下拉 overscroll，用户感知像功能消失。 | 新增顶部历史加载 nested scroll 控制器：只有在顶部、存在历史、非加载中且下拉距离超过阈值才触发 `load_older_messages`；保留加载后的锚点恢复；与底部上滑刷新合并到同一个 nested scroll 管线，互不抢方向；单测和 androidTest 编译已覆盖。 |
 | 消息流窗口与边缘手势 | 默认多展示 turn，顶部加载历史和底部刷新要顺滑稳定。 | 我打开长会话，默认应看到足够多的上下文；滚到顶部继续下拉应稳定加载历史，滚到底部继续上拉应稳定刷新，不该卡在必须精准 overscroll 的手感。 | 旧 gateway 初始窗口只有 24 条消息，长会话默认 turn 太少；Android 顶部/底部触发都依赖 `available.y` 和严格到顶/到底，许多正常拖拽被 LazyColumn 消耗后不会触发。 | gateway 初始窗口和分页步长提升到 80 条；Android 边缘判断允许 24px 容差，顶部/底部都用 consumed/available 方向累计拖拽，阈值降为 88/96px；保留历史锚点恢复和底部刷新短时去重。 |
@@ -106,11 +106,11 @@
 - `.\gradlew.bat :app:compileDebugKotlin`：通过。
 - `.\gradlew.bat :app:testDebugUnitTest`：通过。
 - `node scripts/dev-run.mjs`：通过；消息流底部空白修复后已重新编译安装并打开 App，未卸载。
-- `.\gradlew.bat :app:testDebugUnitTest --tests com.codex.mobile.ui.ThreadScreenStateTest`：通过。
+- `.\gradlew.bat :app:testDebugUnitTest --tests com.codexapp.ui.ThreadScreenStateTest`：通过。
 - `.\gradlew.bat :app:testDebugUnitTest`：通过。
 - ADB 复测：`md2html / 项目会话测试` 长会话底部在输入工具收起态、展开态都不再出现异常高空白。
 - `node scripts/dev-run.mjs`：通过；配置行去中文标签后已重新编译安装并打开 App，未卸载。
-- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codex.mobile.ui.ThreadScreenStateTest`：通过。
+- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codexapp.ui.ThreadScreenStateTest`：通过。
 - ADB 复测：真实会话输入工具展开后配置行显示为 `workspace-write · my_codex · gpt-5.4-mini · medium`。
 - `node scripts/dev-run.mjs`：通过；全局 operational notice 修复后已重启 gateway、编译安装并打开 App，未卸载。
 - `desktop-gateway npm run build`：通过。
@@ -118,53 +118,53 @@
 - ADB 截图复测：标题栏右侧新建按钮已消失，标题仍居中。
 - ADB 手工复测：新会话页不再显示项目选择，模型/推理为同宽下拉；快捷面板只剩紧凑的“清空//命令/文件”，不再显示 Shell、“默认项目”和文件 chip；打开 `/命令` 不误插命令；连续返回先关 `/命令`，再收起输入工具条；`md2html / 项目会话测试` 后台再打开仍保持原会话；`force-stop` 冷启动仍进入“新对话”；抽屉搜索切换会话后键盘收起、输入区回到底部；“滚到底部”按钮不再遮挡右侧用户消息操作按钮；底部消息操作按钮不再伸进 composer；搜索 `md2html` 时目标项目排在预览命中的 `codexapp` 前面。
 - `node scripts/dev-run.mjs`：通过；编辑后重发延迟回滚改动后已重新编译安装并打开 App，未卸载。
-- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codex.mobile.ui.ComposerActionHandlerTest`：通过；覆盖点击只回填、发送才调用 `resend_prompt`、失败保留草稿。
+- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codexapp.ui.ComposerActionHandlerTest`：通过；覆盖点击只回填、发送才调用 `resend_prompt`、失败保留草稿。
 - `node scripts/dev-run.mjs`：通过；全局 operational notice 弹幕改动后已重新编译安装并打开 App，未卸载。
 - `node scripts/dev-run.mjs`：通过；弹幕透明度、黑字样式和避让标题栏调整后已重新编译安装并打开 App，未卸载。
 - `node scripts/dev-run.mjs`：通过；turn 过程信息折叠改动后已重新编译安装并打开 App，未卸载。
-- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codex.mobile.ui.MessageTurnActionsTest --tests com.codex.mobile.ui.ThreadScreenStateTest`：通过。
+- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codexapp.ui.MessageTurnActionsTest --tests com.codexapp.ui.ThreadScreenStateTest`：通过。
 - `node scripts/dev-run.mjs`：通过；新会话模型读取中修复后已重新编译安装并打开 App，未卸载，gateway 错误日志尾部为空。
 - `desktop-gateway npm run build`：通过。
 - `desktop-gateway node --test test\appServerClient.test.mjs test\bridgeBackend.test.mjs`：通过，36 个测试通过。
-- `.\gradlew.bat :app:testDebugUnitTest --tests com.codex.mobile.ui.NewThreadDraftCardOptionsTest --tests com.codex.mobile.ui.GatewaySnapshotMapperTest`：通过。
+- `.\gradlew.bat :app:testDebugUnitTest --tests com.codexapp.ui.NewThreadDraftCardOptionsTest --tests com.codexapp.ui.GatewaySnapshotMapperTest`：通过。
 - `node scripts/dev-run.mjs`：通过；最终 assistant 回复全文显示改动后已重新编译安装并打开 App，未卸载。
-- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codex.mobile.ui.MessageTurnActionsTest --tests com.codex.mobile.ui.CodeBlockLogicTest`：通过。
+- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codexapp.ui.MessageTurnActionsTest --tests com.codexapp.ui.CodeBlockLogicTest`：通过。
 - `desktop-gateway npm run build`：通过。
 - `desktop-gateway node --test test\notificationCoverage.test.mjs test\backendActions.test.mjs`：通过，22 个测试通过。
-- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codex.mobile.ui.GatewaySnapshotMapperTest --tests com.codex.mobile.data.GatewayInboundStateReducerTest`：通过。
+- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codexapp.ui.GatewaySnapshotMapperTest --tests com.codexapp.data.GatewayInboundStateReducerTest`：通过。
 - `.\gradlew.bat :app:testDebugUnitTest`：通过。
 - `node scripts/dev-run.mjs`：通过；新对话表单垂直居中改动后已重新编译安装并打开 App，未卸载。
 - `.\gradlew.bat :app:compileDebugKotlin`：通过。
-- `.\gradlew.bat :app:testDebugUnitTest --tests com.codex.mobile.ui.NewThreadDraftCardOptionsTest`：通过。
+- `.\gradlew.bat :app:testDebugUnitTest --tests com.codexapp.ui.NewThreadDraftCardOptionsTest`：通过。
 - `node scripts/dev-run.mjs`：通过；App 更新检查/下载入口改动后已重新编译安装并打开 App，未卸载。
-- GitHub release 实查：`latest=v0.1.7`，APK asset 为 `CodexMobile.apk`，本地调试包 `0.1.8`，因此当前不会弹更新提示。
-- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codex.mobile.update.AppUpdateManagerTest --tests com.codex.mobile.ui.MessageTurnActionsTest`：通过。
+- GitHub release 实查：`latest=v0.1.7`，APK asset 为 `codexapp.apk`，本地调试包 `0.1.8`，因此当前不会弹更新提示。
+- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codexapp.update.AppUpdateManagerTest --tests com.codexapp.ui.MessageTurnActionsTest`：通过。
 - `node scripts/dev-run.mjs`：通过；信息流上滑刷新触发修复后已重新编译安装并打开 App，未卸载。
-- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codex.mobile.ui.ThreadPullRefreshControllerTest --tests com.codex.mobile.ui.ThreadScreenStateTest`：通过。
+- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codexapp.ui.ThreadPullRefreshControllerTest --tests com.codexapp.ui.ThreadScreenStateTest`：通过。
 - `node scripts/dev-run.mjs`：通过；turn 顶部耗时和三点菜单改动后已重新编译安装并打开 App，未卸载。
 - `desktop-gateway npm run build`：通过。
 - `desktop-gateway node --test test\bridgeBackend.test.mjs test\turnFinalization.test.mjs test\threadState.test.mjs`：通过，58 个测试通过。
-- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codex.mobile.ui.AssistantMessageHeaderTest --tests com.codex.mobile.ui.GatewaySnapshotMapperTest --tests com.codex.mobile.ui.MessageTurnActionsTest`：通过。
+- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codexapp.ui.AssistantMessageHeaderTest --tests com.codexapp.ui.GatewaySnapshotMapperTest --tests com.codexapp.ui.MessageTurnActionsTest`：通过。
 - `node scripts/dev-run.mjs`：通过；最终回复显式 `isFinal` 协议修复后已重新编译安装并打开 App，未卸载。
 - `desktop-gateway npm run build`：通过。
 - `desktop-gateway node --test test\runtimeSnapshotMessages.test.mjs test\bridgeBackend.test.mjs test\turnFinalization.test.mjs test\threadState.test.mjs`：通过，62 个测试通过。
-- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codex.mobile.ui.MessageTurnActionsTest --tests com.codex.mobile.ui.GatewaySnapshotMapperTest --tests com.codex.mobile.ui.AssistantMessageHeaderTest`：通过。
+- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codexapp.ui.MessageTurnActionsTest --tests com.codexapp.ui.GatewaySnapshotMapperTest --tests com.codexapp.ui.AssistantMessageHeaderTest`：通过。
 - `node scripts/dev-run.mjs`：通过；assistant turn 操作迁移到底部图标栏后已重新编译安装并打开 App，未卸载。
-- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codex.mobile.ui.AssistantMessageHeaderTest --tests com.codex.mobile.ui.MessageTurnActionsTest`：通过。
+- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codexapp.ui.AssistantMessageHeaderTest --tests com.codexapp.ui.MessageTurnActionsTest`：通过。
 - `.\gradlew.bat :app:compileDebugAndroidTestKotlin`：通过；同步验证底部图标标签和旧 DrawerContent 测试调用可编译。
 - `node scripts/dev-run.mjs`：通过；运行中 turn 耗时实时更新改动后已重新编译安装并打开 App，未卸载。
 - `desktop-gateway npm run build`：通过。
 - `desktop-gateway node --test test\runtimeSnapshotMessages.test.mjs test\bridgeBackend.test.mjs test\threadState.test.mjs`：通过，61 个测试通过。
-- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codex.mobile.ui.AssistantMessageHeaderTest --tests com.codex.mobile.ui.MessageTurnActionsTest --tests com.codex.mobile.ui.GatewaySnapshotMapperTest`：通过。
-- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codex.mobile.ui.ThreadScreenStateTest --tests com.codex.mobile.ui.ThreadPullRefreshControllerTest`：通过。
+- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codexapp.ui.AssistantMessageHeaderTest --tests com.codexapp.ui.MessageTurnActionsTest --tests com.codexapp.ui.GatewaySnapshotMapperTest`：通过。
+- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codexapp.ui.ThreadScreenStateTest --tests com.codexapp.ui.ThreadPullRefreshControllerTest`：通过。
 - `.\gradlew.bat :app:compileDebugAndroidTestKotlin`：通过；验证顶部下拉加载历史相关仪器测试可编译。
 - `node scripts/dev-run.mjs`：通过；顶部下拉加载历史修复后已重新编译安装并打开 App，未卸载。
 - `desktop-gateway npm run build`：通过。
 - `desktop-gateway node --test test\messageMapping.test.mjs test\runtimeSnapshotMessages.test.mjs test\bridgeBackend.test.mjs`：通过，42 个测试通过。
-- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codex.mobile.ui.AssistantMessageCardsTest --tests com.codex.mobile.ui.MessageTurnActionsTest --tests com.codex.mobile.ui.ThreadScreenStateTest`：通过。
+- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codexapp.ui.AssistantMessageCardsTest --tests com.codexapp.ui.MessageTurnActionsTest --tests com.codexapp.ui.ThreadScreenStateTest`：通过。
 - `node scripts/dev-run.mjs`：通过；过程信息流增强后已重新编译安装并打开 App，未卸载。
 - 发布前完整自测：`node scripts/dev-run.mjs`、`desktop-gateway npm run build`、`desktop-gateway node --test test\*.test.mjs`、`desktop-gateway npm run protocol:selftest`、`.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest`、`.\gradlew.bat :app:compileDebugAndroidTestKotlin` 均通过；APK 保持安装状态。
-- `.\gradlew.bat :app:testDebugUnitTest --tests com.codex.mobile.ui.HomeUiStateStoreTest --tests com.codex.mobile.data.GatewayRepositoryCommandActionsTest --tests com.codex.mobile.ui.GatewaySnapshotMapperTest --tests com.codex.mobile.ui.SessionRemoteMutationsTest`：通过；覆盖新会话提交态和 optimistic 消息去重。
+- `.\gradlew.bat :app:testDebugUnitTest --tests com.codexapp.ui.HomeUiStateStoreTest --tests com.codexapp.data.GatewayRepositoryCommandActionsTest --tests com.codexapp.ui.GatewaySnapshotMapperTest --tests com.codexapp.ui.SessionRemoteMutationsTest`：通过；覆盖新会话提交态和 optimistic 消息去重。
 - `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest`：通过。
 - `desktop-gateway npm run build`：通过。
 - `desktop-gateway node --test test\*.mjs`：通过，165 个测试通过。
@@ -180,12 +180,12 @@
 - `desktop-gateway npm run build` + `node --test desktop-gateway/test/threadSummaries.test.mjs desktop-gateway/test/bridgeBackend.test.mjs`：通过，42 个测试通过。
 - ADB 抽屉复测：第一屏已显示 `codexapp/1`、`codexapp/hello`、`md2html/写一个1`；继续滚动后命中普通会话 `回复一下`、`查看深圳天气`、`重启会话是否中断`。
 - `node scripts/dev-run.mjs`：通过；App 更新检查改为冷启动一次、系统下载器下载后已重新编译安装并打开 App，未卸载。
-- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codex.mobile.update.AppUpdateManagerTest`：通过；覆盖版本比较和进程级启动检查闸门。
+- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codexapp.update.AppUpdateManagerTest`：通过；覆盖版本比较和进程级启动检查闸门。
 - ADB 抽屉烟测：源码和 UI 检索均确认更新提示不再包含 `下载更新`、`正在下载`、`立即安装`；当前未触发新版提示时不展示下载行。
 - `desktop-gateway npm run build`：通过。
 - `node --test desktop-gateway/test/turnFinalization.test.mjs desktop-gateway/test/bridgeBackend.test.mjs desktop-gateway/test/runtimeSummaryState.test.mjs desktop-gateway/test/threadState.test.mjs desktop-gateway/test/notificationCoverage.test.mjs`：通过，79 个测试通过；覆盖会话运行态租约、多 loop finalize 竞态和 stale refresh。
 - `node scripts/dev-run.mjs`：通过；已重启真实 gateway、编译安装 debug APK、打开 App，日志显示 Android hello 握手成功，未卸载 App。
-- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codex.mobile.update.AppUpdateManagerTest`：通过；覆盖更新检查基础逻辑并验证 App 更新改动可编译。
+- `.\gradlew.bat :app:compileDebugKotlin :app:testDebugUnitTest --tests com.codexapp.update.AppUpdateManagerTest`：通过；覆盖更新检查基础逻辑并验证 App 更新改动可编译。
 - `node scripts/dev-run.mjs`：通过；系统下载器优先、浏览器打开 GitHub latest release 兜底改动后已重新编译安装并打开 App，未卸载。
 - `.\gradlew.bat :app:compileDebugKotlin`：通过；Desktop 同步确认重启弹窗补充原因文案后编译通过。
 - `node scripts/dev-run.mjs`：通过；Desktop 同步确认重启弹窗文案改动后已重新编译安装并打开 App，未卸载。
@@ -201,7 +201,7 @@
 | 输入区和文件选择 | 快捷区只保留清空、命令、文件，文件选择可读。 | 我展开输入区，打开 `/命令` 和文件面板，确认按钮紧凑、文件为项目内树形相对路径。 | 已移除紧凑/常规、压缩、回滚、Shell、默认项目等入口；文件面板改为项目内树形搜索。 |
 | Desktop 同步提示 | 移动端改动后提示是否重启 Desktop，但有运行中会话时不提示，且确认后才执行。 | 我从手机重命名/归档/分叉/发送消息，抽屉顶部出现小号警告色重启提示；点提示先弹警告确认；有运行中会话时不出现。 | `/poke` 旧自动刷新逻辑已删除，保留接口；gateway 记录移动端变更并提供 Desktop 重启提示；App 已增加二次确认弹窗；本轮补充重启原因：Desktop 不会实时自动刷新移动端触发的外部会话变更，重启用于重新读取会话索引。 |
 | App 更新 | 冷启动后异步检查 GitHub release。 | 我安装低版本包，打开 App，看到更新提示；后台切回不重复检查；点击后由系统下载器下载 APK。 | 已接入 GitHub latest release API、进程级启动检查闸门和 Android `DownloadManager`；App 内不显示下载进度，不再拉应用内安装 intent。 |
-| 发布工程化 | 本地和 GitHub Actions 都能打包 APK。 | 我运行本地 dev-run 自测，再推送 tag，等待 release workflow 产出 `CodexMobile.apk`。 | 已新增本地脚本，更新 release workflow 说明和项目 wiki；发布前继续跑完整自测。 |
+| 发布工程化 | 本地和 GitHub Actions 都能打包 APK。 | 我运行本地 dev-run 自测，再推送 tag，等待 release workflow 产出 `codexapp.apk`。 | 已新增本地脚本，更新 release workflow 说明和项目 wiki；发布前继续跑完整自测。 |
 
 ## 下一步优先级
 
@@ -227,3 +227,5 @@
 | 断线瞬态清理 | 断线/失败/解析错误后不应残留切换、刷新、加载遮罩。 | 我在切换会话、加载历史或手动刷新时遇到 gateway 断开；我期望立即看到断线/错误状态，不再卡在“正在切换会话”“刷新中”或加载历史状态。 | 旧断线收口只清理 `isGenerating/pendingApproval`，没有清 `pendingSelectionThreadId/pendingThreadTitle/isThreadSwitching/isLoadingOlder/isManualRefreshing`。已让断线、连接失败、手动断开、入站解析失败统一清理这些瞬态；补充 mutation 单测覆盖。 |
 | 发布 latest 摘要 | 发布脚本结束后应有固定路径摘要，避免每次翻长日志判断状态。 | 我运行发布脚本后，只需查看 `scripts/logs/github-release-latest.json`，即可知道版本、tag、日志路径、branch/tag push 结果和 Actions 触发状态。 | 旧日志只有时间戳文件，外部 AI 或用户要判断上次发包是否成功仍需找最新日志再阅读。已新增 latest JSON 摘要，脚本任何内部错误仍写入状态且对外退出正常；实际重试发现 Markdown 说明里出现 `-Notes` 字样会被误判为参数，已改为只识别完整 CLI option token 并补回归测试。 |
 | App 入站日志脱敏 | 移动端调试日志应帮助排查协议状态，但不能输出完整消息正文。 | 我用 logcat 排查 gateway 连接时，只需要看到入站消息类型、revision、线程/消息数量、changed 字段、运行态等摘要；不应把用户 prompt、助手回复、状态 detail 全量打印出来。 | `GatewayRepositoryConnection` 旧日志直接 `Log.d("inbound: $raw")`，长消息会刷屏且可能泄露正文。本轮改成 `summarizeInboundForLog` 结构化摘要，异常 JSON 也只记录字节数和错误类型；新增单测确保 title/preview/正文/detail 不出现在日志摘要里。 |
+| 全局通知 toast 视觉 | 右上角 operational notice 应像常规 toast，清楚可读且不挡标题栏。 | 我触发 MCP/账号等全局通知时，希望看到不透明气泡、清晰字体和稳定位置，而不是过透明的弹幕浮层；通知应整体下移，不压住顶部标题栏。 | 旧样式使用半透明白底和偏轻文字，贴近顶部且行间距过小，可读性差。本轮改为深色不透明 toast 气泡、13sp 中等字重、轻阴影、14dp 圆角，整体下移到标题栏下方，最多同时显示 3 条，并补 Compose 渲染测试。 |
+| 未完成 assistant 禁用操作 | 对话未完成的 turn assistant 不能出现复制和分叉功能。 | 我观察正在生成的 assistant 回复；即使底部显示实时耗时，也不应看到“复制文本”或“从此处分叉”按钮，避免复制半截内容或从未稳定上下文分叉。 | 旧 UI 只看消息是否在 turn 末尾和 `isFinal` 元数据，若运行中消息带了 final/fork 元数据仍可能暴露操作。本轮给运行中的当前 turn 标记 `assistantActionsEnabled=false`，只禁复制/分叉，保留耗时显示；补单测和 Compose 回归测试。 |

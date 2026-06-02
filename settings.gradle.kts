@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "CodexMobileShell"
+rootProject.name = "codexapp"
 include(":app")

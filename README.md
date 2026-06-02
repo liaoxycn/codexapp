@@ -1,4 +1,4 @@
-# Codex Mobile Shell
+# codexapp
 
 这是一个 Android 客户端壳应用，用来在手机上连接桌面端 `desktop-gateway`，再由 `desktop-gateway` 转发到本机 `codex app-server`。
 
@@ -44,7 +44,7 @@ codex app-server
 ### 2.2 下载项目
 
 ```powershell
-git clone https://github.com/liaoxycn/CodexMobileApp.git
+git clone https://github.com/liaoxycn/codexapp.git
 cd codexapp
 ```
 
@@ -99,7 +99,7 @@ node .\scripts\build-apk.mjs
 打包完成后，APK 输出位置：
 
 ```text
-app/build/outputs/apk/release/CodexMobile.apk
+app/build/outputs/apk/release/codexapp.apk
 ```
 
 ### 3.2 从 GitHub Release 下载 APK
@@ -107,9 +107,9 @@ app/build/outputs/apk/release/CodexMobile.apk
 本项目的 GitHub Release 会上传现成 APK，文件名是：
 
 ```text
-CodexMobile.apk
+codexapp.apk
 ```
 
 如果你不想本地配置 Android 打包环境，直接去 GitHub Release 页面下载：
 
-[https://github.com/liaoxycn/CodexMobileApp/releases](https://github.com/liaoxycn/CodexMobileApp/releases)
+[https://github.com/liaoxycn/codexapp/releases](https://github.com/liaoxycn/codexapp/releases)

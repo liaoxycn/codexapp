@@ -22,13 +22,13 @@ test("parseArgs consumes multi-part release notes until the next known option", 
 });
 
 test("parseArgs keeps normal single-value parsing strict", () => {
-  const parsed = withArgv(["-OutputName", "CodexMobile.apk"], () =>
+  const parsed = withArgv(["-OutputName", "codexapp.apk"], () =>
     parseArgs({
       OutputName: "",
     })
   );
 
-  assert.equal(parsed.OutputName, "CodexMobile.apk");
+  assert.equal(parsed.OutputName, "codexapp.apk");
 });
 
 test("parseArgs supports consume-rest values passed with equals syntax", () => {

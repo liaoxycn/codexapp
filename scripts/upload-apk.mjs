@@ -13,7 +13,7 @@ const options = parseArgs({
   WebDavUser: process.env.CODEX_WEBDAV_USER,
   WebDavPassword: process.env.CODEX_WEBDAV_PASSWORD,
   RemotePath: "codex",
-  ApkPath: path.join(root, "app", "build", "outputs", "apk", "release", "CodexMobile.apk"),
+  ApkPath: path.join(root, "app", "build", "outputs", "apk", "release", "codexapp.apk"),
 });
 
 async function main() {

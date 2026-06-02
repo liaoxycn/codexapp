@@ -14,7 +14,7 @@ import {
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(scriptDir, "..");
-const options = parseArgs({ OutputName: "CodexMobile.apk" });
+const options = parseArgs({ OutputName: "codexapp.apk" });
 
 async function main() {
   const apkDir = path.join(root, "app", "build", "outputs", "apk", "release");

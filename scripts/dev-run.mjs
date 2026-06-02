@@ -33,7 +33,7 @@ const paths = {
 const options = parseArgs(
   {
     GatewayDir: path.join(scriptDir, "..", "desktop-gateway"),
-    AppId: "com.codex.mobile",
+    AppId: "com.codexapp",
     Activity: ".MainActivity",
     GatewayHost: "127.0.0.1",
     GatewayBindHost: "0.0.0.0",

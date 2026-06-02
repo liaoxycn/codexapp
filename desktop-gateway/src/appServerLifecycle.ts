@@ -32,7 +32,7 @@ export async function startAppServerSession(
     InitializeResult
   >("initialize", {
     clientInfo: {
-      name: "codex-mobile-desktop-gateway",
+      name: "codexapp-desktop-gateway",
       version: "0.1.0",
     },
     capabilities: null,

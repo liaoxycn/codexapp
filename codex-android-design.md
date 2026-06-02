@@ -452,14 +452,14 @@ gateway -> Android：
 - 自动拉起 `codexflow_api35` 模拟器并等待开机完成
 - 启动 `desktop-gateway` dev 模式并等待端口监听
 - 安装 `debug` APK 到当前模拟器/设备
-- 打开 `com.codex.mobile/.MainActivity`
+- 打开 `com.codexapp/.MainActivity`
 - 将日志写入 `artifacts/`
 
 ### 17.2 例外情况
 只有在排障时，才允许手工拆开执行：
 - `cd desktop-gateway && npm run dev`
 - `.\gradlew.bat :app:installDebug`
-- `adb shell am start -n com.codex.mobile/.MainActivity`
+- `adb shell am start -n com.codexapp/.MainActivity`
 
 ### 17.3 约定
 - 后续所有调试记录默认以 `scripts/dev-run.ps1` 为准。
