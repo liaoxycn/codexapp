@@ -131,7 +131,8 @@ class GatewayRepositoryCommandActionsTest {
                 model = "gpt-5",
                 reasoningEffort = "high",
                 permissionMode = "default"
-            )
+            ),
+            newThread = true
         )
 
         assertTrue(accepted)
@@ -169,7 +170,8 @@ class GatewayRepositoryCommandActionsTest {
 
         val accepted = actions.sendPrompt(
             "hello ordinary chat",
-            NewThreadDraft(model = "gpt-5", reasoningEffort = "high")
+            NewThreadDraft(model = "gpt-5", reasoningEffort = "high"),
+            newThread = true
         )
 
         assertTrue(accepted)

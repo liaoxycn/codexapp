@@ -6,6 +6,8 @@ internal class GatewayCommandSender(
     private val json: Json,
     private val sendText: (String) -> Boolean
 ) {
+    private val sendLock = Any()
+
     fun sendHello(pairToken: String, selectedThreadId: String? = null): Boolean {
         return send(
             GatewayHelloMessage(
@@ -100,12 +102,26 @@ internal class GatewayCommandSender(
         )
     }
 
-    fun resendPrompt(text: String, threadId: String?, rollbackNumTurns: Int): Boolean {
+    fun resendPrompt(
+        text: String,
+        threadId: String?,
+        rollbackNumTurns: Int,
+        model: String? = null,
+        reasoningEffort: String? = null,
+        approvalPolicy: String? = null,
+        approvalsReviewer: String? = null,
+        sandboxMode: String? = null
+    ): Boolean {
         return send(
             GatewayResendPromptMessage(
                 text = text,
                 threadId = threadId?.takeIf { it.isNotBlank() },
-                rollbackNumTurns = rollbackNumTurns.coerceAtLeast(1)
+                rollbackNumTurns = rollbackNumTurns.coerceAtLeast(1),
+                model = model?.takeIf { it.isNotBlank() },
+                reasoningEffort = reasoningEffort?.takeIf { it.isNotBlank() },
+                approvalPolicy = approvalPolicy?.takeIf { it.isNotBlank() },
+                approvalsReviewer = approvalsReviewer?.takeIf { it.isNotBlank() },
+                sandboxMode = sandboxMode?.takeIf { it.isNotBlank() }
             )
         )
     }
@@ -127,66 +143,72 @@ internal class GatewayCommandSender(
     }
 
     private fun send(message: GatewayHelloMessage): Boolean {
-        return sendText(json.encodeToString(GatewayHelloMessage.serializer(), message))
+        return sendSerialized(json.encodeToString(GatewayHelloMessage.serializer(), message))
     }
 
     private fun send(message: GatewayCreateThreadMessage): Boolean {
-        return sendText(json.encodeToString(GatewayCreateThreadMessage.serializer(), message))
+        return sendSerialized(json.encodeToString(GatewayCreateThreadMessage.serializer(), message))
     }
 
     private fun send(message: GatewaySelectThreadMessage): Boolean {
-        return sendText(json.encodeToString(GatewaySelectThreadMessage.serializer(), message))
+        return sendSerialized(json.encodeToString(GatewaySelectThreadMessage.serializer(), message))
     }
 
     private fun send(message: GatewayForkThreadMessage): Boolean {
-        return sendText(json.encodeToString(GatewayForkThreadMessage.serializer(), message))
+        return sendSerialized(json.encodeToString(GatewayForkThreadMessage.serializer(), message))
     }
 
     private fun send(message: GatewayRenameThreadMessage): Boolean {
-        return sendText(json.encodeToString(GatewayRenameThreadMessage.serializer(), message))
+        return sendSerialized(json.encodeToString(GatewayRenameThreadMessage.serializer(), message))
     }
 
     private fun send(message: GatewayArchiveThreadMessage): Boolean {
-        return sendText(json.encodeToString(GatewayArchiveThreadMessage.serializer(), message))
+        return sendSerialized(json.encodeToString(GatewayArchiveThreadMessage.serializer(), message))
     }
 
     private fun send(message: GatewayUnarchiveThreadMessage): Boolean {
-        return sendText(json.encodeToString(GatewayUnarchiveThreadMessage.serializer(), message))
+        return sendSerialized(json.encodeToString(GatewayUnarchiveThreadMessage.serializer(), message))
     }
 
     private fun send(message: GatewayRefreshThreadsMessage): Boolean {
-        return sendText(json.encodeToString(GatewayRefreshThreadsMessage.serializer(), message))
+        return sendSerialized(json.encodeToString(GatewayRefreshThreadsMessage.serializer(), message))
     }
 
     private fun send(message: GatewayLoadOlderMessagesMessage): Boolean {
-        return sendText(json.encodeToString(GatewayLoadOlderMessagesMessage.serializer(), message))
+        return sendSerialized(json.encodeToString(GatewayLoadOlderMessagesMessage.serializer(), message))
     }
 
     private fun send(message: GatewaySendPromptMessage): Boolean {
-        return sendText(json.encodeToString(GatewaySendPromptMessage.serializer(), message))
+        return sendSerialized(json.encodeToString(GatewaySendPromptMessage.serializer(), message))
     }
 
     private fun send(message: GatewayRollbackThreadMessage): Boolean {
-        return sendText(json.encodeToString(GatewayRollbackThreadMessage.serializer(), message))
+        return sendSerialized(json.encodeToString(GatewayRollbackThreadMessage.serializer(), message))
     }
 
     private fun send(message: GatewayResendPromptMessage): Boolean {
-        return sendText(json.encodeToString(GatewayResendPromptMessage.serializer(), message))
+        return sendSerialized(json.encodeToString(GatewayResendPromptMessage.serializer(), message))
     }
 
     private fun send(message: GatewayStopTurnMessage): Boolean {
-        return sendText(json.encodeToString(GatewayStopTurnMessage.serializer(), message))
+        return sendSerialized(json.encodeToString(GatewayStopTurnMessage.serializer(), message))
     }
 
     private fun send(message: GatewayApprovePendingMessage): Boolean {
-        return sendText(json.encodeToString(GatewayApprovePendingMessage.serializer(), message))
+        return sendSerialized(json.encodeToString(GatewayApprovePendingMessage.serializer(), message))
     }
 
     private fun send(message: GatewayRejectPendingMessage): Boolean {
-        return sendText(json.encodeToString(GatewayRejectPendingMessage.serializer(), message))
+        return sendSerialized(json.encodeToString(GatewayRejectPendingMessage.serializer(), message))
     }
 
     private fun send(message: GatewayRestartDesktopMessage): Boolean {
-        return sendText(json.encodeToString(GatewayRestartDesktopMessage.serializer(), message))
+        return sendSerialized(json.encodeToString(GatewayRestartDesktopMessage.serializer(), message))
+    }
+
+    private fun sendSerialized(payload: String): Boolean {
+        return synchronized(sendLock) {
+            sendText(payload)
+        }
     }
 }

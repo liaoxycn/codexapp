@@ -34,6 +34,7 @@ internal fun rememberThreadPullRefreshController(
 ): ThreadPullRefreshController {
     var pullDistance by rememberSaveable(selectedThreadId) { mutableFloatStateOf(0f) }
     var pullVelocity by rememberSaveable(selectedThreadId) { mutableFloatStateOf(0f) }
+    var pullGestureStartedAtBottom by rememberSaveable(selectedThreadId) { mutableStateOf(false) }
     var lastPullSampleAt by rememberSaveable(selectedThreadId) { mutableStateOf(0L) }
     var pullHintVisibleUntil by rememberSaveable(selectedThreadId) { mutableStateOf(0L) }
     var pullGestureTick by rememberSaveable(selectedThreadId) { mutableIntStateOf(0) }
@@ -65,14 +66,21 @@ internal fun rememberThreadPullRefreshController(
                     return Offset.Zero
                 }
                 if (!isAtBottom) {
-                    if (pullDistance != 0f) {
+                    if (pullDistance != 0f || pullGestureStartedAtBottom) {
                         pullDistance = 0f
                         pullVelocity = 0f
+                        pullGestureStartedAtBottom = false
                     }
                     return Offset.Zero
                 }
                 val upwardDrag = (-consumed.y).coerceAtLeast(-available.y).coerceAtLeast(0f)
                 if (upwardDrag > 0f) {
+                    if (pullDistance <= 0f) {
+                        pullGestureStartedAtBottom = isAtBottom
+                    }
+                    if (!pullGestureStartedAtBottom) {
+                        return Offset.Zero
+                    }
                     val now = SystemClock.uptimeMillis()
                     val elapsed = (now - lastPullSampleAt).coerceAtLeast(1L).toFloat()
                     pullVelocity = (upwardDrag / elapsed) * 1000f
@@ -83,6 +91,7 @@ internal fun rememberThreadPullRefreshController(
                             isAtBottom = isAtBottom,
                             isGenerating = isGenerating,
                             isManualRefreshing = isManualRefreshing,
+                            gestureStartedAtBottom = pullGestureStartedAtBottom,
                             pullDistance = pullDistance,
                             pullThreshold = pullThreshold,
                             refreshTriggered = refreshTriggered
@@ -93,10 +102,12 @@ internal fun rememberThreadPullRefreshController(
                         onRefreshCurrent()
                         pullDistance = 0f
                         pullVelocity = 0f
+                        pullGestureStartedAtBottom = false
                     }
-                } else if ((consumed.y > 0f || available.y > 0f) && pullDistance > 0f) {
+                } else if ((consumed.y > 0f || available.y > 0f) && (pullDistance > 0f || pullGestureStartedAtBottom)) {
                     pullDistance = 0f
                     pullVelocity = 0f
+                    pullGestureStartedAtBottom = false
                     refreshTriggered = false
                     pullGestureTick += 1
                 }
@@ -108,6 +119,7 @@ internal fun rememberThreadPullRefreshController(
                         isAtBottom = isAtBottom,
                         isGenerating = isGenerating,
                         isManualRefreshing = isManualRefreshing,
+                        gestureStartedAtBottom = pullGestureStartedAtBottom,
                         pullDistance = pullDistance,
                         pullThreshold = pullThreshold,
                         refreshTriggered = refreshTriggered
@@ -118,9 +130,12 @@ internal fun rememberThreadPullRefreshController(
                     onRefreshCurrent()
                     pullDistance = 0f
                     pullVelocity = 0f
+                    pullGestureStartedAtBottom = false
                     return Velocity.Zero
                 }
+                pullDistance = 0f
                 pullVelocity = 0f
+                pullGestureStartedAtBottom = false
                 return Velocity.Zero
             }
         }
@@ -144,6 +159,7 @@ internal fun rememberThreadPullRefreshController(
         ) {
             pullDistance = 0f
             pullVelocity = 0f
+            pullGestureStartedAtBottom = false
         }
     }
 
@@ -158,11 +174,13 @@ internal fun shouldTriggerPullRefresh(
     isAtBottom: Boolean,
     isGenerating: Boolean,
     isManualRefreshing: Boolean,
+    gestureStartedAtBottom: Boolean,
     pullDistance: Float,
     pullThreshold: Float,
     refreshTriggered: Boolean
 ): Boolean {
     return isAtBottom &&
+        gestureStartedAtBottom &&
         !isGenerating &&
         !isManualRefreshing &&
         !refreshTriggered &&

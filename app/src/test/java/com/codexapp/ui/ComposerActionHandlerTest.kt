@@ -15,7 +15,7 @@ class ComposerActionHandlerTest {
         val sentPrompts = mutableListOf<String>()
         val handler = handlerFor(
             session = session,
-            sendPrompt = { prompt, _ ->
+            sendPrompt = { prompt, _, _ ->
                 sentPrompts += prompt
                 true
             }
@@ -33,7 +33,7 @@ class ComposerActionHandlerTest {
         val session = ComposerSession("thread-1")
         val handler = handlerFor(
             session = session,
-            sendPrompt = { _, _ -> false }
+            sendPrompt = { _, _, _ -> false }
         )
 
         handler.updateComposer("draft")
@@ -48,7 +48,7 @@ class ComposerActionHandlerTest {
         val sentPrompts = mutableListOf<String>()
         val handler = handlerFor(
             session = session,
-            sendPrompt = { prompt, _ ->
+            sendPrompt = { prompt, _, _ ->
                 sentPrompts += prompt
                 true
             }
@@ -66,7 +66,7 @@ class ComposerActionHandlerTest {
         val sentPrompts = mutableListOf<String>()
         val handler = handlerFor(
             session = session,
-            sendPrompt = { prompt, _ ->
+            sendPrompt = { prompt, _, _ ->
                 sentPrompts += prompt
                 true
             }
@@ -84,7 +84,7 @@ class ComposerActionHandlerTest {
         val sentPrompts = mutableListOf<String>()
         val handler = handlerFor(
             session = session,
-            sendPrompt = { prompt, _ ->
+            sendPrompt = { prompt, _, _ ->
                 sentPrompts += prompt
                 true
             }
@@ -104,11 +104,11 @@ class ComposerActionHandlerTest {
         val resentPrompts = mutableListOf<Pair<String, Int>>()
         val handler = handlerFor(
             session = session,
-            sendPrompt = { prompt, _ ->
+            sendPrompt = { prompt, _, _ ->
                 sentPrompts += prompt
                 true
             },
-            resendPrompt = { prompt, rollbackNumTurns ->
+            resendPrompt = { prompt, rollbackNumTurns, _ ->
                 resentPrompts += prompt to rollbackNumTurns
                 true
             }
@@ -133,7 +133,7 @@ class ComposerActionHandlerTest {
         val session = ComposerSession("thread-1")
         val handler = handlerFor(
             session = session,
-            resendPrompt = { _, _ -> false }
+            resendPrompt = { _, _, _ -> false }
         )
 
         handler.editAndResendText("editable", 2)
@@ -170,8 +170,10 @@ class ComposerActionHandlerTest {
         val handler = handlerFor(
             session = session,
             selectedThreadId = { "" },
+            isNewThreadDraft = { true },
             newThreadDraft = { NewThreadDraft(cwd = "D:/Projects/App") },
-            sendPrompt = { _, draft -> draft != null },
+            composerConfigDraft = { NewThreadDraft(cwd = "D:/Projects/App") },
+            sendPrompt = { _, draft, isNewThread -> draft != null && isNewThread },
             onPromptAccepted = { acceptedDraft = it }
         )
 
@@ -185,15 +187,19 @@ class ComposerActionHandlerTest {
     private fun handlerFor(
         session: ComposerSession,
         selectedThreadId: () -> String = { "thread-1" },
+        isNewThreadDraft: () -> Boolean = { false },
         newThreadDraft: () -> NewThreadDraft? = { null },
-        sendPrompt: suspend (String, NewThreadDraft?) -> Boolean = { _, _ -> true },
-        resendPrompt: suspend (String, Int) -> Boolean = { _, _ -> true },
+        composerConfigDraft: () -> NewThreadDraft? = { null },
+        sendPrompt: suspend (String, NewThreadDraft?, Boolean) -> Boolean = { _, _, _ -> true },
+        resendPrompt: suspend (String, Int, NewThreadDraft?) -> Boolean = { _, _, _ -> true },
         onPromptAccepted: (Boolean) -> Unit = {}
     ): ComposerActionHandler {
         return ComposerActionHandler(
             composerSession = session,
             selectedThreadId = selectedThreadId,
+            isNewThreadDraft = isNewThreadDraft,
             newThreadDraft = newThreadDraft,
+            composerConfigDraft = composerConfigDraft,
             launch = { block -> runBlockingImmediate(block) },
             sendPrompt = sendPrompt,
             resendPrompt = resendPrompt,

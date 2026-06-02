@@ -26,6 +26,9 @@ class HomeViewModel(
 
     fun updateNewThreadDraft(transform: (NewThreadDraft) -> NewThreadDraft) = delegate.updateNewThreadDraft(transform)
 
+    fun updateCurrentThreadConfig(transform: (NewThreadDraft) -> NewThreadDraft) =
+        delegate.updateCurrentThreadConfig(transform)
+
     fun forkThread(id: String, numTurns: Int? = null) = delegate.forkThread(id, numTurns)
 
     fun renameThread(id: String, name: String) = delegate.renameThread(id, name)

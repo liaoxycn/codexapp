@@ -35,7 +35,7 @@ internal fun Composer(
     onChange: (String) -> Unit,
     onInsertText: (String) -> Unit,
     onApplySlashCommand: (String) -> Unit,
-    onDraftChange: (NewThreadDraft) -> Unit,
+    onConfigDraftChange: (NewThreadDraft) -> Unit,
     onClearComposer: () -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit
@@ -100,7 +100,7 @@ internal fun Composer(
                 onResetInlineSlashPanel = controller.resetInlineSlashPanel,
                 onSelectSlashCommand = controller.selectSlashCommand,
                 onSelectFile = controller.selectFile,
-                onDraftChange = onDraftChange,
+                onDraftChange = onConfigDraftChange,
             )
             ComposerInputBar(
                 state = state,

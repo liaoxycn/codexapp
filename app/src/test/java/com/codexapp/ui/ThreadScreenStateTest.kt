@@ -113,6 +113,7 @@ class ThreadScreenStateTest {
                 isLoadingOlder = false,
                 isThreadSwitching = false,
                 hasMessages = true,
+                gestureStartedAtTop = true,
                 pullDistance = 92f,
                 pullThreshold = 88f,
                 loadArmed = true
@@ -129,6 +130,7 @@ class ThreadScreenStateTest {
                 isLoadingOlder = false,
                 isThreadSwitching = false,
                 hasMessages = true,
+                gestureStartedAtTop = true,
                 pullDistance = 160f,
                 pullThreshold = 120f,
                 loadArmed = true
@@ -141,6 +143,24 @@ class ThreadScreenStateTest {
                 isLoadingOlder = true,
                 isThreadSwitching = false,
                 hasMessages = true,
+                gestureStartedAtTop = true,
+                pullDistance = 160f,
+                pullThreshold = 120f,
+                loadArmed = true
+            )
+        )
+    }
+
+    @Test
+    fun historyLoadDoesNotTriggerWhenGestureDidNotStartAtTop() {
+        assertFalse(
+            shouldTriggerHistoryLoad(
+                isAtTop = true,
+                hasMoreHistory = true,
+                isLoadingOlder = false,
+                isThreadSwitching = false,
+                hasMessages = true,
+                gestureStartedAtTop = false,
                 pullDistance = 160f,
                 pullThreshold = 120f,
                 loadArmed = true

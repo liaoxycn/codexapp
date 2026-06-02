@@ -94,16 +94,16 @@ class DefaultSessionRepository(
         commandActions.loadOlderMessages()
     }
 
-    override suspend fun sendPrompt(prompt: String, newThreadDraft: NewThreadDraft?): Boolean {
-        return commandActions.sendPrompt(prompt, newThreadDraft)
+    override suspend fun sendPrompt(prompt: String, draft: NewThreadDraft?, newThread: Boolean): Boolean {
+        return commandActions.sendPrompt(prompt, draft, newThread)
     }
 
     override suspend fun rollbackThread(numTurns: Int): Boolean {
         return commandActions.rollbackThread(numTurns)
     }
 
-    override suspend fun resendPrompt(prompt: String, rollbackNumTurns: Int): Boolean {
-        return commandActions.resendPrompt(prompt, rollbackNumTurns)
+    override suspend fun resendPrompt(prompt: String, rollbackNumTurns: Int, draft: NewThreadDraft?): Boolean {
+        return commandActions.resendPrompt(prompt, rollbackNumTurns, draft)
     }
 
     override suspend fun stopTurn() {

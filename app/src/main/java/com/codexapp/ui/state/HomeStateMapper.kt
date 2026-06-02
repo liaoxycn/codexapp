@@ -8,6 +8,7 @@ import com.codexapp.model.NewThreadDraft
 import com.codexapp.model.PendingEditResendState
 import com.codexapp.model.SessionConfig
 import com.codexapp.model.SessionRemoteState
+import com.codexapp.model.resolveSupportedNewThreadPermissionMode
 
 internal fun SessionRemoteState.toHomeState(
     composer: String,
@@ -18,6 +19,7 @@ internal fun SessionRemoteState.toHomeState(
     draftSubmissionInFlight: Boolean,
     isForkingThread: Boolean,
     newThreadDraft: NewThreadDraft,
+    composerConfigDraftOverride: NewThreadDraft? = null,
     appUpdate: AppUpdateState = AppUpdateState()
 ): HomeUiState = HomeUiState(
     threads = threads,
@@ -62,6 +64,14 @@ internal fun SessionRemoteState.toHomeState(
     isManualRefreshing = isManualRefreshing,
     isNewThreadDraft = isNewThreadDraft,
     newThreadDraft = newThreadDraft,
+    composerConfigDraft = resolveComposerConfigDraft(
+        isNewThreadDraft = isNewThreadDraft,
+        newThreadDraft = newThreadDraft,
+        overrideDraft = composerConfigDraftOverride,
+        sessionConfig = sessionConfig,
+        cwd = cwd,
+        configOptions = configOptions
+    ),
     configOptions = configOptions,
     diagnostics = diagnostics.copy(
         selectedThreadId = if (isNewThreadDraft) "" else diagnostics.selectedThreadId,
@@ -86,4 +96,38 @@ private fun NewThreadDraft.toSessionConfig(): SessionConfig {
         model = model,
         reasoningEffort = reasoningEffort
     )
+}
+
+private fun resolveComposerConfigDraft(
+    isNewThreadDraft: Boolean,
+    newThreadDraft: NewThreadDraft,
+    overrideDraft: NewThreadDraft?,
+    sessionConfig: SessionConfig,
+    cwd: String,
+    configOptions: com.codexapp.model.GatewayConfigOptions
+): NewThreadDraft {
+    if (isNewThreadDraft) {
+        return newThreadDraft
+    }
+    if (overrideDraft != null) {
+        return overrideDraft
+    }
+    return NewThreadDraft(
+        cwd = cwd,
+        model = sessionConfig.model.ifBlank { configOptions.defaults.model },
+        reasoningEffort = sessionConfig.reasoningEffort.ifBlank { configOptions.defaults.reasoningEffort },
+        permissionMode = resolveSupportedNewThreadPermissionMode(
+            requested = sessionConfig.permissionMode.toPermissionDraftValue(),
+            availableSandboxModes = configOptions.sandboxModes.map { it.value }
+        )
+    )
+}
+
+private fun String.toPermissionDraftValue(): String {
+    return when (trim()) {
+        "danger-full-access", "完全访问权限" -> "full-access"
+        "workspace-write", "workspace-write+net", "默认权限" -> "default"
+        "auto-review", "自动审查" -> "auto-review"
+        else -> "full-access"
+    }
 }

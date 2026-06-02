@@ -29,7 +29,13 @@ internal class HomeViewModelDelegate(
     private val composerActions = ComposerActionHandler(
         composerSession = composerSession,
         selectedThreadId = { uiStateStore.state.value.selectedThreadId },
+        isNewThreadDraft = { uiStateStore.state.value.isNewThreadDraft },
         newThreadDraft = { uiStateStore.state.value.newThreadDraft.takeIf { uiStateStore.state.value.isNewThreadDraft } },
+        composerConfigDraft = {
+            uiStateStore.state.value.composerConfigDraft.takeIf {
+                uiStateStore.state.value.isNewThreadDraft || uiStateStore.state.value.selectedThreadId.isNotBlank()
+            }
+        },
         launch = { block -> scope.launch { block() } },
         sendPrompt = repository::sendPrompt,
         resendPrompt = repository::resendPrompt,
@@ -61,7 +67,12 @@ internal class HomeViewModelDelegate(
     }
 
     fun selectThread(id: String) {
-        uiStateStore.exitNewThreadDraft()
+        if (canStartGatewayAction(id)) {
+            uiStateStore.markThreadSelectionStarted(id)
+            if (repository.state.value.selectedThreadId == id) {
+                uiStateStore.syncRemoteSelection(repository.state.value)
+            }
+        }
         repositoryActions.selectThread(id)
     }
 
@@ -70,7 +81,7 @@ internal class HomeViewModelDelegate(
     }
 
     fun forkThread(id: String, numTurns: Int? = null) {
-        if (id.isBlank() || uiStateStore.state.value.connectionStatus != ConnectionStatus.CONNECTED) {
+        if (!canStartGatewayAction(id)) {
             repositoryActions.forkThread(id, numTurns)
             return
         }
@@ -87,12 +98,18 @@ internal class HomeViewModelDelegate(
     }
 
     fun archiveThread(id: String) {
-        uiStateStore.startNewThreadDraft()
+        if (canStartGatewayAction(id)) {
+            uiStateStore.markArchiveStarted(id, repository.state.value)
+        }
         repositoryActions.archiveThread(id)
     }
 
     fun updateNewThreadDraft(transform: (com.codexapp.model.NewThreadDraft) -> com.codexapp.model.NewThreadDraft) {
         uiStateStore.updateNewThreadDraft(transform)
+    }
+
+    fun updateCurrentThreadConfig(transform: (com.codexapp.model.NewThreadDraft) -> com.codexapp.model.NewThreadDraft) {
+        uiStateStore.updateCurrentThreadConfig(repository.state.value, transform)
     }
 
     fun unarchiveThread(id: String) {
@@ -166,7 +183,11 @@ internal class HomeViewModelDelegate(
 
     fun resendUserMessage(text: String, rollbackNumTurns: Int) {
         scope.launch {
-            repository.resendPrompt(text, rollbackNumTurns)
+            repository.resendPrompt(
+                text,
+                rollbackNumTurns,
+                uiStateStore.state.value.composerConfigDraft.takeIf { !uiStateStore.state.value.isNewThreadDraft }
+            )
         }
     }
 
@@ -213,6 +234,10 @@ internal class HomeViewModelDelegate(
         if (appUpdateManager.consumeStartupCheck()) {
             checkAppUpdate()
         }
+    }
+
+    private fun canStartGatewayAction(id: String): Boolean {
+        return id.isNotBlank() && uiStateStore.state.value.connectionStatus == ConnectionStatus.CONNECTED
     }
 
     fun downloadAppUpdate() {

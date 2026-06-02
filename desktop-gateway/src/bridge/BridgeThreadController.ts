@@ -66,13 +66,14 @@ export class BridgeThreadController {
     return this.catalog.loadOlderMessages(threadId);
   }
 
-  async sendPrompt(threadId: string, text: string): Promise<ClientSnapshot> {
+  async sendPrompt(threadId: string, text: string, options: ThreadStartOptions = {}): Promise<ClientSnapshot> {
     const resolved = this.runtime.resolveThreadId(threadId);
     const state = await this.ensureResumed(resolved);
     return handlePromptSubmission({
       appServer: this.getAppServer(),
       emitChanged: () => this.runtime.emitChanged(),
       getSnapshot: (selectedThreadId) => this.runtime.getSnapshot(selectedThreadId),
+      options,
       state,
       text,
       threadId: resolved,
@@ -95,13 +96,19 @@ export class BridgeThreadController {
     }, numTurns);
   }
 
-  async resendPrompt(threadId: string, text: string, rollbackNumTurns: number): Promise<ClientSnapshot> {
+  async resendPrompt(
+    threadId: string,
+    text: string,
+    rollbackNumTurns: number,
+    options: ThreadStartOptions = {}
+  ): Promise<ClientSnapshot> {
     const resolved = this.runtime.resolveThreadId(threadId);
     const state = await this.ensureResumed(resolved);
     return resendPromptFromTurn({
       appServer: this.getAppServer(),
       emitChanged: () => this.runtime.emitChanged(),
       getSnapshot: (selectedThreadId) => this.runtime.getSnapshot(selectedThreadId),
+      options,
       state,
       text,
       threadId: resolved,

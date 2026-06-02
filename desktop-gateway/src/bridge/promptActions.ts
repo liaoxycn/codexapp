@@ -1,5 +1,6 @@
 import { AppServerClient } from "../appServerClient.js";
-import type { ClientSnapshot } from "../protocol.js";
+import type { AppServerApprovalPolicy, AppServerSandboxPolicy } from "../appServerTypes.js";
+import type { ClientSnapshot, ThreadStartOptions } from "../protocol.js";
 import {
   appendUserMessage,
   hasTrailingSystemStatus,
@@ -27,6 +28,7 @@ interface SharedPromptActionDeps {
 }
 
 interface SendPromptParams extends SharedPromptActionDeps {
+  options?: ThreadStartOptions;
   state: ThreadRuntimeState;
   threadId: string;
   text: string;
@@ -36,6 +38,7 @@ export async function handlePromptSubmission({
   appServer,
   emitChanged,
   getSnapshot,
+  options = {},
   state,
   text,
   threadId,
@@ -135,7 +138,8 @@ export async function handlePromptSubmission({
     return getSnapshot(threadId);
   }
 
-  const turnId = await appServer.turnStart(threadId, text);
+  applyRuntimeOptions(state, options);
+  const turnId = await appServer.turnStart(threadId, text, options);
   state.currentTurnId = turnId;
   state.snapshot.isGenerating = true;
   markRunningSignal(state);
@@ -186,6 +190,56 @@ export async function rollbackThreadTurns({
 
   emitChanged();
   return getSnapshot(threadId);
+}
+
+function applyRuntimeOptions(state: ThreadRuntimeState, options: ThreadStartOptions): void {
+  if (options.model) {
+    state.model = options.model;
+    state.snapshot.sessionConfig.model = options.model;
+  }
+  if (options.reasoningEffort) {
+    state.reasoningEffort = options.reasoningEffort;
+    state.snapshot.sessionConfig.reasoningEffort = options.reasoningEffort;
+  }
+  if (options.approvalPolicy) {
+    state.approvalPolicy = mapRuntimeApprovalPolicy(options.approvalPolicy);
+  }
+  if (options.approvalsReviewer) {
+    state.approvalsReviewer = options.approvalsReviewer;
+  }
+  if (options.sandboxMode) {
+    state.sandbox = mapRuntimeSandbox(options.sandboxMode);
+    state.snapshot.sessionConfig.permissionMode = options.sandboxMode;
+  }
+}
+
+function mapRuntimeSandbox(value: string): AppServerSandboxPolicy {
+  switch (value) {
+    case "danger-full-access":
+      return { type: "dangerFullAccess" };
+    case "read-only":
+      return { type: "readOnly", networkAccess: false };
+    default:
+      return {
+        type: "workspaceWrite",
+        writableRoots: [] as string[],
+        networkAccess: value.includes("+net"),
+        excludeTmpdirEnvVar: false,
+        excludeSlashTmp: false,
+      };
+  }
+}
+
+function mapRuntimeApprovalPolicy(value: string): AppServerApprovalPolicy {
+  switch (value) {
+    case "untrusted":
+    case "on-failure":
+    case "on-request":
+    case "never":
+      return value;
+    default:
+      return "never";
+  }
 }
 
 export async function resendPromptFromTurn(

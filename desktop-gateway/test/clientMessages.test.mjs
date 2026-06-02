@@ -296,8 +296,8 @@ test("handleClientMessage switches selected thread for send_prompt and marks des
     backend: createBackend(),
     markDesktopRestartRequired: (reason) => restartReasons.push(reason),
   });
-  backend.sendPrompt = async (threadId, text) => {
-    sendCalls.push([threadId, text]);
+  backend.sendPrompt = async (threadId, text, options) => {
+    sendCalls.push([threadId, text, options]);
     return createSnapshot({ selectedThreadId: threadId });
   };
 
@@ -309,7 +309,14 @@ test("handleClientMessage switches selected thread for send_prompt and marks des
 
   assert.equal(context.selectionVersion, 1);
   assert.equal(context.selectedThreadId, "thread-2");
-  assert.deepEqual(sendCalls, [["thread-2", "hello"]]);
+  assert.deepEqual(sendCalls, [["thread-2", "hello", {
+    cwd: undefined,
+    model: undefined,
+    reasoningEffort: undefined,
+    approvalPolicy: undefined,
+    approvalsReviewer: undefined,
+    sandboxMode: undefined,
+  }]]);
   assert.deepEqual(restartReasons, ["send_prompt"]);
   assert.equal(snapshots.at(-1).selectedThreadId, "thread-2");
 });
@@ -365,8 +372,8 @@ test("handleClientMessage resends by rolling back before prompt submission", asy
     backend: createBackend(),
     markDesktopRestartRequired: (reason) => restartReasons.push(reason),
   });
-  backend.resendPrompt = async (threadId, text, rollbackNumTurns) => {
-    resendCalls.push([threadId, text, rollbackNumTurns]);
+  backend.resendPrompt = async (threadId, text, rollbackNumTurns, options) => {
+    resendCalls.push([threadId, text, rollbackNumTurns, options]);
     return createSnapshot({ selectedThreadId: threadId });
   };
 
@@ -376,7 +383,13 @@ test("handleClientMessage resends by rolling back before prompt submission", asy
     handlers
   );
 
-  assert.deepEqual(resendCalls, [["thread-1", "hello again", 2]]);
+  assert.deepEqual(resendCalls, [["thread-1", "hello again", 2, {
+    model: undefined,
+    reasoningEffort: undefined,
+    approvalPolicy: undefined,
+    approvalsReviewer: undefined,
+    sandboxMode: undefined,
+  }]]);
   assert.deepEqual(restartReasons, ["resend_prompt"]);
   assert.equal(snapshots.at(-1).selectedThreadId, "thread-1");
 });
@@ -390,8 +403,8 @@ test("handleClientMessage creates thread before first draft prompt", async () =>
     createCalls.push([cwd, options]);
     return createSnapshot({ selectedThreadId: "thread-created" });
   };
-  backend.sendPrompt = async (threadId, text) => {
-    sendCalls.push([threadId, text]);
+  backend.sendPrompt = async (threadId, text, options) => {
+    sendCalls.push([threadId, text, options]);
     return createSnapshot({ selectedThreadId: threadId });
   };
 
@@ -423,7 +436,56 @@ test("handleClientMessage creates thread before first draft prompt", async () =>
       sandboxMode: "workspace-write",
     },
   ]]);
-  assert.deepEqual(sendCalls, [["thread-created", "hello draft"]]);
+  assert.deepEqual(sendCalls, [[
+    "thread-created",
+    "hello draft",
+    {
+      cwd: "D:/Projects/codexapp",
+      model: "gpt-5",
+      reasoningEffort: "medium",
+      approvalPolicy: "on-failure",
+      approvalsReviewer: "auto_review",
+      sandboxMode: "workspace-write",
+    },
+  ]]);
+
+test("handleClientMessage forwards existing thread overrides on send_prompt", async () => {
+  const context = createContext({ authenticated: true, selectedThreadId: "thread-1" });
+  const calls = [];
+  const { handlers, backend } = createHandlers({ backend: createBackend() });
+  backend.sendPrompt = async (threadId, text, options) => {
+    calls.push([threadId, text, options]);
+    return createSnapshot({ selectedThreadId: threadId });
+  };
+
+  await handleClientMessage(
+    context,
+    JSON.stringify({
+      type: "send_prompt",
+      threadId: "thread-1",
+      text: "override config",
+      model: "gpt-5",
+      reasoningEffort: "high",
+      approvalPolicy: "never",
+      approvalsReviewer: "user",
+      sandboxMode: "danger-full-access",
+    }),
+    handlers
+  );
+
+  assert.deepEqual(calls, [[
+    "thread-1",
+    "override config",
+    {
+      cwd: undefined,
+      model: "gpt-5",
+      reasoningEffort: "high",
+      approvalPolicy: "never",
+      approvalsReviewer: "user",
+      sandboxMode: "danger-full-access",
+    },
+  ]]);
+});
   assert.equal(snapshots.at(-1).selectedThreadId, "thread-created");
 });
 

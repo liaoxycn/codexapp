@@ -6,10 +6,12 @@ import com.codexapp.model.PendingEditResendState
 internal class ComposerActionHandler(
     private val composerSession: ComposerSession,
     private val selectedThreadId: () -> String,
+    private val isNewThreadDraft: () -> Boolean,
     private val newThreadDraft: () -> NewThreadDraft?,
+    private val composerConfigDraft: () -> NewThreadDraft?,
     private val launch: (suspend () -> Unit) -> Unit,
-    private val sendPrompt: suspend (String, NewThreadDraft?) -> Boolean,
-    private val resendPrompt: suspend (String, Int) -> Boolean = { _, _ -> false },
+    private val sendPrompt: suspend (String, NewThreadDraft?, Boolean) -> Boolean,
+    private val resendPrompt: suspend (String, Int, NewThreadDraft?) -> Boolean = { _, _, _ -> false },
     private val onPromptAccepted: (Boolean) -> Unit = {}
 ) {
     private var pendingEditResend: PendingEditResend? = null
@@ -79,18 +81,22 @@ internal class ComposerActionHandler(
         if (prompt.isBlank()) return
         launch {
             val pending = pendingEditResend?.takeIf { it.threadId == threadId }
-            val draft = if (pending == null) newThreadDraft() else null
-            val accepted = if (pending != null) {
-                resendPrompt(prompt, pending.rollbackNumTurns)
+            val draft = if (pending == null) {
+                composerConfigDraft()
             } else {
-                sendPrompt(prompt, draft)
+                composerConfigDraft()
+            }
+            val accepted = if (pending != null) {
+                resendPrompt(prompt, pending.rollbackNumTurns, draft)
+            } else {
+                sendPrompt(prompt, draft, isNewThreadDraft())
             }
             if (accepted) {
                 if (pending != null) {
                     pendingEditResend = null
                 }
                 composerSession.clearAcceptedDraft(threadId)
-                onPromptAccepted(draft != null)
+                onPromptAccepted(isNewThreadDraft())
             }
         }
     }

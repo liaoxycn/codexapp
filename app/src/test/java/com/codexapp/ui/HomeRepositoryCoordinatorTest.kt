@@ -239,11 +239,11 @@ class HomeRepositoryCoordinatorTest {
 
         override fun markManualRefreshing(refreshing: Boolean) = Unit
 
-        override suspend fun sendPrompt(prompt: String, newThreadDraft: NewThreadDraft?): Boolean = true
+        override suspend fun sendPrompt(prompt: String, draft: NewThreadDraft?, newThread: Boolean): Boolean = true
 
         override suspend fun rollbackThread(numTurns: Int): Boolean = true
 
-        override suspend fun resendPrompt(prompt: String, rollbackNumTurns: Int): Boolean = true
+        override suspend fun resendPrompt(prompt: String, rollbackNumTurns: Int, draft: NewThreadDraft?): Boolean = true
 
         override suspend fun stopTurn() = Unit
 

@@ -5,6 +5,7 @@ import com.codexapp.model.MessageBlock
 import com.codexapp.model.MessageRole
 import com.codexapp.model.PendingEditResendState
 import com.codexapp.model.SessionRemoteState
+import com.codexapp.model.StateDiagnostics
 import com.codexapp.model.ThreadMessage
 import com.codexapp.model.ThreadStatus
 import com.codexapp.model.ThreadSummary
@@ -201,6 +202,225 @@ class HomeUiStateStoreTest {
 
             assertFalse(store.state.value.isNewThreadDraft)
             assertEquals("thread-new", store.state.value.selectedThreadId)
+            collector.cancel()
+            scope.coroutineContext[Job]?.cancel()
+        }
+    }
+
+    @Test
+    fun threadSelectionExitsDraftOnlyAfterRemoteSelectsTargetThread() {
+        runBlocking {
+            val remoteState = MutableStateFlow(
+                SessionRemoteState(
+                    selectedThreadId = "thread-old",
+                    connectionStatus = ConnectionStatus.CONNECTED
+                )
+            )
+            val composerText = MutableStateFlow("")
+            val scope = CoroutineScope(Dispatchers.Unconfined + Job())
+            val store = HomeUiStateStore(
+                remoteState = remoteState,
+                composerText = composerText,
+                scope = scope
+            )
+            val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) { store.state.collect {} }
+
+            store.markThreadSelectionStarted("thread-new")
+            yield()
+
+            assertTrue(store.state.value.isNewThreadDraft)
+            assertEquals("", store.state.value.selectedThreadId)
+
+            remoteState.value = remoteState.value.copy(selectedThreadId = "thread-old")
+            store.syncRemoteSelection(remoteState.value)
+            yield()
+
+            assertTrue(store.state.value.isNewThreadDraft)
+            assertEquals("", store.state.value.selectedThreadId)
+
+            remoteState.value = remoteState.value.copy(selectedThreadId = "thread-new")
+            store.syncRemoteSelection(remoteState.value)
+            yield()
+
+            assertFalse(store.state.value.isNewThreadDraft)
+            assertEquals("thread-new", store.state.value.selectedThreadId)
+            collector.cancel()
+            scope.coroutineContext[Job]?.cancel()
+        }
+    }
+
+    @Test
+    fun threadSelectionExitsDraftWhenRemoteAlreadySelectedTargetThread() {
+        runBlocking {
+            val remoteState = MutableStateFlow(
+                SessionRemoteState(
+                    selectedThreadId = "thread-current",
+                    connectionStatus = ConnectionStatus.CONNECTED
+                )
+            )
+            val composerText = MutableStateFlow("")
+            val scope = CoroutineScope(Dispatchers.Unconfined + Job())
+            val store = HomeUiStateStore(
+                remoteState = remoteState,
+                composerText = composerText,
+                scope = scope
+            )
+            val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) { store.state.collect {} }
+
+            store.markThreadSelectionStarted("thread-current")
+            store.syncRemoteSelection(remoteState.value)
+            yield()
+
+            assertFalse(store.state.value.isNewThreadDraft)
+            assertEquals("thread-current", store.state.value.selectedThreadId)
+            collector.cancel()
+            scope.coroutineContext[Job]?.cancel()
+        }
+    }
+
+    @Test
+    fun archiveSwitchesToNewDraftOnlyAfterRemoteArchiveSucceeds() {
+        runBlocking {
+            val remoteState = MutableStateFlow(
+                SessionRemoteState(
+                    selectedThreadId = "thread-archive",
+                    connectionStatus = ConnectionStatus.CONNECTED
+                )
+            )
+            val composerText = MutableStateFlow("")
+            val scope = CoroutineScope(Dispatchers.Unconfined + Job())
+            val store = HomeUiStateStore(
+                remoteState = remoteState,
+                composerText = composerText,
+                scope = scope
+            )
+            val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) { store.state.collect {} }
+
+            store.exitNewThreadDraft()
+            yield()
+            assertFalse(store.state.value.isNewThreadDraft)
+            assertEquals("thread-archive", store.state.value.selectedThreadId)
+
+            store.markArchiveStarted("thread-archive", remoteState.value)
+            yield()
+
+            assertFalse(store.state.value.isNewThreadDraft)
+            assertEquals("thread-archive", store.state.value.selectedThreadId)
+
+            remoteState.value = remoteState.value.copy(
+                diagnostics = StateDiagnostics(
+                    actionType = "archive_thread",
+                    actionStatus = "started",
+                    actionStartedAt = 100L
+                )
+            )
+            store.syncRemoteSelection(remoteState.value)
+            yield()
+
+            assertFalse(store.state.value.isNewThreadDraft)
+            assertEquals("thread-archive", store.state.value.selectedThreadId)
+
+            remoteState.value = remoteState.value.copy(
+                diagnostics = StateDiagnostics(
+                    actionType = "archive_thread",
+                    actionStatus = "succeeded",
+                    actionStartedAt = 100L,
+                    actionFinishedAt = 180L
+                )
+            )
+            store.syncRemoteSelection(remoteState.value)
+            yield()
+
+            assertTrue(store.state.value.isNewThreadDraft)
+            assertEquals("", store.state.value.selectedThreadId)
+            collector.cancel()
+            scope.coroutineContext[Job]?.cancel()
+        }
+    }
+
+    @Test
+    fun staleArchiveSuccessDoesNotSwitchToNewDraft() {
+        runBlocking {
+            val remoteState = MutableStateFlow(
+                SessionRemoteState(
+                    selectedThreadId = "thread-archive",
+                    connectionStatus = ConnectionStatus.CONNECTED,
+                    diagnostics = StateDiagnostics(
+                        actionType = "archive_thread",
+                        actionStatus = "succeeded",
+                        actionStartedAt = 100L,
+                        actionFinishedAt = 180L
+                    )
+                )
+            )
+            val composerText = MutableStateFlow("")
+            val scope = CoroutineScope(Dispatchers.Unconfined + Job())
+            val store = HomeUiStateStore(
+                remoteState = remoteState,
+                composerText = composerText,
+                scope = scope
+            )
+            val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) { store.state.collect {} }
+
+            store.exitNewThreadDraft()
+            store.markArchiveStarted("thread-archive", remoteState.value)
+            store.syncRemoteSelection(remoteState.value)
+            yield()
+
+            assertFalse(store.state.value.isNewThreadDraft)
+            assertEquals("thread-archive", store.state.value.selectedThreadId)
+
+            remoteState.value = remoteState.value.copy(
+                diagnostics = StateDiagnostics(
+                    actionType = "archive_thread",
+                    actionStatus = "succeeded",
+                    actionStartedAt = 210L,
+                    actionFinishedAt = 260L
+                )
+            )
+            store.syncRemoteSelection(remoteState.value)
+            yield()
+
+            assertTrue(store.state.value.isNewThreadDraft)
+            assertEquals("", store.state.value.selectedThreadId)
+            collector.cancel()
+            scope.coroutineContext[Job]?.cancel()
+        }
+    }
+
+    @Test
+    fun archiveFailureDoesNotSwitchToNewDraft() {
+        runBlocking {
+            val remoteState = MutableStateFlow(
+                SessionRemoteState(
+                    selectedThreadId = "thread-archive",
+                    connectionStatus = ConnectionStatus.CONNECTED
+                )
+            )
+            val composerText = MutableStateFlow("")
+            val scope = CoroutineScope(Dispatchers.Unconfined + Job())
+            val store = HomeUiStateStore(
+                remoteState = remoteState,
+                composerText = composerText,
+                scope = scope
+            )
+            val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) { store.state.collect {} }
+
+            store.exitNewThreadDraft()
+            store.markArchiveStarted("thread-archive", remoteState.value)
+            remoteState.value = remoteState.value.copy(
+                diagnostics = StateDiagnostics(
+                    actionType = "archive_thread",
+                    actionStatus = "failed",
+                    actionStartedAt = 100L,
+                    actionFinishedAt = 180L
+                )
+            )
+            store.syncRemoteSelection(remoteState.value)
+            yield()
+
+            assertFalse(store.state.value.isNewThreadDraft)
+            assertEquals("thread-archive", store.state.value.selectedThreadId)
             collector.cancel()
             scope.coroutineContext[Job]?.cancel()
         }

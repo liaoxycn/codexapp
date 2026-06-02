@@ -33,13 +33,12 @@ internal fun rememberThreadListController(
     val lastMessageRevision = state.messages.lastOrNull()?.revisionKey()
     val isAtTop by remember {
         derivedStateOf {
-            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset <= 24
+            listState.layoutInfo.totalItemsCount == 0 || !listState.canScrollBackward
         }
     }
     val isAtBottom by remember {
         derivedStateOf {
-            listState.layoutInfo.totalItemsCount == 0 || !listState.canScrollForward ||
-                listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index == listState.layoutInfo.totalItemsCount - 1
+            listState.layoutInfo.totalItemsCount == 0 || !listState.canScrollForward
         }
     }
     val metrics = calculateThreadListMetrics(state, compactMode, isAtBottom)

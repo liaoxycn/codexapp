@@ -730,6 +730,7 @@ class ThreadScreenVisibilityTest {
                     onChange = {},
                     onInsertText = {},
                     onApplySlashCommand = {},
+                    onDraftChange = {},
                     onClearComposer = {},
                     onSend = {},
                     onStop = {}
@@ -759,6 +760,7 @@ class ThreadScreenVisibilityTest {
                     onChange = {},
                     onInsertText = {},
                     onApplySlashCommand = {},
+                    onDraftChange = {},
                     onClearComposer = {},
                     onSend = {},
                     onStop = {}
@@ -798,6 +800,7 @@ class ThreadScreenVisibilityTest {
                     onChange = {},
                     onInsertText = {},
                     onApplySlashCommand = {},
+                    onDraftChange = {},
                     onClearComposer = {},
                     onSend = {},
                     onStop = {}
@@ -896,6 +899,7 @@ class ThreadScreenVisibilityTest {
                     },
                     onInsertText = {},
                     onApplySlashCommand = { appliedCommand = it },
+                    onDraftChange = {},
                     onClearComposer = { composerText = "" },
                     onSend = {},
                     onStop = {}
@@ -944,6 +948,7 @@ class ThreadScreenVisibilityTest {
                     onChange = {},
                     onInsertText = { inserted = it },
                     onApplySlashCommand = {},
+                    onDraftChange = {},
                     onClearComposer = {},
                     onSend = {},
                     onStop = {}
@@ -982,6 +987,7 @@ class ThreadScreenVisibilityTest {
                     onChange = {},
                     onInsertText = {},
                     onApplySlashCommand = {},
+                    onDraftChange = {},
                     onClearComposer = {},
                     onSend = {},
                     onStop = {}
@@ -1017,6 +1023,7 @@ class ThreadScreenVisibilityTest {
                     onChange = {},
                     onInsertText = {},
                     onApplySlashCommand = {},
+                    onDraftChange = {},
                     onClearComposer = {},
                     onSend = {},
                     onStop = {}
@@ -1106,6 +1113,42 @@ class ThreadScreenVisibilityTest {
         }
 
         rule.onNodeWithText("发布页").performClick()
+        assertEquals(1, openReleaseCalls)
+    }
+
+    @Test
+    fun appUpdateAvailableRowShowsDownloadAndReleaseActions() {
+        var downloadCalls = 0
+        var openReleaseCalls = 0
+        rule.setContent {
+            CodexTheme {
+                DrawerContent(
+                    state = sampleDrawerState().copy(
+                        appUpdate = AppUpdateState(
+                            status = AppUpdateStatus.AVAILABLE,
+                            latestVersion = "0.2.28",
+                            downloadUrl = "https://example.com/codexapp.apk",
+                            releasePageUrl = "https://github.com/liaoxycn/codexapp/releases/latest"
+                        )
+                    ),
+                    onCreateThread = {},
+                    onCreateThreadInProject = {},
+                    onOpenConnection = {},
+                    onRefreshThreads = {},
+                    onSelectThread = {},
+                    onRenameThread = { _, _ -> },
+                    onArchiveThread = {},
+                    onRestartDesktop = {},
+                    onDownloadUpdate = { downloadCalls += 1 },
+                    onOpenUpdateReleasePage = { openReleaseCalls += 1 }
+                )
+            }
+        }
+
+        rule.onNodeWithText("系统下载").assertIsDisplayed().performClick()
+        rule.onNodeWithText("发布页").assertIsDisplayed().performClick()
+
+        assertEquals(1, downloadCalls)
         assertEquals(1, openReleaseCalls)
     }
 

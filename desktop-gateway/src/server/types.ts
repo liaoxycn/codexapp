@@ -39,9 +39,14 @@ export type Backend = {
   unarchiveThread(threadId: string): ClientSnapshot | Promise<ClientSnapshot>;
   refreshThreads(selectedThreadId?: string): ClientSnapshot | Promise<ClientSnapshot>;
   loadOlderMessages(threadId: string): ClientSnapshot | Promise<ClientSnapshot>;
-  sendPrompt(threadId: string, text: string): ClientSnapshot | Promise<ClientSnapshot>;
+  sendPrompt(threadId: string, text: string, options?: ThreadStartOptions): ClientSnapshot | Promise<ClientSnapshot>;
   rollbackThread(threadId: string, numTurns: number): ClientSnapshot | Promise<ClientSnapshot>;
-  resendPrompt(threadId: string, text: string, rollbackNumTurns: number): ClientSnapshot | Promise<ClientSnapshot>;
+  resendPrompt(
+    threadId: string,
+    text: string,
+    rollbackNumTurns: number,
+    options?: ThreadStartOptions
+  ): ClientSnapshot | Promise<ClientSnapshot>;
   stopTurn(threadId: string): ClientSnapshot | Promise<ClientSnapshot>;
   approveCurrent(threadId: string, allow: boolean): ClientSnapshot | Promise<ClientSnapshot>;
 };

@@ -97,16 +97,21 @@ export class AppServerBridgeBackend {
     return this.controller.loadOlderMessages(threadId);
   }
 
-  async sendPrompt(threadId: string, text: string): Promise<ClientSnapshot> {
-    return this.controller.sendPrompt(threadId, text);
+  async sendPrompt(threadId: string, text: string, options: ThreadStartOptions = {}): Promise<ClientSnapshot> {
+    return this.controller.sendPrompt(threadId, text, options);
   }
 
   async rollbackThread(threadId: string, numTurns: number): Promise<ClientSnapshot> {
     return this.controller.rollbackThread(threadId, numTurns);
   }
 
-  async resendPrompt(threadId: string, text: string, rollbackNumTurns: number): Promise<ClientSnapshot> {
-    return this.controller.resendPrompt(threadId, text, rollbackNumTurns);
+  async resendPrompt(
+    threadId: string,
+    text: string,
+    rollbackNumTurns: number,
+    options: ThreadStartOptions = {}
+  ): Promise<ClientSnapshot> {
+    return this.controller.resendPrompt(threadId, text, rollbackNumTurns, options);
   }
 
   async stopTurn(threadId: string): Promise<ClientSnapshot> {

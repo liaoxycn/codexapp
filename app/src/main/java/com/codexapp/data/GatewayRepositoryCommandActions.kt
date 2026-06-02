@@ -89,10 +89,10 @@ internal class GatewayRepositoryCommandActions(
         }
     }
 
-    fun sendPrompt(prompt: String, newThreadDraft: NewThreadDraft? = null): Boolean {
+    fun sendPrompt(prompt: String, draft: NewThreadDraft? = null, newThread: Boolean = false): Boolean {
         if (prompt.isBlank()) return false
         val snapshot = readState()
-        val targetThreadId = if (newThreadDraft == null) snapshot.selectedThreadId.ifBlank { null } else null
+        val targetThreadId = if (newThread) null else snapshot.selectedThreadId.ifBlank { null }
         if (snapshot.connectionStatus == ConnectionStatus.CONNECTING) {
             updateState { it.withConnectionDetail("正在同步会话，请稍后再发") }
             return false
@@ -104,13 +104,13 @@ internal class GatewayRepositoryCommandActions(
         val sent = commandSender.sendPrompt(
             text = prompt,
             threadId = targetThreadId,
-            newThread = newThreadDraft != null,
-            cwd = newThreadDraft?.cwd,
-            model = newThreadDraft?.model,
-            reasoningEffort = newThreadDraft?.reasoningEffort,
-            approvalPolicy = newThreadDraft?.approvalPolicy,
-            approvalsReviewer = newThreadDraft?.approvalsReviewer,
-            sandboxMode = newThreadDraft?.sandboxMode
+            newThread = newThread,
+            cwd = draft?.cwd,
+            model = draft?.model,
+            reasoningEffort = draft?.reasoningEffort,
+            approvalPolicy = draft?.approvalPolicy,
+            approvalsReviewer = draft?.approvalsReviewer,
+            sandboxMode = draft?.sandboxMode
         )
         logDebug("send_prompt sent=$sent")
         if (!sent) {
@@ -118,7 +118,7 @@ internal class GatewayRepositoryCommandActions(
             return false
         }
         updateState {
-            if (newThreadDraft != null) {
+            if (newThread) {
                 it.startCreatingThread().withOptimisticPrompt(prompt)
             } else {
                 it.withOptimisticPrompt(prompt)
@@ -135,7 +135,7 @@ internal class GatewayRepositoryCommandActions(
         }
     }
 
-    fun resendPrompt(prompt: String, rollbackNumTurns: Int): Boolean {
+    fun resendPrompt(prompt: String, rollbackNumTurns: Int, draft: NewThreadDraft? = null): Boolean {
         if (prompt.isBlank()) return false
         val snapshot = readState()
         val threadId = snapshot.selectedThreadId.ifBlank { return false }
@@ -146,7 +146,12 @@ internal class GatewayRepositoryCommandActions(
         val sent = commandSender.resendPrompt(
             text = prompt.trim(),
             threadId = threadId,
-            rollbackNumTurns = rollbackNumTurns
+            rollbackNumTurns = rollbackNumTurns,
+            model = draft?.model,
+            reasoningEffort = draft?.reasoningEffort,
+            approvalPolicy = draft?.approvalPolicy,
+            approvalsReviewer = draft?.approvalsReviewer,
+            sandboxMode = draft?.sandboxMode
         )
         if (!sent) {
             updateState { it.withSendFailure("重发失败，gateway 连接已断开") }

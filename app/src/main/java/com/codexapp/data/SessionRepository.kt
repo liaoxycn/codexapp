@@ -19,9 +19,9 @@ interface SessionRepository {
     suspend fun refreshThreads()
     suspend fun loadOlderMessages()
     fun markManualRefreshing(refreshing: Boolean)
-    suspend fun sendPrompt(prompt: String, newThreadDraft: NewThreadDraft? = null): Boolean
+    suspend fun sendPrompt(prompt: String, draft: NewThreadDraft? = null, newThread: Boolean = false): Boolean
     suspend fun rollbackThread(numTurns: Int): Boolean
-    suspend fun resendPrompt(prompt: String, rollbackNumTurns: Int): Boolean
+    suspend fun resendPrompt(prompt: String, rollbackNumTurns: Int, draft: NewThreadDraft? = null): Boolean
     suspend fun stopTurn()
     suspend fun approvePending()
     suspend fun rejectPending()

@@ -65,7 +65,14 @@ async function handleResendPrompt(
     const snapshot = await handlers.backend().resendPrompt(
       requestedThreadId,
       message.text,
-      message.rollbackNumTurns
+      message.rollbackNumTurns,
+      {
+        model: message.model,
+        reasoningEffort: message.reasoningEffort,
+        approvalPolicy: message.approvalPolicy,
+        approvalsReviewer: message.approvalsReviewer,
+        sandboxMode: message.sandboxMode,
+      }
     );
     context.selectedThreadId = snapshot.selectedThreadId || requestedThreadId;
     handlers.markDesktopRestartRequired("resend_prompt");
@@ -100,7 +107,14 @@ async function handleSendPrompt(
       context.selectionVersion += 1;
       context.selectedThreadId = requestedThreadId;
     }
-    const snapshot = await handlers.backend().sendPrompt(requestedThreadId, message.text);
+    const snapshot = await handlers.backend().sendPrompt(requestedThreadId, message.text, {
+      cwd: message.cwd,
+      model: message.model,
+      reasoningEffort: message.reasoningEffort,
+      approvalPolicy: message.approvalPolicy,
+      approvalsReviewer: message.approvalsReviewer,
+      sandboxMode: message.sandboxMode,
+    });
     context.selectedThreadId = snapshot.selectedThreadId || requestedThreadId;
     console.log(`[gateway] send_prompt backend ok thread=${context.selectedThreadId}`);
     handlers.markDesktopRestartRequired("send_prompt");

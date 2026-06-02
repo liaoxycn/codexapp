@@ -95,6 +95,11 @@ export interface GatewayResendPromptMessage {
   text: string;
   threadId?: string;
   rollbackNumTurns: number;
+  model?: string;
+  reasoningEffort?: string;
+  approvalPolicy?: string;
+  approvalsReviewer?: string;
+  sandboxMode?: string;
 }
 
 export interface GatewayStopTurnMessage {

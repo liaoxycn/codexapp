@@ -29,6 +29,7 @@ internal fun rememberThreadHistoryPagingController(
 ): ThreadHistoryPagingController {
     var topLoadArmed by rememberSaveable(state.selectedThreadId) { mutableStateOf(false) }
     var topPullDistance by rememberSaveable(state.selectedThreadId) { mutableFloatStateOf(0f) }
+    var topPullStartedAtTop by rememberSaveable(state.selectedThreadId) { mutableStateOf(false) }
     var topLoadAnchorId by rememberSaveable(state.selectedThreadId) { mutableStateOf<String?>(null) }
     var topLoadAnchorOffset by rememberSaveable(state.selectedThreadId) { mutableIntStateOf(0) }
     val topPullThreshold = 88f
@@ -36,6 +37,7 @@ internal fun rememberThreadHistoryPagingController(
     fun resetTopPull() {
         topPullDistance = 0f
         topLoadArmed = false
+        topPullStartedAtTop = false
     }
 
     fun captureHistoryAnchor() {
@@ -79,6 +81,12 @@ internal fun rememberThreadHistoryPagingController(
                 }
                 val downwardDrag = consumed.y.coerceAtLeast(available.y).coerceAtLeast(0f)
                 if (downwardDrag > 0f) {
+                    if (topPullDistance <= 0f) {
+                        topPullStartedAtTop = isAtTop
+                    }
+                    if (!topPullStartedAtTop) {
+                        return Offset.Zero
+                    }
                     topPullDistance = (topPullDistance + downwardDrag).coerceAtMost(220f)
                     topLoadArmed = true
                     if (shouldTriggerHistoryLoad(
@@ -87,6 +95,7 @@ internal fun rememberThreadHistoryPagingController(
                             isLoadingOlder = state.isLoadingOlder,
                             isThreadSwitching = state.isThreadSwitching,
                             hasMessages = state.messages.isNotEmpty(),
+                            gestureStartedAtTop = topPullStartedAtTop,
                             pullDistance = topPullDistance,
                             pullThreshold = topPullThreshold,
                             loadArmed = topLoadArmed
@@ -100,6 +109,28 @@ internal fun rememberThreadHistoryPagingController(
                     resetTopPull()
                 }
                 return Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: androidx.compose.ui.unit.Velocity, available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+                if (shouldTriggerHistoryLoad(
+                        isAtTop = isAtTop,
+                        hasMoreHistory = state.hasMoreHistory,
+                        isLoadingOlder = state.isLoadingOlder,
+                        isThreadSwitching = state.isThreadSwitching,
+                        hasMessages = state.messages.isNotEmpty(),
+                        gestureStartedAtTop = topPullStartedAtTop,
+                        pullDistance = topPullDistance,
+                        pullThreshold = topPullThreshold,
+                        loadArmed = topLoadArmed
+                    )
+                ) {
+                    captureHistoryAnchor()
+                    resetTopPull()
+                    onLoadOlderMessages()
+                    return androidx.compose.ui.unit.Velocity.Zero
+                }
+                resetTopPull()
+                return androidx.compose.ui.unit.Velocity.Zero
             }
         }
     }
@@ -140,11 +171,13 @@ internal fun shouldTriggerHistoryLoad(
     isLoadingOlder: Boolean,
     isThreadSwitching: Boolean,
     hasMessages: Boolean,
+    gestureStartedAtTop: Boolean,
     pullDistance: Float,
     pullThreshold: Float,
     loadArmed: Boolean
 ): Boolean {
     return isAtTop &&
+        gestureStartedAtTop &&
         hasMoreHistory &&
         !isLoadingOlder &&
         !isThreadSwitching &&

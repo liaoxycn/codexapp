@@ -1,4 +1,5 @@
-import type { TurnStartResult } from "./appServerTypes.js";
+import type { AppServerApprovalPolicy, AppServerSandboxPolicy, TurnStartResult } from "./appServerTypes.js";
+import type { ThreadStartOptions } from "./protocol.js";
 
 export interface MentionInput {
   type: "mention";
@@ -26,12 +27,32 @@ export function buildUserInput(text: string) {
 export async function startTurn(
   request: RequestFn,
   threadId: string,
-  text: string
+  text: string,
+  options: ThreadStartOptions = {}
 ): Promise<string> {
-  const result = (await request("turn/start", {
+  const params: Record<string, unknown> = {
     threadId,
     input: buildUserInput(text),
-  })) as TurnStartResult;
+  };
+  if (options.cwd) {
+    params.cwd = options.cwd;
+  }
+  if (options.model) {
+    params.model = options.model;
+  }
+  if (options.reasoningEffort) {
+    params.effort = options.reasoningEffort;
+  }
+  if (options.approvalPolicy) {
+    params.approvalPolicy = mapApprovalPolicy(options.approvalPolicy);
+  }
+  if (options.approvalsReviewer) {
+    params.approvalsReviewer = options.approvalsReviewer;
+  }
+  if (options.sandboxMode) {
+    params.sandboxPolicy = mapSandboxPolicy(options.sandboxMode);
+  }
+  const result = (await request("turn/start", params)) as TurnStartResult;
   return result.turn.id;
 }
 
@@ -103,4 +124,41 @@ function mentionNameFromPath(path: string): string {
   const normalized = path.replaceAll("\\", "/");
   const segments = normalized.split("/").filter(Boolean);
   return segments.at(-1) ?? path;
+}
+
+function mapApprovalPolicy(value: string): AppServerApprovalPolicy {
+  switch (value) {
+    case "untrusted":
+    case "on-failure":
+    case "on-request":
+    case "never":
+      return value;
+    default:
+      return "never";
+  }
+}
+
+function mapSandboxPolicy(value: string): AppServerSandboxPolicy {
+  switch (value) {
+    case "danger-full-access":
+      return { type: "dangerFullAccess" };
+    case "read-only":
+      return { type: "readOnly", networkAccess: false };
+    case "workspace-write":
+      return {
+        type: "workspaceWrite",
+        writableRoots: [],
+        networkAccess: false,
+        excludeTmpdirEnvVar: false,
+        excludeSlashTmp: false,
+      };
+    default:
+      return {
+        type: "workspaceWrite",
+        writableRoots: [],
+        networkAccess: value.includes("+net"),
+        excludeTmpdirEnvVar: false,
+        excludeSlashTmp: false,
+      };
+  }
 }

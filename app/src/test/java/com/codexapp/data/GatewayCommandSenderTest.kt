@@ -11,6 +11,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 class GatewayCommandSenderTest {
     private val json = Json {
@@ -184,5 +188,46 @@ class GatewayCommandSenderTest {
         val payload = json.parseToJsonElement(captured.single()).jsonObject
         assertEquals("refresh_threads", payload.getValue("type").jsonPrimitive.content)
         assertEquals("true", payload.getValue("forceSnapshot").jsonPrimitive.content)
+    }
+
+    @Test
+    fun senderSerializesConcurrentGatewayCalls() {
+        val ready = CountDownLatch(2)
+        val start = CountDownLatch(1)
+        val inFlight = AtomicInteger(0)
+        val maxInFlight = AtomicInteger(0)
+        val captured = mutableListOf<String>()
+        val sender = GatewayCommandSender(json) { payload ->
+            val active = inFlight.incrementAndGet()
+            maxInFlight.accumulateAndGet(active, Math::max)
+            try {
+                Thread.sleep(30L)
+                synchronized(captured) {
+                    captured += payload
+                }
+                true
+            } finally {
+                inFlight.decrementAndGet()
+            }
+        }
+        val executor = Executors.newFixedThreadPool(2)
+
+        executor.execute {
+            ready.countDown()
+            start.await(1, TimeUnit.SECONDS)
+            sender.refreshThreads()
+        }
+        executor.execute {
+            ready.countDown()
+            start.await(1, TimeUnit.SECONDS)
+            sender.sendPrompt("hello", "thread-1")
+        }
+        assertTrue(ready.await(1, TimeUnit.SECONDS))
+        start.countDown()
+        executor.shutdown()
+        assertTrue(executor.awaitTermination(2, TimeUnit.SECONDS))
+
+        assertEquals(2, captured.size)
+        assertEquals(1, maxInFlight.get())
     }
 }

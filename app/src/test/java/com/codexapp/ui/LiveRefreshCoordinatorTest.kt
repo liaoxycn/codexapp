@@ -16,9 +16,9 @@ import org.junit.Test
 
 class LiveRefreshCoordinatorTest {
     @Test
-    fun syncPollsRunningSelectedThreadUntilItBecomesIdle() = runBlocking {
+    fun syncDoesNotPollRunningSelectedThread() = runBlocking {
         val scope = CoroutineScope(coroutineContext + SupervisorJob())
-        val coordinator = LiveRefreshCoordinator(liveRefreshIntervalMs = 20L)
+        val coordinator = LiveRefreshCoordinator()
         var snapshot = connectedSnapshot("thread-1", ThreadStatus.RUNNING)
         var refreshCount = 0
 
@@ -29,22 +29,20 @@ class LiveRefreshCoordinatorTest {
             setManualRefreshing = {},
             refresh = {
                 refreshCount += 1
-                if (refreshCount == 2) {
-                    snapshot = connectedSnapshot("thread-1", ThreadStatus.IDLE)
-                }
+                snapshot = connectedSnapshot("thread-1", ThreadStatus.IDLE)
             }
         )
 
         delay(90L)
         scope.cancel()
 
-        assertEquals(2, refreshCount)
+        assertEquals(0, refreshCount)
     }
 
     @Test
-    fun syncStopsPollingWhenSelectionBecomesPending() = runBlocking {
+    fun syncDoesNotPollWhenSelectionBecomesPending() = runBlocking {
         val scope = CoroutineScope(coroutineContext + SupervisorJob())
-        val coordinator = LiveRefreshCoordinator(liveRefreshIntervalMs = 20L)
+        val coordinator = LiveRefreshCoordinator()
         var snapshot = connectedSnapshot("thread-1", ThreadStatus.RUNNING)
         var refreshCount = 0
 
@@ -66,13 +64,13 @@ class LiveRefreshCoordinatorTest {
         delay(90L)
         scope.cancel()
 
-        assertEquals(1, refreshCount)
+        assertEquals(0, refreshCount)
     }
 
     @Test
     fun syncDoesNotStartPollingIdleThread() = runBlocking {
         val scope = CoroutineScope(coroutineContext + SupervisorJob())
-        val coordinator = LiveRefreshCoordinator(liveRefreshIntervalMs = 20L)
+        val coordinator = LiveRefreshCoordinator()
         val snapshot = connectedSnapshot("thread-1", ThreadStatus.IDLE)
         var refreshCount = 0
 
@@ -91,9 +89,9 @@ class LiveRefreshCoordinatorTest {
     }
 
     @Test
-    fun syncDoesNotRestartExistingPollForSameThread() = runBlocking {
+    fun repeatedSyncDoesNotStartPollingForSameThread() = runBlocking {
         val scope = CoroutineScope(coroutineContext + SupervisorJob())
-        val coordinator = LiveRefreshCoordinator(liveRefreshIntervalMs = 30L)
+        val coordinator = LiveRefreshCoordinator()
         var snapshot = connectedSnapshot("thread-1", ThreadStatus.RUNNING)
         var refreshCount = 0
 
@@ -113,7 +111,7 @@ class LiveRefreshCoordinatorTest {
         delay(80L)
         scope.cancel()
 
-        assertEquals(1, refreshCount)
+        assertEquals(0, refreshCount)
     }
 
     private fun connectedSnapshot(

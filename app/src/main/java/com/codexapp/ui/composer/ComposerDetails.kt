@@ -109,34 +109,11 @@ internal fun ComposerDetailsSection(
                     }
                 }
             }
-            if (state.isNewThreadDraft) {
-                DraftQuickConfigRow(
-                    draft = state.newThreadDraft,
-                    configOptions = state.configOptions,
-                    onDraftChange = onDraftChange
-                )
-            } else {
-                val configItems = rememberSessionConfigItems(state.sessionConfig)
-                if (configItems.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = configItems.joinToString("  ·  "),
-                            color = CodexTheme.colors.textSecondary,
-                            fontSize = ComposerMetaTextSize,
-                            lineHeight = ComposerMetaLineHeight,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
+            DraftQuickConfigRow(
+                draft = state.composerConfigDraft,
+                configOptions = state.configOptions,
+                onDraftChange = onDraftChange
+            )
             AnimatedVisibility(visible = slashPanelVisible) {
                 SlashCommandPanel(
                     query = slashQuery,
@@ -284,13 +261,4 @@ private fun DraftQuickPicker(
             }
         }
     }
-}
-
-private fun rememberSessionConfigItems(config: SessionConfig): List<String> {
-    return listOfNotNull(
-        config.permissionMode.takeIf(String::isNotBlank),
-        config.provider.takeIf(String::isNotBlank),
-        config.model.takeIf(String::isNotBlank),
-        config.reasoningEffort.takeIf(String::isNotBlank)
-    )
 }

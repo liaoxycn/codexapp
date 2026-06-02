@@ -97,7 +97,12 @@ internal data class GatewayResendPromptMessage(
     val type: String = "resend_prompt",
     val text: String,
     val threadId: String? = null,
-    val rollbackNumTurns: Int
+    val rollbackNumTurns: Int,
+    val model: String? = null,
+    val reasoningEffort: String? = null,
+    val approvalPolicy: String? = null,
+    val approvalsReviewer: String? = null,
+    val sandboxMode: String? = null
 )
 
 @Serializable

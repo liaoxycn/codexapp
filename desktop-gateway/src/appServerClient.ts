@@ -110,8 +110,8 @@ export class AppServerClient {
     await unsubscribeThread(this.request.bind(this), threadId);
   }
 
-  async turnStart(threadId: string, text: string): Promise<string> {
-    return await startTurn(this.request.bind(this), threadId, text);
+  async turnStart(threadId: string, text: string, options: ThreadStartOptions = {}): Promise<string> {
+    return await startTurn(this.request.bind(this), threadId, text, options);
   }
 
   async turnInterrupt(threadId: string, turnId: string): Promise<void> {
