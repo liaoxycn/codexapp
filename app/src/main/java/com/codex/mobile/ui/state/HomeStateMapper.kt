@@ -63,9 +63,10 @@ internal fun SessionRemoteState.toHomeState(
 )
 
 private fun NewThreadDraft.toComposerChips(): List<ComposerChip> {
-    val projectLabel = cwd.ifBlank { "默认项目" }
-    return listOf(
-        ComposerChip(label = projectLabel, icon = ComposerChipIcon.FILE, path = cwd.takeIf(String::isNotBlank)),
+    return listOfNotNull(
+        cwd.takeIf(String::isNotBlank)?.let { path ->
+            ComposerChip(label = path.substringAfterLast('/').substringAfterLast('\\'), icon = ComposerChipIcon.FILE, path = path)
+        },
         ComposerChip(label = model.ifBlank { "默认模型" }, icon = ComposerChipIcon.CONTEXT),
         ComposerChip(label = sandboxMode.ifBlank { "默认权限" }, icon = ComposerChipIcon.CONTEXT)
     )

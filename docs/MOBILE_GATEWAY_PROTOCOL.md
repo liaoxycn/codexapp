@@ -181,7 +181,7 @@ gateway 负责把 Codex App Server JSON-RPC 压平成移动端 snapshot：
 8. 归档/fork/重命名：归档和重命名在目录操作；fork 在消息/turn 操作，分叉后选中新会话。
 9. 断线重连：断开 gateway 后重连，不丢当前线程和草稿。
 10. patch 降级：制造 patch revision 不匹配，应自动请求 `forceSnapshot`，下一次 full snapshot 恢复。
-11. App 更新：进程冷启动时检查一次 GitHub latest release；本地版本低时显示更新提示；点击后交给 Android 系统下载器下载 APK，App 内不显示下载进度。
+11. App 更新：进程冷启动时检查一次 GitHub latest release；本地版本低时显示更新提示；点击后优先交给 Android 系统下载器下载 APK，App 内不显示下载进度；系统下载器不可用时打开浏览器跳转 GitHub latest release 页面。
 
 ## 自测命令
 
