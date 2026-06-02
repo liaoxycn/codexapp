@@ -59,7 +59,12 @@ internal fun SessionRemoteState.toHomeState(
     isManualRefreshing = isManualRefreshing,
     isNewThreadDraft = isNewThreadDraft,
     newThreadDraft = newThreadDraft,
-    configOptions = configOptions
+    configOptions = configOptions,
+    diagnostics = diagnostics.copy(
+        selectedThreadId = if (isNewThreadDraft) "" else diagnostics.selectedThreadId,
+        pendingSelectionThreadId = if (isNewThreadDraft) "" else diagnostics.pendingSelectionThreadId,
+        isGenerating = if (isNewThreadDraft && !draftSubmissionInFlight) false else diagnostics.isGenerating
+    )
 )
 
 private fun NewThreadDraft.toComposerChips(): List<ComposerChip> {
@@ -67,8 +72,8 @@ private fun NewThreadDraft.toComposerChips(): List<ComposerChip> {
         cwd.takeIf(String::isNotBlank)?.let { path ->
             ComposerChip(label = path.substringAfterLast('/').substringAfterLast('\\'), icon = ComposerChipIcon.FILE, path = path)
         },
-        ComposerChip(label = model.ifBlank { "默认模型" }, icon = ComposerChipIcon.CONTEXT),
-        ComposerChip(label = sandboxMode.ifBlank { "默认权限" }, icon = ComposerChipIcon.CONTEXT)
+        model.takeIf(String::isNotBlank)?.let { ComposerChip(label = it, icon = ComposerChipIcon.CONTEXT) },
+        sandboxMode.takeIf(String::isNotBlank)?.let { ComposerChip(label = it, icon = ComposerChipIcon.CONTEXT) }
     )
 }
 

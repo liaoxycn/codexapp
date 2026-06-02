@@ -25,11 +25,25 @@ data class SessionRemoteState(
     val operationalNotices: List<OperationalNotice> = emptyList(),
     val isDemoMode: Boolean = true,
     val snapshotRevision: Long = 0L,
-    val configOptions: GatewayConfigOptions = GatewayConfigOptions()
+    val configOptions: GatewayConfigOptions = GatewayConfigOptions(),
+    val diagnostics: StateDiagnostics = StateDiagnostics()
 )
 
 data class OperationalNotice(
     val id: String,
     val text: String,
     val createdAt: Long = 0L
+)
+
+data class StateDiagnostics(
+    val selectedThreadId: String = "",
+    val pendingSelectionThreadId: String = "",
+    val isGenerating: Boolean = false,
+    val runningThreadIds: List<String> = emptyList(),
+    val snapshotRevision: Long = 0L,
+    val actionTraceId: String = "",
+    val actionType: String = "",
+    val actionStatus: String = "",
+    val actionStartedAt: Long = 0L,
+    val actionFinishedAt: Long = 0L
 )

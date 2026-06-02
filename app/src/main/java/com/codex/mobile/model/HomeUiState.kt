@@ -31,7 +31,8 @@ data class HomeUiState(
     val isDemoMode: Boolean,
     val isNewThreadDraft: Boolean,
     val newThreadDraft: NewThreadDraft,
-    val configOptions: GatewayConfigOptions = GatewayConfigOptions()
+    val configOptions: GatewayConfigOptions = GatewayConfigOptions(),
+    val diagnostics: StateDiagnostics = StateDiagnostics()
 )
 
 data class NewThreadDraft(

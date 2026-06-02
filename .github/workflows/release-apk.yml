@@ -102,16 +102,6 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          body: |
-            ## 本次更新
-            - 新会话草稿页、真实模型/权限配置、项目内文件选择和紧凑命令面板整体成型。
-            - 会话列表对齐 Codex Desktop：过滤归档/无关会话，修复普通会话分组、默认普通新建、分叉可见性。
-            - 消息流增强：过程信息增量展示、最终回复折叠过程、turn 底部操作、耗时、复制、分叉、历史分页和底部刷新。
-            - 稳定性修复：会话切换遮罩、防旧快照抢页、运行态租约、后台恢复保持原会话。
-            - 移动端改动后的 Desktop 同步重启提示、确认原因说明，以及 App 更新检查/系统下载器/浏览器兜底。
-            - UI 统一：新会话页、标题栏、输入 dock、文件面板、全局 loading、operational notice 和应用图标。
-
-            ## Release 产物
-            - `CodexMobile.apk`
+          body_path: docs/RELEASE_NOTES.md
           files: |
             release-assets/CodexMobile/CodexMobile.apk

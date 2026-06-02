@@ -53,6 +53,7 @@ async function handleForkThread(
   handlers: ClientMessageHandlers
 ): Promise<void> {
   context.selectionVersion += 1;
+  context.actionTraceType = message.type;
   await handlers.runBackendAction(context, async () => {
     const snapshot = await handlers.backend().forkThread(message.threadId, message.numTurns);
     context.selectedThreadId = snapshot.selectedThreadId;
@@ -67,6 +68,7 @@ async function handleCreateThread(
   handlers: ClientMessageHandlers
 ): Promise<void> {
   context.selectionVersion += 1;
+  context.actionTraceType = message.type;
   await handlers.runBackendAction(context, async () => {
     const snapshot = await handlers.backend().createThread(message.cwd, {
       cwd: message.cwd,
@@ -89,6 +91,7 @@ async function handleSelectThread(
   context.selectedThreadId = handlers.backend().hasThread(message.threadId)
     ? message.threadId
     : handlers.backend().getDefaultThreadId();
+  context.actionTraceType = message.type;
   await handlers.runBackendAction(context, async () =>
     handlers.backend().selectThread(context.selectedThreadId)
   );
@@ -99,6 +102,7 @@ async function handleRenameThread(
   message: GatewayRenameThreadMessage,
   handlers: ClientMessageHandlers
 ): Promise<void> {
+  context.actionTraceType = message.type;
   await handlers.runBackendAction(context, async () => {
     const snapshot = await handlers.backend().renameThread(message.threadId, message.name);
     handlers.markDesktopRestartRequired("rename_thread");
@@ -112,6 +116,7 @@ async function handleArchiveThread(
   handlers: ClientMessageHandlers
 ): Promise<void> {
   context.selectionVersion += 1;
+  context.actionTraceType = message.type;
   await handlers.runBackendAction(context, async () => {
     const snapshot = await handlers.backend().archiveThread(message.threadId);
     context.selectedThreadId = "";
@@ -137,6 +142,7 @@ async function handleUnarchiveThread(
   handlers: ClientMessageHandlers
 ): Promise<void> {
   context.selectionVersion += 1;
+  context.actionTraceType = message.type;
   await handlers.runBackendAction(context, async () => {
     const snapshot = await handlers.backend().unarchiveThread(message.threadId);
     context.selectedThreadId = snapshot.selectedThreadId;
@@ -155,14 +161,16 @@ async function handleRefreshThreads(
     context.lastSnapshotMessage = null;
     context.snapshotRevision = 0;
   }
+  context.actionTraceType = message.type;
   await handlers.refreshSelectedThread(context, "manual");
 }
 
 async function handleLoadOlderMessages(
   context: ClientContext,
-  _message: GatewayLoadOlderMessagesMessage,
+  message: GatewayLoadOlderMessagesMessage,
   handlers: ClientMessageHandlers
 ): Promise<void> {
+  context.actionTraceType = message.type;
   await handlers.runBackendAction(context, async () =>
     handlers.backend().loadOlderMessages(context.selectedThreadId)
   );

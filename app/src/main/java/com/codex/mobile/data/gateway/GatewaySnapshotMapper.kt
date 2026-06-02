@@ -13,6 +13,7 @@ import com.codex.mobile.model.MessageBlock
 import com.codex.mobile.model.OperationalNotice
 import com.codex.mobile.model.SessionConfig
 import com.codex.mobile.model.SessionRemoteState
+import com.codex.mobile.model.StateDiagnostics
 import com.codex.mobile.model.ThreadGroupKind
 import com.codex.mobile.model.ThreadMessage
 import com.codex.mobile.model.ThreadStatus
@@ -102,6 +103,7 @@ internal fun GatewaySnapshotMessage.applyTo(
         desktopRestartRequired = desktopRestartRequired,
         operationalNotices = operationalNotices.toOperationalNotices(),
         isGenerating = isGenerating,
+        diagnostics = diagnostics.toStateDiagnostics(revision ?: previous.snapshotRevision),
         isManualRefreshing = false,
         connectionStatus = ConnectionStatus.CONNECTED,
         connectionDetail = if (threads.isEmpty()) "已连接，暂无会话" else "已同步 ${threads.size} 个会话",
@@ -174,6 +176,11 @@ internal fun GatewaySnapshotPatchMessage.applyTo(
             emptyList()
         },
         isGenerating = if (acceptSelectedSnapshot && "isGenerating" in changedFields) isGenerating == true else previous.isGenerating,
+        diagnostics = if ("diagnostics" in changedFields) {
+            diagnostics?.toStateDiagnostics(revision) ?: previous.diagnostics.copy(snapshotRevision = revision)
+        } else {
+            previous.diagnostics.copy(snapshotRevision = revision)
+        },
         isManualRefreshing = if (acceptSelectedSnapshot) false else previous.isManualRefreshing,
         connectionStatus = ConnectionStatus.CONNECTED,
         connectionDetail = if (nextThreads.isEmpty()) "已连接，暂无会话" else "已同步 ${nextThreads.size} 个会话",
@@ -339,6 +346,21 @@ internal fun List<GatewayOperationalNoticePayload>.toOperationalNotices(): List<
             OperationalNotice(id = id, text = text, createdAt = notice.createdAt)
         }
     }
+}
+
+internal fun GatewayDiagnosticsPayload.toStateDiagnostics(revisionFallback: Long): StateDiagnostics {
+    return StateDiagnostics(
+        selectedThreadId = selectedThreadId.orEmpty(),
+        pendingSelectionThreadId = pendingSelectionThreadId.orEmpty(),
+        isGenerating = isGenerating,
+        runningThreadIds = runningThreadIds.filter(String::isNotBlank),
+        snapshotRevision = snapshotRevision.takeIf { it > 0L } ?: revisionFallback,
+        actionTraceId = actionTraceId.orEmpty(),
+        actionType = actionType.orEmpty(),
+        actionStatus = actionStatus.orEmpty(),
+        actionStartedAt = actionStartedAt,
+        actionFinishedAt = actionFinishedAt
+    )
 }
 
 internal fun GatewayConfigOptionsPayload.toConfigOptions(): GatewayConfigOptions {

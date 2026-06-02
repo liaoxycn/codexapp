@@ -59,6 +59,7 @@ export async function handleClientMessage(
   }
 
   if (message.type === "restart_desktop") {
+    context.actionTraceType = message.type;
     await handlers.runBackendAction(context, async () => {
       await handlers.restartDesktop();
       return handlers.backend().getSnapshot(context.selectedThreadId);
@@ -96,6 +97,7 @@ async function handleHello(
     detail: `已配对 ${message.client ?? "android"} ${message.version ?? ""}`.trim(),
   });
   if (context.selectedThreadId) {
+    context.actionTraceType = "hello/select_thread";
     await handlers.runBackendAction(context, () => handlers.backend().selectThread(context.selectedThreadId));
     return;
   }

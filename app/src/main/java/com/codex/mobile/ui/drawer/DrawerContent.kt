@@ -86,6 +86,7 @@ internal fun DrawerContent(
             connectionDetail = state.connectionDetail,
             desktopRestartRequired = state.desktopRestartRequired,
             appUpdate = state.appUpdate,
+            diagnostics = state.diagnostics,
             hasRunningThread = state.threads.any { it.status == ThreadStatus.RUNNING },
             isRefreshing = state.isManualRefreshing,
             onCreateThread = {

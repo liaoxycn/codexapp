@@ -74,7 +74,7 @@ export class GatewayBackendController {
   }
 
   sendSnapshot(context: ClientContext, snapshot: ClientSnapshot): void {
-    sendSnapshot(context, this.withDesktopRestartState(snapshot), {
+    sendSnapshot(context, this.withDesktopRestartState(context, snapshot), {
       refreshSelectedThread: (nextContext, source) => this.refreshSelectedThread(nextContext, source),
       refreshThreadList: (nextContext) => this.refreshThreadList(nextContext),
     });
@@ -124,10 +124,23 @@ export class GatewayBackendController {
     }
   }
 
-  private withDesktopRestartState(snapshot: ClientSnapshot): ClientSnapshot {
+  private withDesktopRestartState(context: ClientContext, snapshot: ClientSnapshot): ClientSnapshot {
+    const action = context.currentAction;
     return {
       ...snapshot,
       desktopRestartRequired: this.desktopRestartRequired,
+      diagnostics: {
+        selectedThreadId: snapshot.selectedThreadId,
+        pendingSelectionThreadId: context.selectedThreadId !== snapshot.selectedThreadId ? context.selectedThreadId : undefined,
+        isGenerating: snapshot.isGenerating,
+        runningThreadIds: snapshot.threads.filter((thread) => thread.status === "running").map((thread) => thread.id),
+        snapshotRevision: 0,
+        actionTraceId: action?.id,
+        actionType: action?.type,
+        actionStatus: action?.status,
+        actionStartedAt: action?.startedAt,
+        actionFinishedAt: action?.finishedAt,
+      },
     };
   }
 

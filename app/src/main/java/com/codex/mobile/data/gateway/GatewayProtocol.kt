@@ -141,7 +141,8 @@ internal data class GatewaySnapshotMessage(
     val configOptions: GatewayConfigOptionsPayload = GatewayConfigOptionsPayload(),
     val operationalNotices: List<GatewayOperationalNoticePayload> = emptyList(),
     val desktopRestartRequired: Boolean = false,
-    val isGenerating: Boolean = false
+    val isGenerating: Boolean = false,
+    val diagnostics: GatewayDiagnosticsPayload = GatewayDiagnosticsPayload()
 )
 
 @Serializable
@@ -164,7 +165,8 @@ internal data class GatewaySnapshotPatchMessage(
     val configOptions: GatewayConfigOptionsPayload? = null,
     val operationalNotices: List<GatewayOperationalNoticePayload>? = null,
     val desktopRestartRequired: Boolean? = null,
-    val isGenerating: Boolean? = null
+    val isGenerating: Boolean? = null,
+    val diagnostics: GatewayDiagnosticsPayload? = null
 )
 
 @Serializable
@@ -172,6 +174,20 @@ internal data class GatewayOperationalNoticePayload(
     val id: String,
     val text: String,
     val createdAt: Long = 0L
+)
+
+@Serializable
+internal data class GatewayDiagnosticsPayload(
+    val selectedThreadId: String? = null,
+    val pendingSelectionThreadId: String? = null,
+    val isGenerating: Boolean = false,
+    val runningThreadIds: List<String> = emptyList(),
+    val snapshotRevision: Long = 0L,
+    val actionTraceId: String? = null,
+    val actionType: String? = null,
+    val actionStatus: String? = null,
+    val actionStartedAt: Long = 0L,
+    val actionFinishedAt: Long = 0L
 )
 
 @Serializable

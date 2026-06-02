@@ -208,3 +208,12 @@
 1. 把高频流程矩阵补成更完整的自动化端到端测试。
 2. 继续按用户视角找弱反馈问题，例如编辑/重发是否还需要 toast 或视觉确认。
 3. 继续盘点无法实现或未使用的兼容导出层、mock 代码，确认无引用后清理。
+
+## 稳定性 + 可观测 + 体验收口
+
+| 项 | 概述 | 用户视角流程步骤自述 | 发现的问题/修复情况 |
+| --- | --- | --- | --- |
+| 状态诊断折叠行 | 抽屉内提供轻量状态排障信息。 | 我打开抽屉；普通空闲状态不出现调试噪声；出现运行中、切换中、失败或关键远程动作完成后 5 秒内，才看到一行小号诊断摘要，点开查看 selected/pending/generating/running/action trace。 | 之前状态同步问题只能靠日志猜测，App 端看不到当前 snapshot revision、运行会话数和最后动作。已新增 gateway `diagnostics` payload 与 App 条件折叠行，成功动作过期后自动隐藏，不影响正常会话列表阅读。 |
+| Gateway 动作 trace | 移动端远程动作统一带 trace id、类型、状态和耗时日志。 | 我点击刷新、切换、发送、分叉、归档等按钮；如果状态异常，可以用抽屉诊断里的 trace id 对照 gateway 日志。 | 旧日志分散，排查“来回跳/状态闪空闲”缺少统一动作边界。已在 backend action 和手动 refresh 管线加入 trace，并随 snapshot 下发最后动作状态。 |
+| Gateway 入站日志摘要 | gateway 日志可用于排障，但不泄露 prompt 原文。 | 我查看 gateway 日志，只看到 `type/thread/textLen/numTurns` 等路由摘要，不会把输入内容或 pair token 原样打印出来。 | 旧日志直接输出完整 websocket payload，排障信息太吵，也可能暴露用户输入。已改成结构化摘要，并补测试验证 prompt 与 token 不进入日志摘要。 |
+| 发布前检查脚本 | 发布前可一键串联核心检查。 | 我准备发包前运行 `node scripts/pre-release-check.mjs`；需要真机安装再加 `--dev-run`。 | 之前发布检查命令散落在文档和历史记录里，容易漏跑。已新增脚本并同步项目 wiki；本轮仍按项目要求单独执行 `node scripts/dev-run.mjs`。 |

@@ -22,6 +22,8 @@ export interface ClientContext {
   lastSnapshotMessage: GatewaySnapshotMessage | null;
   snapshotRevision: number;
   supportsSnapshotPatch: boolean;
+  currentAction: ClientActionTrace | null;
+  actionTraceType: string | null;
 }
 
 export type Backend = {
@@ -47,3 +49,11 @@ export type Backend = {
 export type RefreshSource = "manual" | "live" | "list";
 
 export const LIST_REFRESH_INTERVAL_MS = 2500;
+
+export interface ClientActionTrace {
+  id: string;
+  type: string;
+  status: "started" | "succeeded" | "failed";
+  startedAt: number;
+  finishedAt?: number;
+}

@@ -44,6 +44,7 @@ async function handleRollbackThread(
   message: GatewayRollbackThreadMessage,
   handlers: ClientMessageHandlers
 ): Promise<void> {
+  context.actionTraceType = message.type;
   await handlers.runBackendAction(context, async () => {
     const requestedThreadId = message.threadId?.trim() || context.selectedThreadId;
     const snapshot = await handlers.backend().rollbackThread(requestedThreadId, message.numTurns);
@@ -58,6 +59,7 @@ async function handleResendPrompt(
   message: GatewayResendPromptMessage,
   handlers: ClientMessageHandlers
 ): Promise<void> {
+  context.actionTraceType = message.type;
   await handlers.runBackendAction(context, async () => {
     const requestedThreadId = message.threadId?.trim() || context.selectedThreadId;
     const snapshot = await handlers.backend().resendPrompt(
@@ -80,6 +82,7 @@ async function handleSendPrompt(
     context.selectionVersion += 1;
     context.selectedThreadId = "";
   }
+  context.actionTraceType = message.type;
   await handlers.runBackendAction(context, async () => {
     let requestedThreadId = message.threadId?.trim() || context.selectedThreadId;
     if (message.newThread || !requestedThreadId) {
@@ -105,9 +108,10 @@ async function handleSendPrompt(
 
 async function handleStopTurn(
   context: ClientContext,
-  _message: GatewayStopTurnMessage,
+  message: GatewayStopTurnMessage,
   handlers: ClientMessageHandlers
 ): Promise<void> {
+  context.actionTraceType = message.type;
   await handlers.runBackendAction(context, async () =>
     handlers.backend().stopTurn(context.selectedThreadId)
   );
@@ -115,9 +119,10 @@ async function handleStopTurn(
 
 async function handleApprovePending(
   context: ClientContext,
-  _message: GatewayApprovePendingMessage,
+  message: GatewayApprovePendingMessage,
   handlers: ClientMessageHandlers
 ): Promise<void> {
+  context.actionTraceType = message.type;
   await handlers.runBackendAction(context, async () =>
     handlers.backend().approveCurrent(context.selectedThreadId, true)
   );
@@ -125,9 +130,10 @@ async function handleApprovePending(
 
 async function handleRejectPending(
   context: ClientContext,
-  _message: GatewayRejectPendingMessage,
+  message: GatewayRejectPendingMessage,
   handlers: ClientMessageHandlers
 ): Promise<void> {
+  context.actionTraceType = message.type;
   await handlers.runBackendAction(context, async () =>
     handlers.backend().approveCurrent(context.selectedThreadId, false)
   );

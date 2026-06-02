@@ -13,13 +13,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.codex.mobile.model.AppUpdateState
 import com.codex.mobile.model.AppUpdateStatus
 import com.codex.mobile.model.ConnectionStatus
+import com.codex.mobile.model.StateDiagnostics
 import com.codex.mobile.ui.theme.CodexTheme
 
 @Composable
@@ -40,6 +48,7 @@ internal fun DrawerHeader(
     connectionDetail: String,
     desktopRestartRequired: Boolean,
     appUpdate: AppUpdateState,
+    diagnostics: StateDiagnostics,
     hasRunningThread: Boolean,
     isRefreshing: Boolean,
     onCreateThread: () -> Unit,
@@ -97,8 +106,106 @@ internal fun DrawerHeader(
                 state = appUpdate,
                 onDownload = onDownloadUpdate,
             )
+            if (shouldShowDiagnostics(diagnostics, nowMillis = System.currentTimeMillis())) {
+                DiagnosticsRow(diagnostics = diagnostics)
+            }
         }
     }
+}
+
+internal fun shouldShowDiagnostics(
+    diagnostics: StateDiagnostics,
+    nowMillis: Long = System.currentTimeMillis()
+): Boolean {
+    val recentAction = diagnostics.actionFinishedAt > 0L &&
+        nowMillis - diagnostics.actionFinishedAt in 0L..5_000L
+    return diagnostics.isGenerating ||
+        diagnostics.pendingSelectionThreadId.isNotBlank() ||
+        diagnostics.runningThreadIds.isNotEmpty() ||
+        diagnostics.actionStatus == "failed" ||
+        (recentAction && diagnostics.actionType in diagnosticActionTypes)
+}
+
+private val diagnosticActionTypes = setOf(
+    "select_thread",
+    "send_prompt",
+    "fork_thread",
+    "archive_thread",
+    "refresh_threads",
+    "hello/select_thread"
+)
+
+@Composable
+private fun DiagnosticsRow(
+    diagnostics: StateDiagnostics
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val action = diagnostics.actionType.takeIf(String::isNotBlank)?.let { type ->
+        val status = diagnostics.actionStatus.ifBlank { "pending" }
+        "$type/$status"
+    } ?: "idle"
+    val summary = "rev ${diagnostics.snapshotRevision} / run ${diagnostics.runningThreadIds.size} / $action"
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(CodexTheme.colors.surfaceSubtle)
+            .clickable { expanded = !expanded }
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Info,
+                contentDescription = null,
+                tint = CodexTheme.colors.textSecondary,
+                modifier = Modifier.size(13.dp)
+            )
+            Text(
+                text = summary,
+                color = CodexTheme.colors.textSecondary,
+                fontSize = 11.sp,
+                lineHeight = 14.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f),
+                style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = CodexTheme.colors.textSecondary,
+                modifier = Modifier.size(14.dp)
+            )
+        }
+        if (expanded) {
+            Text(
+                text = buildDiagnosticsText(diagnostics),
+                color = CodexTheme.colors.textSecondary,
+                fontSize = 10.sp,
+                lineHeight = 13.sp,
+                style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
+            )
+        }
+    }
+}
+
+private fun buildDiagnosticsText(diagnostics: StateDiagnostics): String {
+    val running = diagnostics.runningThreadIds.take(4).joinToString(", ").ifBlank { "-" }
+    val action = listOf(
+        diagnostics.actionTraceId.ifBlank { "-" },
+        diagnostics.actionType.ifBlank { "-" },
+        diagnostics.actionStatus.ifBlank { "-" }
+    ).joinToString(" / ")
+    return listOf(
+        "selected: ${diagnostics.selectedThreadId.ifBlank { "-" }}",
+        "pending: ${diagnostics.pendingSelectionThreadId.ifBlank { "-" }}",
+        "generating: ${diagnostics.isGenerating}",
+        "running: $running",
+        "action: $action"
+    ).joinToString("\n")
 }
 
 @Composable

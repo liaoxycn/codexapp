@@ -859,7 +859,6 @@ class ThreadScreenVisibilityTest {
                     onSelectThread = {},
                     onRenameThread = { _, _ -> },
                     onArchiveThread = {},
-                    onUnarchiveThread = {},
                     onRestartDesktop = {}
                 )
             }
@@ -886,7 +885,6 @@ class ThreadScreenVisibilityTest {
                     onSelectThread = {},
                     onRenameThread = { _, _ -> },
                     onArchiveThread = {},
-                    onUnarchiveThread = {},
                     onRestartDesktop = {}
                 )
             }
@@ -911,7 +909,6 @@ class ThreadScreenVisibilityTest {
                     onSelectThread = {},
                     onRenameThread = { id, name -> renameCall = id to name },
                     onArchiveThread = {},
-                    onUnarchiveThread = {},
                     onRestartDesktop = {}
                 )
             }
@@ -939,7 +936,6 @@ class ThreadScreenVisibilityTest {
                     onSelectThread = {},
                     onRenameThread = { _, _ -> },
                     onArchiveThread = {},
-                    onUnarchiveThread = {},
                     onRestartDesktop = {}
                 )
             }
@@ -964,7 +960,6 @@ class ThreadScreenVisibilityTest {
                     onSelectThread = {},
                     onRenameThread = { _, _ -> },
                     onArchiveThread = { archivedThreadId = it },
-                    onUnarchiveThread = {},
                     onRestartDesktop = {}
                 )
             }
@@ -977,8 +972,7 @@ class ThreadScreenVisibilityTest {
     }
 
     @Test
-    fun drawerArchivedSectionCanUnarchiveThread() {
-        var unarchivedThreadId: String? = null
+    fun drawerOmitsArchivedThreads() {
         rule.setContent {
             CodexTheme {
                 DrawerContent(
@@ -999,18 +993,12 @@ class ThreadScreenVisibilityTest {
                     onSelectThread = {},
                     onRenameThread = { _, _ -> },
                     onArchiveThread = {},
-                    onUnarchiveThread = { unarchivedThreadId = it },
                     onRestartDesktop = {}
                 )
             }
         }
 
-        rule.onNodeWithText("归档").assertExists()
-        rule.onNodeWithText("Archived chat").assertExists()
-        rule.onNodeWithTag("thread_row_more_archived-1").performClick()
-        rule.onNodeWithText("取消归档").performClick()
-
-        assertEquals("archived-1", unarchivedThreadId)
+        rule.onNodeWithText("Archived chat").assertDoesNotExist()
     }
 
     private fun sampleState(
@@ -1027,6 +1015,7 @@ class ThreadScreenVisibilityTest {
             )
         ),
         selectedThreadId = "t1",
+        pendingSelectionThreadId = null,
         pendingThreadTitle = null,
         isThreadSwitching = false,
         messages = List(messageCount) { index ->
@@ -1078,6 +1067,7 @@ class ThreadScreenVisibilityTest {
             )
         ),
         selectedThreadId = "project-a-1",
+        pendingSelectionThreadId = null,
         pendingThreadTitle = null,
         isThreadSwitching = false,
         messages = emptyList(),

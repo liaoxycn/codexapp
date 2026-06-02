@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BridgeCatalogController } from "../dist/bridge/BridgeCatalogController.js";
 import { BridgeRuntimeStore } from "../dist/bridge/bridgeRuntimeStore.js";
+import { HISTORY_WINDOW_STEP, INITIAL_HISTORY_WINDOW } from "../dist/bridge/types.js";
 
 function existingState(id, overrides = {}) {
   return {
@@ -30,7 +31,7 @@ function existingState(id, overrides = {}) {
     },
     isSubscribed: false,
     lastActivityAtMs: 100000,
-    historyWindow: 24,
+    historyWindow: INITIAL_HISTORY_WINDOW,
     currentTurnId: null,
     activeAssistantMessageId: null,
     liveAssistantItemId: null,
@@ -69,7 +70,7 @@ test("BridgeCatalogController loadOlderMessages expands window and returns updat
 
   const snapshot = await controller.loadOlderMessages("thread-a");
 
-  assert.equal(runtime.threads.get("thread-a")?.historyWindow, 48);
+  assert.equal(runtime.threads.get("thread-a")?.historyWindow, INITIAL_HISTORY_WINDOW + HISTORY_WINDOW_STEP);
   assert.equal(snapshot.selectedThreadId, "thread-a");
 });
 

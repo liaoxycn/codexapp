@@ -22,6 +22,12 @@ function createSnapshot(overrides = {}) {
     sessionConfig: {},
     configOptions: { models: [], reasoningEfforts: [], sandboxModes: [], defaults: {} },
     desktopRestartRequired: false,
+    diagnostics: {
+      selectedThreadId: "thread-1",
+      isGenerating: false,
+      runningThreadIds: [],
+      snapshotRevision: 1,
+    },
     isGenerating: false,
     ...overrides,
   };
@@ -64,6 +70,8 @@ test("buildSnapshotMessage fills gateway defaults for optional fields", () => {
   assert.equal(message.pendingApproval, null);
   assert.deepEqual(message.sessionConfig, {});
   assert.equal(message.desktopRestartRequired, false);
+  assert.equal(message.diagnostics.selectedThreadId, "thread-1");
+  assert.equal(message.diagnostics.snapshotRevision, 1);
 });
 
 test("sendSnapshot serializes snapshot payload for client socket", () => {
@@ -120,6 +128,30 @@ test("buildSnapshotPatchMessage includes changed desktop restart prompt state", 
   assert.equal(patch.desktopRestartRequired, true);
 });
 
+test("buildSnapshotPatchMessage includes changed diagnostics", () => {
+  const previous = buildSnapshotMessage(createSnapshot());
+  const next = buildSnapshotMessage(createSnapshot({
+    diagnostics: {
+      selectedThreadId: "thread-2",
+      pendingSelectionThreadId: "thread-2",
+      isGenerating: true,
+      runningThreadIds: ["thread-2"],
+      snapshotRevision: 2,
+      actionTraceId: "trace-1",
+      actionType: "select_thread",
+      actionStatus: "succeeded",
+      actionStartedAt: 10,
+      actionFinishedAt: 20,
+    },
+  }));
+
+  const patch = buildSnapshotPatchMessage(previous, next, 1, 2);
+
+  assert.deepEqual(patch.changed, ["diagnostics"]);
+  assert.equal(patch.diagnostics.actionTraceId, "trace-1");
+  assert.deepEqual(patch.diagnostics.runningThreadIds, ["thread-2"]);
+});
+
 test("buildSnapshotPatchMessage includes changed session config", () => {
   const previous = buildSnapshotMessage(createSnapshot());
   const next = buildSnapshotMessage(createSnapshot({
@@ -170,6 +202,20 @@ test("sendSnapshot skips duplicate payloads for the same client", () => {
 
   sendSnapshot(context, createSnapshot(), handlers);
   sendSnapshot(context, createSnapshot(), handlers);
+
+  assert.equal(context.socket.sent.length, 1);
+});
+
+test("sendSnapshot does not emit patches for revision-only diagnostics fallback", () => {
+  const context = createContext({ supportsSnapshotPatch: true });
+  const handlers = {
+    refreshSelectedThread: async () => {},
+    refreshThreadList: async () => {},
+  };
+  const snapshot = createSnapshot({ diagnostics: undefined });
+
+  sendSnapshot(context, snapshot, handlers);
+  sendSnapshot(context, snapshot, handlers);
 
   assert.equal(context.socket.sent.length, 1);
 });

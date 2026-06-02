@@ -44,6 +44,12 @@ export function buildSnapshotMessage(snapshot: ClientSnapshot): GatewaySnapshotM
     configOptions: snapshot.configOptions,
     operationalNotices: snapshot.operationalNotices ?? [],
     desktopRestartRequired: snapshot.desktopRestartRequired ?? false,
+    diagnostics: snapshot.diagnostics ?? {
+      selectedThreadId: snapshot.selectedThreadId,
+      isGenerating: snapshot.isGenerating,
+      runningThreadIds: snapshot.threads.filter((thread) => thread.status === "running").map((thread) => thread.id),
+      snapshotRevision: 0,
+    },
     isGenerating: snapshot.isGenerating,
   };
 }
@@ -65,6 +71,7 @@ const PATCH_FIELDS: SnapshotPatchField[] = [
   "configOptions",
   "operationalNotices",
   "desktopRestartRequired",
+  "diagnostics",
   "isGenerating",
 ];
 
@@ -129,10 +136,15 @@ export async function runBackendAction(
   action: () => ClientSnapshot | Promise<ClientSnapshot>,
   handlers: RefreshHandlers & SnapshotHandlers
 ): Promise<void> {
+  const actionType = context.actionTraceType ?? "backend_action";
+  context.actionTraceType = null;
+  const actionTrace = startActionTrace(context, actionType);
   try {
     const snapshot = await action();
+    finishActionTrace(context, actionTrace, "succeeded");
     handlers.sendSnapshot(context, snapshot);
   } catch (error) {
+    finishActionTrace(context, actionTrace, "failed");
     const detail = error instanceof Error ? error.message : "后端操作失败";
     console.error("[gateway] backend action failed:", detail);
     handlers.sendStatus(context.socket, {
@@ -144,16 +156,57 @@ export async function runBackendAction(
   }
 }
 
+export function startActionTrace(context: ClientContext, type: string): NonNullable<ClientContext["currentAction"]> {
+  const trace = {
+    id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    type,
+    status: "started" as const,
+    startedAt: Date.now(),
+  };
+  context.currentAction = trace;
+  console.log(`[gateway] action start id=${trace.id} type=${type} selected=${context.selectedThreadId || "-"}`);
+  return trace;
+}
+
+export function finishActionTrace(
+  context: ClientContext,
+  trace: NonNullable<ClientContext["currentAction"]>,
+  status: "succeeded" | "failed"
+): void {
+  const finished = {
+    ...trace,
+    status,
+    finishedAt: Date.now(),
+  };
+  context.currentAction = finished;
+  console.log(
+    `[gateway] action ${status} id=${finished.id} type=${finished.type} selected=${context.selectedThreadId || "-"} durationMs=${finished.finishedAt - finished.startedAt}`
+  );
+}
+
 export async function refreshSelectedThread(
   context: ClientContext,
   source: RefreshSource,
   handlers: RefreshHandlers & SnapshotHandlers
 ): Promise<void> {
-  await refreshSelectedThreadState(context, source, {
-    backend: handlers.backend,
-    sendSnapshot: handlers.sendSnapshot,
-    sendStatus: handlers.sendStatus,
-  });
+  const shouldTrace = source === "manual" && context.actionTraceType != null;
+  const trace = shouldTrace ? startActionTrace(context, context.actionTraceType ?? "refresh_threads") : null;
+  context.actionTraceType = null;
+  try {
+    await refreshSelectedThreadState(context, source, {
+      backend: handlers.backend,
+      sendSnapshot: handlers.sendSnapshot,
+      sendStatus: handlers.sendStatus,
+    });
+    if (trace) {
+      finishActionTrace(context, trace, "succeeded");
+    }
+  } catch (error) {
+    if (trace) {
+      finishActionTrace(context, trace, "failed");
+    }
+    throw error;
+  }
 }
 
 export async function refreshThreadList(

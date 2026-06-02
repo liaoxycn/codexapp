@@ -132,6 +132,7 @@ export interface GatewaySnapshotMessage {
   configOptions: GatewayConfigOptionsPayload;
   operationalNotices?: GatewayOperationalNoticePayload[];
   desktopRestartRequired?: boolean;
+  diagnostics?: GatewayDiagnosticsPayload;
   isGenerating: boolean;
 }
 
@@ -154,6 +155,7 @@ export interface GatewaySnapshotPatchMessage {
   configOptions?: GatewayConfigOptionsPayload;
   operationalNotices?: GatewayOperationalNoticePayload[];
   desktopRestartRequired?: boolean;
+  diagnostics?: GatewayDiagnosticsPayload;
   isGenerating?: boolean;
 }
 
@@ -161,6 +163,19 @@ export interface GatewayOperationalNoticePayload {
   id: string;
   text: string;
   createdAt: number;
+}
+
+export interface GatewayDiagnosticsPayload {
+  selectedThreadId?: string;
+  pendingSelectionThreadId?: string;
+  isGenerating: boolean;
+  runningThreadIds: string[];
+  snapshotRevision: number;
+  actionTraceId?: string;
+  actionType?: string;
+  actionStatus?: string;
+  actionStartedAt?: number;
+  actionFinishedAt?: number;
 }
 
 export interface GatewayConfigOptionPayload {
@@ -254,6 +269,7 @@ export interface ClientSnapshot {
   configOptions: GatewayConfigOptionsPayload;
   operationalNotices?: GatewayOperationalNoticePayload[];
   desktopRestartRequired?: boolean;
+  diagnostics?: GatewayDiagnosticsPayload;
   isGenerating: boolean;
 }
 

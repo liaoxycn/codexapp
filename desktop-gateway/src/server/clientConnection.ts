@@ -40,6 +40,8 @@ export function createGatewayClientContext({
     lastSnapshotMessage: null,
     snapshotRevision: 0,
     supportsSnapshotPatch: false,
+    currentAction: null,
+    actionTraceType: null,
     unsubscribe: backend().subscribe(() => {
       if (context.authenticated && socket.readyState === socket.OPEN) {
         scheduleSnapshot(context, backend, (nextContext, snapshot) => sendSnapshot(nextContext, snapshot));
@@ -55,8 +57,9 @@ export function attachGatewayClientSocket({
   onClosed,
 }: AttachGatewayClientSocketArgs): void {
   context.socket.on("message", (payload) => {
-    console.log("[gateway] inbound:", payload.toString());
-    void handleMessage(context, payload.toString());
+    const raw = payload.toString();
+    console.log(`[gateway] inbound ${summarizeInboundMessage(raw)}`);
+    void handleMessage(context, raw);
   });
 
   context.socket.on("close", () => {
@@ -69,4 +72,33 @@ export function attachGatewayClientSocket({
   context.socket.on("error", (error) => {
     console.error("[gateway] websocket error:", error.message);
   });
+}
+
+export function summarizeInboundMessage(raw: string): string {
+  try {
+    const message = JSON.parse(raw) as Record<string, unknown>;
+    const type = typeof message.type === "string" ? message.type : "unknown";
+    const parts = [`type=${type}`];
+    if (typeof message.threadId === "string" && message.threadId.trim()) {
+      parts.push(`thread=${message.threadId.trim()}`);
+    }
+    if (message.newThread === true) {
+      parts.push("newThread=true");
+    }
+    if (typeof message.text === "string") {
+      parts.push(`textLen=${message.text.length}`);
+    }
+    if (typeof message.numTurns === "number") {
+      parts.push(`numTurns=${message.numTurns}`);
+    }
+    if (typeof message.rollbackNumTurns === "number") {
+      parts.push(`rollbackNumTurns=${message.rollbackNumTurns}`);
+    }
+    if (Array.isArray(message.capabilities)) {
+      parts.push(`capabilities=${message.capabilities.length}`);
+    }
+    return parts.join(" ");
+  } catch {
+    return "invalid-json";
+  }
 }

@@ -3,6 +3,7 @@ package com.codex.mobile.ui
 import com.codex.mobile.data.gateway.GatewayBlockPayload
 import com.codex.mobile.data.gateway.GatewayChipPayload
 import com.codex.mobile.data.gateway.GatewayFilePayload
+import com.codex.mobile.data.gateway.GatewayDiagnosticsPayload
 import com.codex.mobile.data.gateway.GatewayOperationalNoticePayload
 import com.codex.mobile.data.gateway.GatewaySessionConfigPayload
 import com.codex.mobile.data.gateway.GatewaySnapshotMessage
@@ -77,6 +78,18 @@ class GatewaySnapshotMapperTest {
             operationalNotices = listOf(
                 GatewayOperationalNoticePayload(id = "mcp-startup-playwright", text = "MCP 服务 playwright: 已就绪", createdAt = 1234L)
             ),
+            diagnostics = GatewayDiagnosticsPayload(
+                selectedThreadId = "thread-1",
+                pendingSelectionThreadId = "thread-2",
+                isGenerating = true,
+                runningThreadIds = listOf("thread-1", "thread-3"),
+                snapshotRevision = 7L,
+                actionTraceId = "trace-7",
+                actionType = "send_prompt",
+                actionStatus = "succeeded",
+                actionStartedAt = 100L,
+                actionFinishedAt = 180L
+            ),
             slashCommands = listOf("/compact"),
             cwd = "D:/Projects/home/codexapp",
             permissionSummary = "workspace-write",
@@ -110,6 +123,10 @@ class GatewaySnapshotMapperTest {
         assertEquals("gpt-5", next.sessionConfig.model)
         assertEquals("high", next.sessionConfig.reasoningEffort)
         assertTrue(next.desktopRestartRequired)
+        assertEquals("trace-7", next.diagnostics.actionTraceId)
+        assertEquals("send_prompt", next.diagnostics.actionType)
+        assertEquals(listOf("thread-1", "thread-3"), next.diagnostics.runningThreadIds)
+        assertEquals(7L, next.diagnostics.snapshotRevision)
         assertEquals(2, next.messages.first().forkNumTurns)
         assertEquals(3, next.messages.first().rollbackNumTurns)
         assertEquals(61_000L, next.messages.first().durationMs)
