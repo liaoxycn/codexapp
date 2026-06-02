@@ -39,6 +39,7 @@ class DefaultSessionRepository(
     private val connection = GatewayRepositoryConnection(
         gatewayClient = gatewayClient,
         commandSender = commandSender,
+        json = json,
         readState = { _state.value },
         updateState = { transform -> _state.update(transform) },
         onInboundRawMessage = ::handleInboundMessage

@@ -4,12 +4,15 @@ import android.util.Log
 import com.codex.mobile.data.gateway.GatewayCommandSender
 import com.codex.mobile.data.gateway.GatewayWebSocketClient
 import com.codex.mobile.data.gateway.decorateConnectionError
+import com.codex.mobile.data.gateway.summarizeInboundForLog
+import kotlinx.serialization.json.Json
 import com.codex.mobile.model.GatewayConfig
 import com.codex.mobile.model.SessionRemoteState
 
 internal class GatewayRepositoryConnection(
     private val gatewayClient: GatewayWebSocketClient,
     private val commandSender: GatewayCommandSender,
+    private val json: Json,
     private val readState: () -> SessionRemoteState,
     private val updateState: ((SessionRemoteState) -> SessionRemoteState) -> Unit,
     private val onInboundRawMessage: (String) -> Unit,
@@ -39,7 +42,7 @@ internal class GatewayRepositoryConnection(
                 updateState { it.withConnectionFailure(decorateConnectionError(config.url, error)) }
             },
             onMessage = { raw ->
-                Log.d(tag, "inbound: $raw")
+                Log.d(tag, "inbound: ${summarizeInboundForLog(json, raw)}")
                 onInboundRawMessage(raw)
             }
         )
