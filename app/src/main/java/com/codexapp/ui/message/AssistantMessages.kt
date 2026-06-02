@@ -245,7 +245,7 @@ private fun TurnProcessBlock(
     }
 }
 
-private fun processSlotMinHeight(compactMode: Boolean) = if (compactMode) 20.dp else 22.dp
+private fun processSlotMinHeight(compactMode: Boolean) = if (compactMode) 26.dp else 30.dp
 
 @Composable
 private fun StableAssistantBodySlot(

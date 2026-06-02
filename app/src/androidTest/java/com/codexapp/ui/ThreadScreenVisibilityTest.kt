@@ -44,6 +44,7 @@ import com.codexapp.ui.app.OperationalNoticeOverlay
 import com.codexapp.ui.drawer.DrawerContent
 import com.codexapp.ui.composer.Composer
 import com.codexapp.ui.composer.ComposerPanel
+import com.codexapp.ui.message.MessageCard
 import com.codexapp.ui.theme.CodexTheme
 import com.codexapp.ui.thread.ThreadScreen
 import org.junit.Assert.assertEquals
@@ -581,6 +582,73 @@ class ThreadScreenVisibilityTest {
         rule.onNodeWithText("已处理 5s").assertExists()
         assertTrue(runCatching { rule.onNodeWithTag("assistant_turn_copy_assistant-running").assertExists() }.isFailure)
         assertTrue(runCatching { rule.onNodeWithTag("assistant_turn_fork_assistant-running").assertExists() }.isFailure)
+    }
+
+    @Test
+    fun runningAssistantTemporaryProcessUpdatesKeepReplySlotsAnchored() {
+        lateinit var updateProcessMessages: (List<ThreadMessage>) -> Unit
+        val assistant = ThreadMessage(
+            id = "assistant-slot",
+            role = MessageRole.ASSISTANT,
+            blocks = emptyList()
+        )
+
+        rule.setContent {
+            var processMessages by remember { mutableStateOf(emptyList<ThreadMessage>()) }
+            updateProcessMessages = { processMessages = it }
+            MaterialTheme {
+                MessageCard(
+                    messages = listOf(assistant),
+                    message = assistant,
+                    processMessages = processMessages,
+                    assistantActionsEnabled = false,
+                    compactMode = false,
+                    messageIndex = 0,
+                    onEditUserMessage = { _, _ -> },
+                    onResendUserMessage = { _, _ -> },
+                    onForkFromMessage = {}
+                )
+            }
+        }
+        rule.runOnIdle {
+            updateProcessMessages(emptyList())
+        }
+        rule.waitForIdle()
+
+        val runningBodyTag = "assistant_body_slot_assistant-slot"
+        val runningFooterTag = "assistant_turn_footer_assistant-slot"
+        val emptyBodyTop = rule.onNodeWithTag(runningBodyTag, useUnmergedTree = true).getUnclippedBoundsInRoot().top
+        val emptyFooterTop = rule.onNodeWithTag(runningFooterTag, useUnmergedTree = true).getUnclippedBoundsInRoot().top
+
+        rule.runOnIdle {
+            updateProcessMessages(
+                listOf(
+                    ThreadMessage(
+                        id = "assistant-thinking",
+                        role = MessageRole.ASSISTANT,
+                        blocks = listOf(MessageBlock.Reasoning("正在思考"))
+                    )
+                )
+            )
+        }
+        rule.waitForIdle()
+        assertEquals(emptyBodyTop, rule.onNodeWithTag(runningBodyTag, useUnmergedTree = true).getUnclippedBoundsInRoot().top)
+        assertEquals(emptyFooterTop, rule.onNodeWithTag(runningFooterTag, useUnmergedTree = true).getUnclippedBoundsInRoot().top)
+
+        rule.runOnIdle {
+            updateProcessMessages(
+                listOf(
+                    ThreadMessage(
+                        id = "assistant-status",
+                        role = MessageRole.ASSISTANT,
+                        blocks = listOf(MessageBlock.Status("Token 总计 123"))
+                    )
+                )
+            )
+        }
+        rule.waitForIdle()
+        assertEquals(emptyBodyTop, rule.onNodeWithTag(runningBodyTag, useUnmergedTree = true).getUnclippedBoundsInRoot().top)
+        assertEquals(emptyFooterTop, rule.onNodeWithTag(runningFooterTag, useUnmergedTree = true).getUnclippedBoundsInRoot().top)
     }
 
     @Test
