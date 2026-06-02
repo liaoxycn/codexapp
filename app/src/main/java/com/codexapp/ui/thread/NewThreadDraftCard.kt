@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import com.codexapp.model.GatewayConfigOption
 import com.codexapp.model.GatewayConfigOptions
 import com.codexapp.model.NewThreadDraft
+import com.codexapp.model.NewThreadPermissionPresets
 import com.codexapp.ui.theme.CodexTheme
 
 @Composable
@@ -62,7 +63,7 @@ internal fun NewThreadDraftCard(
 ) {
     val modelOptions = buildModelDraftOptions(draft, configOptions.models)
     val reasoningOptions = buildConfigDraftOptions(configOptions.reasoningEfforts)
-    val sandboxOptions = buildConfigDraftOptions(configOptions.sandboxModes)
+    val permissionOptions = buildPermissionDraftOptions(configOptions)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -96,12 +97,12 @@ internal fun NewThreadDraftCard(
                 )
             }
         }
-        if (sandboxOptions.isNotEmpty()) {
+        if (permissionOptions.isNotEmpty()) {
             DraftPermissionStrip(
-                options = sandboxOptions,
-                selected = draft.sandboxMode,
+                options = permissionOptions,
+                selected = draft.permissionMode,
                 compactMode = compactMode,
-                onSelect = { sandbox -> onDraftChange(draft.copy(sandboxMode = sandbox)) }
+                onSelect = { mode -> onDraftChange(draft.copy(permissionMode = mode)) }
             )
         }
     }
@@ -348,4 +349,18 @@ internal fun buildConfigDraftOptions(options: List<GatewayConfigOption>): List<D
     return options
         .filter { it.value.isNotBlank() }
         .map { DraftOption(it.label.ifBlank { it.value }, it.value) }
+}
+
+internal fun buildPermissionDraftOptions(configOptions: GatewayConfigOptions): List<DraftOption> {
+    val sandboxModes = configOptions.sandboxModes
+        .map { it.value.trim() }
+        .filter { it.isNotBlank() }
+        .toSet()
+    return NewThreadPermissionPresets.all.mapNotNull { preset ->
+        if (sandboxModes.isNotEmpty() && !sandboxModes.contains(preset.sandboxMode)) {
+            null
+        } else {
+            DraftOption(label = preset.label, value = preset.value)
+        }
+    }
 }

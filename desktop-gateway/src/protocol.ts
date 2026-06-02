@@ -35,6 +35,8 @@ export interface GatewayCreateThreadMessage {
   cwd?: string;
   model?: string;
   reasoningEffort?: string;
+  approvalPolicy?: string;
+  approvalsReviewer?: string;
   sandboxMode?: string;
 }
 
@@ -77,6 +79,8 @@ export interface GatewaySendPromptMessage {
   cwd?: string;
   model?: string;
   reasoningEffort?: string;
+  approvalPolicy?: string;
+  approvalsReviewer?: string;
   sandboxMode?: string;
 }
 
@@ -277,6 +281,8 @@ export interface ThreadStartOptions {
   cwd?: string;
   model?: string;
   reasoningEffort?: string;
+  approvalPolicy?: string;
+  approvalsReviewer?: string;
   sandboxMode?: string;
 }
 

@@ -24,7 +24,7 @@
 | type | 参数 | 作用 |
 | --- | --- | --- |
 | `hello` | `client`, `version`, `pairToken`, `capabilities` | 鉴权、能力协商、拉首个 snapshot |
-| `create_thread` | `cwd?`, `model?`, `reasoningEffort?`, `sandboxMode?` | 直接新开会话，默认继承当前 cwd |
+| `create_thread` | `cwd?`, `model?`, `reasoningEffort?`, `approvalPolicy?`, `approvalsReviewer?`, `sandboxMode?` | 直接新开会话，默认继承当前 cwd |
 | `select_thread` | `threadId` | 切换会话 |
 | `fork_thread` | `threadId`, `numTurns?` | 从指定会话 fork；传 `numTurns` 时从第 N 个 turn 后分叉 |
 | `rename_thread` | `threadId`, `name` | 重命名会话 |
@@ -32,7 +32,7 @@
 | `unarchive_thread` | `threadId` | 反归档并选中 |
 | `refresh_threads` | `forceSnapshot?` | 手动刷新目录与当前会话；`forceSnapshot=true` 时下一包强制完整 `snapshot` |
 | `load_older_messages` | 无 | 当前会话加载更早历史 |
-| `send_prompt` | `text`, `threadId?`, `newThread?`, `cwd?`, `model?`, `reasoningEffort?`, `sandboxMode?` | 发送输入；`newThread=true` 或无选中会话时先按草稿配置创建真实会话 |
+| `send_prompt` | `text`, `threadId?`, `newThread?`, `cwd?`, `model?`, `reasoningEffort?`, `approvalPolicy?`, `approvalsReviewer?`, `sandboxMode?` | 发送输入；`newThread=true` 或无选中会话时先按草稿配置创建真实会话 |
 | `stop_turn` | 无 | 中断当前 turn |
 | `approve_pending` | 无 | 允许当前审批 |
 | `reject_pending` | 无 | 拒绝当前审批 |
@@ -41,7 +41,7 @@
 
 分叉入口属于消息/turn，不属于会话列表。App Server 的 `thread/fork` 参数只有 `threadId`，没有 turn id；gateway 通过 `fork_thread.numTurns` 实现移动端 turn 级分叉：先调用 `thread/fork` 复制会话，再按源会话总 turn 数对新会话调用 `thread/rollback` 裁掉后续 turns。
 
-移动端默认启动到“新对话草稿态”。草稿态只保存在本地 UI；用户发送第一条消息时，App 发送 `send_prompt.newThread=true` 与草稿配置，gateway 先调用 app-server `thread/start`，再对新线程调用 `turn/start`。归档当前会话后，gateway 返回 `selectedThreadId=""`、空消息和空 cwd，App 保持草稿态，不自动跳到其他会话。
+移动端默认启动到“新对话草稿态”。草稿态只保存在本地 UI；用户发送第一条消息时，App 发送 `send_prompt.newThread=true` 与草稿配置，gateway 先调用 app-server `thread/start`，再对新线程调用 `turn/start`。新会话权限模式当前提供三档预设：`默认权限 -> on-request + user + workspace-write`、`自动审查 -> on-failure + auto_review + workspace-write`、`完全访问权限 -> never + user + danger-full-access`，默认值为“完全访问权限”。归档当前会话后，gateway 返回 `selectedThreadId=""`、空消息和空 cwd，App 保持草稿态，不自动跳到其他会话。
 
 ## 服务端消息
 
@@ -154,7 +154,7 @@
 gateway 负责把 Codex App Server JSON-RPC 压平成移动端 snapshot：
 
 - `thread/list/read/resume/start/fork/archive/unarchive` -> `threads`、`selectedThreadId`、`messages`
-- `config/read`、`model/list` -> `configOptions`；新会话页只能展示 app-server 返回的真实模型、推理和 sandbox 选项，不展示审批策略选择
+- `config/read`、`model/list` -> `configOptions`；新会话页与快捷功能区展示 app-server 返回的真实模型、推理和 sandbox 能力，权限模式由移动端预设映射到 `approvalPolicy + approvalsReviewer + sandbox`
 - `file/search`/项目文件枚举 -> `projectFiles`；移动端文件面板只展示当前项目内文件，并过滤 app-server 已排除路径
 - `turn/start/steer/interrupt` -> `send_prompt`、`stop_turn`
 - `serverRequest/*` -> `pendingApproval`

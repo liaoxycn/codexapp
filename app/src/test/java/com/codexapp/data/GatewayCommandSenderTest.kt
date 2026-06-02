@@ -91,6 +91,8 @@ class GatewayCommandSenderTest {
             cwd = "D:/Projects/App",
             model = "gpt-5",
             reasoningEffort = "high",
+            approvalPolicy = "never",
+            approvalsReviewer = "user",
             sandboxMode = "workspace-write"
         )
 
@@ -100,7 +102,8 @@ class GatewayCommandSenderTest {
         assertEquals("D:/Projects/App", payload.getValue("cwd").jsonPrimitive.content)
         assertEquals("gpt-5", payload.getValue("model").jsonPrimitive.content)
         assertEquals("high", payload.getValue("reasoningEffort").jsonPrimitive.content)
-        assertFalse(payload.containsKey("approvalPolicy"))
+        assertEquals("never", payload.getValue("approvalPolicy").jsonPrimitive.content)
+        assertEquals("user", payload.getValue("approvalsReviewer").jsonPrimitive.content)
         assertEquals("workspace-write", payload.getValue("sandboxMode").jsonPrimitive.content)
     }
 

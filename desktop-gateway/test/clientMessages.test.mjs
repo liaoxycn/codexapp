@@ -404,6 +404,8 @@ test("handleClientMessage creates thread before first draft prompt", async () =>
       cwd: "D:/Projects/codexapp",
       model: "gpt-5",
       reasoningEffort: "medium",
+      approvalPolicy: "on-failure",
+      approvalsReviewer: "auto_review",
       sandboxMode: "workspace-write",
     }),
     handlers
@@ -416,6 +418,8 @@ test("handleClientMessage creates thread before first draft prompt", async () =>
       cwd: "D:/Projects/codexapp",
       model: "gpt-5",
       reasoningEffort: "medium",
+      approvalPolicy: "on-failure",
+      approvalsReviewer: "auto_review",
       sandboxMode: "workspace-write",
     },
   ]]);

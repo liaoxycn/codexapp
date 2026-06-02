@@ -45,7 +45,7 @@ internal fun SessionRemoteState.toHomeState(
     slashCommands = slashCommands,
     pendingApproval = if (isNewThreadDraft) null else pendingApproval,
     cwd = if (isNewThreadDraft) newThreadDraft.cwd else cwd,
-    permissionSummary = if (isNewThreadDraft) newThreadDraft.sandboxMode else permissionSummary,
+    permissionSummary = if (isNewThreadDraft) newThreadDraft.permissionLabel else permissionSummary,
     sessionConfig = if (isNewThreadDraft) {
         newThreadDraft.toSessionConfig()
     } else {
@@ -76,13 +76,13 @@ private fun NewThreadDraft.toComposerChips(): List<ComposerChip> {
             ComposerChip(label = path.substringAfterLast('/').substringAfterLast('\\'), icon = ComposerChipIcon.FILE, path = path)
         },
         model.takeIf(String::isNotBlank)?.let { ComposerChip(label = it, icon = ComposerChipIcon.CONTEXT) },
-        sandboxMode.takeIf(String::isNotBlank)?.let { ComposerChip(label = it, icon = ComposerChipIcon.CONTEXT) }
+        permissionLabel.takeIf(String::isNotBlank)?.let { ComposerChip(label = it, icon = ComposerChipIcon.CONTEXT) }
     )
 }
 
 private fun NewThreadDraft.toSessionConfig(): SessionConfig {
     return SessionConfig(
-        permissionMode = sandboxMode,
+        permissionMode = permissionLabel,
         model = model,
         reasoningEffort = reasoningEffort
     )

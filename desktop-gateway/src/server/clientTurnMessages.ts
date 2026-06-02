@@ -90,6 +90,8 @@ async function handleSendPrompt(
         cwd: message.cwd,
         model: message.model,
         reasoningEffort: message.reasoningEffort,
+        approvalPolicy: message.approvalPolicy,
+        approvalsReviewer: message.approvalsReviewer,
         sandboxMode: message.sandboxMode,
       });
       requestedThreadId = created.selectedThreadId;

@@ -1,9 +1,11 @@
 package com.codexapp.ui
 
 import com.codexapp.model.GatewayConfigOption
+import com.codexapp.model.GatewayConfigOptions
 import com.codexapp.model.NewThreadDraft
 import com.codexapp.ui.thread.buildConfigDraftOptions
 import com.codexapp.ui.thread.buildModelDraftOptions
+import com.codexapp.ui.thread.buildPermissionDraftOptions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -41,5 +43,26 @@ class NewThreadDraftCardOptionsTest {
 
         assertEquals(listOf("low", "high"), options.map { it.value })
         assertEquals(listOf("low", "high"), options.map { it.label })
+    }
+
+    @Test
+    fun permissionOptionsOnlyExposeSupportedSandboxPresets() {
+        val options = buildPermissionDraftOptions(
+            GatewayConfigOptions(
+                sandboxModes = listOf(
+                    GatewayConfigOption(label = "workspace-write", value = "workspace-write"),
+                    GatewayConfigOption(label = "danger-full-access", value = "danger-full-access")
+                )
+            )
+        )
+
+        assertEquals(
+            listOf("默认权限", "自动审查", "完全访问权限"),
+            options.map { it.label }
+        )
+        assertEquals(
+            listOf("default", "auto-review", "full-access"),
+            options.map { it.value }
+        )
     }
 }

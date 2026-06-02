@@ -130,7 +130,7 @@ class GatewayRepositoryCommandActionsTest {
                 cwd = "D:/Projects/App",
                 model = "gpt-5",
                 reasoningEffort = "high",
-                sandboxMode = "workspace-write"
+                permissionMode = "default"
             )
         )
 
@@ -138,6 +138,9 @@ class GatewayRepositoryCommandActionsTest {
         assertTrue(sentMessages.single().contains("\"newThread\":true"))
         assertFalse(sentMessages.single().contains("\"threadId\":\"thread-1\""))
         assertTrue(sentMessages.single().contains("\"cwd\":\"D:/Projects/App\""))
+        assertTrue(sentMessages.single().contains("\"approvalPolicy\":\"on-request\""))
+        assertTrue(sentMessages.single().contains("\"approvalsReviewer\":\"user\""))
+        assertTrue(sentMessages.single().contains("\"sandboxMode\":\"workspace-write\""))
         assertEquals(2, state.messages.size)
         assertEquals("", state.selectedThreadId)
         assertEquals("新会话", state.pendingThreadTitle)
@@ -173,6 +176,9 @@ class GatewayRepositoryCommandActionsTest {
         assertTrue(sentMessages.single().contains("\"newThread\":true"))
         assertFalse(sentMessages.single().contains("\"threadId\":\"thread-project\""))
         assertFalse(sentMessages.single().contains("\"cwd\""))
+        assertTrue(sentMessages.single().contains("\"approvalPolicy\":\"never\""))
+        assertTrue(sentMessages.single().contains("\"approvalsReviewer\":\"user\""))
+        assertTrue(sentMessages.single().contains("\"sandboxMode\":\"danger-full-access\""))
     }
 
     @Test

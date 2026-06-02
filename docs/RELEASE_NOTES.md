@@ -1,2 +1,1 @@
-- 清理 MOBILE_GATEWAY_FLOW_PROGRESS 历史记录，只保留当前版本有效结论
-- 删除过时、重复和已废弃条目，压缩最近验证与后续项
+- 新会话新增三档权限模式预设，默认完全访问权限，并打通到 gateway 与 app-server thread/start\n- 快捷功能区中的权限模式、模型、推理强度改为可下拉修改，新会话草稿可直接生效\n- 清理断线/失败后的旧 diagnostics 残留，精简并更新移动端 gateway 进度与协议文档

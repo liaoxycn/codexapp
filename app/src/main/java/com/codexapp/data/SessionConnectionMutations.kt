@@ -1,6 +1,7 @@
 package com.codexapp.data
 
 import com.codexapp.model.ConnectionStatus
+import com.codexapp.model.StateDiagnostics
 import com.codexapp.model.GatewayConfig
 import com.codexapp.model.SessionRemoteState
 
@@ -48,7 +49,8 @@ internal fun SessionRemoteState.withDisconnectedGateway(reason: String): Session
         isLoadingOlder = false,
         isManualRefreshing = false,
         isGenerating = false,
-        pendingApproval = null
+        pendingApproval = null,
+        diagnostics = diagnostics.clearedAfterConnectionLoss()
     )
 }
 
@@ -63,7 +65,8 @@ internal fun SessionRemoteState.withConnectionFailure(detail: String): SessionRe
         isLoadingOlder = false,
         isManualRefreshing = false,
         isGenerating = false,
-        pendingApproval = null
+        pendingApproval = null,
+        diagnostics = diagnostics.clearedAfterConnectionLoss()
     )
 }
 
@@ -78,7 +81,8 @@ internal fun SessionRemoteState.withManualDisconnect(): SessionRemoteState {
         isLoadingOlder = false,
         isManualRefreshing = false,
         isGenerating = false,
-        pendingApproval = null
+        pendingApproval = null,
+        diagnostics = diagnostics.clearedAfterConnectionLoss()
     )
 }
 
@@ -112,6 +116,20 @@ internal fun SessionRemoteState.withInboundDecodeFailure(message: String?): Sess
         isLoadingOlder = false,
         isManualRefreshing = false,
         isGenerating = false,
-        pendingApproval = null
+        pendingApproval = null,
+        diagnostics = diagnostics.clearedAfterConnectionLoss()
+    )
+}
+
+private fun StateDiagnostics.clearedAfterConnectionLoss(): StateDiagnostics {
+    return copy(
+        pendingSelectionThreadId = "",
+        isGenerating = false,
+        runningThreadIds = emptyList(),
+        actionTraceId = "",
+        actionType = "",
+        actionStatus = "",
+        actionStartedAt = 0L,
+        actionFinishedAt = 0L
     )
 }

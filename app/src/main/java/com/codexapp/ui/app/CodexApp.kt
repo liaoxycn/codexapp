@@ -113,6 +113,7 @@ fun CodexApp(
                         onChange = viewModel::updateComposer,
                         onInsertText = viewModel::insertComposerText,
                         onApplySlashCommand = viewModel::applySlashCommand,
+                        onDraftChange = { draft -> viewModel.updateNewThreadDraft { draft } },
                         onClearComposer = viewModel::clearComposer,
                         onSend = viewModel::send,
                         onStop = viewModel::stopGenerating

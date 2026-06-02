@@ -23,6 +23,8 @@ internal class GatewayRepositoryCommandActions(
                 cwd = cwd,
                 model = draft?.model,
                 reasoningEffort = draft?.reasoningEffort,
+                approvalPolicy = draft?.approvalPolicy,
+                approvalsReviewer = draft?.approvalsReviewer,
                 sandboxMode = draft?.sandboxMode
             )
         }
@@ -106,6 +108,8 @@ internal class GatewayRepositoryCommandActions(
             cwd = newThreadDraft?.cwd,
             model = newThreadDraft?.model,
             reasoningEffort = newThreadDraft?.reasoningEffort,
+            approvalPolicy = newThreadDraft?.approvalPolicy,
+            approvalsReviewer = newThreadDraft?.approvalsReviewer,
             sandboxMode = newThreadDraft?.sandboxMode
         )
         logDebug("send_prompt sent=$sent")

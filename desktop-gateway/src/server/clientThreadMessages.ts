@@ -74,6 +74,8 @@ async function handleCreateThread(
       cwd: message.cwd,
       model: message.model,
       reasoningEffort: message.reasoningEffort,
+      approvalPolicy: message.approvalPolicy,
+      approvalsReviewer: message.approvalsReviewer,
       sandboxMode: message.sandboxMode,
     });
     context.selectedThreadId = snapshot.selectedThreadId;

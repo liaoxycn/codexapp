@@ -40,8 +40,23 @@ data class NewThreadDraft(
     val cwd: String = "",
     val model: String = "",
     val reasoningEffort: String = "",
-    val sandboxMode: String = ""
-)
+    val permissionMode: String = NewThreadPermissionPresets.FullAccess.value
+) {
+    val permissionPreset: NewThreadPermissionPreset
+        get() = newThreadPermissionPreset(permissionMode)
+
+    val permissionLabel: String
+        get() = permissionPreset.label
+
+    val approvalPolicy: String
+        get() = permissionPreset.approvalPolicy
+
+    val approvalsReviewer: String
+        get() = permissionPreset.approvalsReviewer
+
+    val sandboxMode: String
+        get() = permissionPreset.sandboxMode
+}
 
 data class SessionConfig(
     val permissionMode: String = "",

@@ -29,6 +29,8 @@ internal data class GatewayCreateThreadMessage(
     val cwd: String? = null,
     val model: String? = null,
     val reasoningEffort: String? = null,
+    val approvalPolicy: String? = null,
+    val approvalsReviewer: String? = null,
     val sandboxMode: String? = null
 )
 
@@ -78,6 +80,8 @@ internal data class GatewaySendPromptMessage(
     val cwd: String? = null,
     val model: String? = null,
     val reasoningEffort: String? = null,
+    val approvalPolicy: String? = null,
+    val approvalsReviewer: String? = null,
     val sandboxMode: String? = null
 )
 

@@ -19,6 +19,8 @@ internal class GatewayCommandSender(
         cwd: String?,
         model: String? = null,
         reasoningEffort: String? = null,
+        approvalPolicy: String? = null,
+        approvalsReviewer: String? = null,
         sandboxMode: String? = null
     ): Boolean {
         return send(
@@ -26,6 +28,8 @@ internal class GatewayCommandSender(
                 cwd = cwd?.takeIf { it.isNotBlank() },
                 model = model?.takeIf { it.isNotBlank() },
                 reasoningEffort = reasoningEffort?.takeIf { it.isNotBlank() },
+                approvalPolicy = approvalPolicy?.takeIf { it.isNotBlank() },
+                approvalsReviewer = approvalsReviewer?.takeIf { it.isNotBlank() },
                 sandboxMode = sandboxMode?.takeIf { it.isNotBlank() }
             )
         )
@@ -68,6 +72,8 @@ internal class GatewayCommandSender(
         cwd: String? = null,
         model: String? = null,
         reasoningEffort: String? = null,
+        approvalPolicy: String? = null,
+        approvalsReviewer: String? = null,
         sandboxMode: String? = null
     ): Boolean {
         return send(
@@ -78,6 +84,8 @@ internal class GatewayCommandSender(
                 cwd = cwd?.takeIf { it.isNotBlank() },
                 model = model?.takeIf { it.isNotBlank() },
                 reasoningEffort = reasoningEffort?.takeIf { it.isNotBlank() },
+                approvalPolicy = approvalPolicy?.takeIf { it.isNotBlank() },
+                approvalsReviewer = approvalsReviewer?.takeIf { it.isNotBlank() },
                 sandboxMode = sandboxMode?.takeIf { it.isNotBlank() }
             )
         )

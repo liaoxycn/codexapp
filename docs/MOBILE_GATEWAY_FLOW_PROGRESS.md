@@ -7,7 +7,7 @@
 | 项 | 当前状态 |
 | --- | --- |
 | 协议与通知 | 已补齐 Android App 与 `desktop-gateway` 协议文档，常见 app-server 通知已映射或显式 no-op。 |
-| 新会话流程 | 默认进入草稿页，首条消息发送时才创建真实会话；模型、推理、sandbox 选项来自真实配置。 |
+| 新会话流程 | 默认进入草稿页，首条消息发送时才创建真实会话；权限模式/模型/推理强度都可在草稿快捷区直接修改，默认权限模式为“完全访问权限”。 |
 | 会话列表 | 只展示 Desktop 当前可见的未归档会话；普通会话不再误归到 `new-chat` 或错误项目。 |
 | 消息流 | 运行中展示 reasoning/命令/工具/网页搜索等过程；完成后过程折叠到“已处理 X 项”，最终回复保留完整正文。 |
 | turn 操作 | 编辑后重发改为“发送时才回滚”；复制、分叉、耗时移到 assistant 最终回复底部；未完成 turn 禁止复制/分叉。 |
@@ -41,6 +41,7 @@
 | Goal 多 turn 运行态续租 | 有目标的持续会话不应在多个 turn 间隙掉成空闲。 | 我在 Desktop 开启 goal 目标后让会话持续执行多个 turn；我期望移动端抽屉和消息流只要 goal 仍是 active，就稳定显示运行中，刷新也不突然闪空闲。 | 深排发现 `thread/goal/updated` 旧逻辑只写“目标”状态消息，没有把 `active` goal 当成运行信号；多 turn 场景下上一轮 `turn/completed` 或随后的 `thread/read` 可能把 `isGenerating/currentTurnId` 清掉。已让 `active` goal 更新续租 running、记录 `turnId`、刷新本地活动时间；`complete/paused/budgetLimited` 不强制拉成 running，避免误报。 |
 | 同秒 idle refresh 防降级 | 刚续租的运行态不能被同一秒返回的旧快照覆盖。 | 我在 goal 会话运行中点刷新或等自动同步；如果 Desktop app-server 返回的 `thread/read` 仍显示上一 turn completed 且时间戳与 goal 更新时间同秒，我期望移动端仍保持运行中。 | App-server时间戳粒度是秒，本地 overlay 是毫秒；旧 overlay 保留逻辑要求 incoming 活动时间严格小于本地时间，同秒快照会被误认为不旧，导致 running lease 被 idle refresh 打掉。已改为有效 running lease 期间，同时间戳或更旧的 idle 快照不能降级，只有明确更新的快照才覆盖。 |
 | 断线瞬态清理 | 断线/失败/解析错误后不应残留切换、刷新、加载遮罩。 | 我在切换会话、加载历史或手动刷新时遇到 gateway 断开；我期望立即看到断线/错误状态，不再卡在“正在切换会话”“刷新中”或加载历史状态。 | 旧断线收口只清理 `isGenerating/pendingApproval`，没有清 `pendingSelectionThreadId/pendingThreadTitle/isThreadSwitching/isLoadingOlder/isManualRefreshing`。已让断线、连接失败、手动断开、入站解析失败统一清理这些瞬态；补充 mutation 单测覆盖。 |
+| 断线后诊断状态清理 | 连接断开后，抽屉诊断行也不应残留旧的 running/trace 信息。 | 我在运行中或刷新中遇到 gateway 断线、连接失败或消息解析失败；我期望除了主状态恢复到断线态，抽屉里的诊断折叠行也同步清空旧的 pending/running/action 记录，不再误导我以为后台还在继续。 | 之前 `withDisconnectedGateway` / `withConnectionFailure` / `withManualDisconnect` / `withInboundDecodeFailure` 只清主状态，不清 `diagnostics`，导致抽屉仍可能显示过期 running thread、pending selection 或最近 action trace。现已在这些收口路径统一清空 `diagnostics` 的 pending/running/action 字段，并补 `SessionRemoteMutationsTest` 回归覆盖。 |
 | 发布 latest 摘要 | 发布脚本结束后应有固定路径摘要，避免每次翻长日志判断状态。 | 我运行发布脚本后，只需查看 `scripts/logs/github-release-latest.json`，即可知道版本、tag、日志路径、branch/tag push 结果和 Actions 触发状态。 | 旧日志只有时间戳文件，外部 AI 或用户要判断上次发包是否成功仍需找最新日志再阅读。已新增 latest JSON 摘要，脚本任何内部错误仍写入状态且对外退出正常；实际重试发现 Markdown 说明里出现 `-Notes` 字样会被误判为参数，已改为只识别完整 CLI option token 并补回归测试。 |
 | App 入站日志脱敏 | 移动端调试日志应帮助排查协议状态，但不能输出完整消息正文。 | 我用 logcat 排查 gateway 连接时，只需要看到入站消息类型、revision、线程/消息数量、changed 字段、运行态等摘要；不应把用户 prompt、助手回复、状态 detail 全量打印出来。 | `GatewayRepositoryConnection` 旧日志直接 `Log.d("inbound: $raw")`，长消息会刷屏且可能泄露正文。本轮改成 `summarizeInboundForLog` 结构化摘要，异常 JSON 也只记录字节数和错误类型；新增单测确保 title/preview/正文/detail 不出现在日志摘要里。 |
 | 主区连接横幅细节 | 消息区顶部连接横幅在断线/异常时应直接给出原因。 | 我停在主消息区遇到 gateway 断开、解析失败或连接异常；我期望不用先打开抽屉，也能在顶部横幅直接看到具体原因，再决定是否重连。 | 旧主区横幅只有“连接异常/未连接 Desktop Gateway”，具体 `connectionDetail` 只在抽屉里可见，主区排障反馈太弱。 | 已让主区连接横幅在 `ERROR`/`DISCONNECTED` 时显示最多两行具体原因，并过滤“未连接 gateway/未连接 desktop gateway”这类泛文案；补单测和 Compose 可见性测试覆盖解析失败详情显示。 |

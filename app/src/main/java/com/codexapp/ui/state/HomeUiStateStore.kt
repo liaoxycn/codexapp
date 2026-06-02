@@ -5,6 +5,7 @@ import com.codexapp.model.AppUpdateState
 import com.codexapp.model.NewThreadDraft
 import com.codexapp.model.PendingEditResendState
 import com.codexapp.model.SessionRemoteState
+import com.codexapp.model.resolveSupportedNewThreadPermissionMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -203,7 +204,10 @@ internal class HomeUiStateStore(
             draft.copy(
                 model = draft.model.ifBlank { remote.configOptions.defaults.model },
                 reasoningEffort = draft.reasoningEffort.ifBlank { remote.configOptions.defaults.reasoningEffort },
-                sandboxMode = draft.sandboxMode.ifBlank { remote.configOptions.defaults.sandboxMode }
+                permissionMode = resolveSupportedNewThreadPermissionMode(
+                    requested = draft.permissionMode,
+                    availableSandboxModes = remote.configOptions.sandboxModes.map { it.value }
+                )
             )
         }
     }

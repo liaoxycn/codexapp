@@ -111,6 +111,8 @@ test("startThread forwards draft model and permission options", async () => {
     cwd: "D:/Projects/App",
     model: "gpt-5",
     reasoningEffort: "high",
+    approvalPolicy: "on-failure",
+    approvalsReviewer: "auto_review",
     sandboxMode: "workspace-write",
   });
 
@@ -121,6 +123,8 @@ test("startThread forwards draft model and permission options", async () => {
         cwd: "D:/Projects/App",
         model: "gpt-5",
         reasoningEffort: "high",
+        approvalPolicy: "on-failure",
+        approvalsReviewer: "auto_review",
         sandbox: "workspace-write",
       },
     },

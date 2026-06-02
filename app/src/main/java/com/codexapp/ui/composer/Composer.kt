@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.Text
 import com.codexapp.model.HomeUiState
+import com.codexapp.model.NewThreadDraft
 import com.codexapp.ui.theme.CodexTheme
 
 @Composable
@@ -34,6 +35,7 @@ internal fun Composer(
     onChange: (String) -> Unit,
     onInsertText: (String) -> Unit,
     onApplySlashCommand: (String) -> Unit,
+    onDraftChange: (NewThreadDraft) -> Unit,
     onClearComposer: () -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit
@@ -98,6 +100,7 @@ internal fun Composer(
                 onResetInlineSlashPanel = controller.resetInlineSlashPanel,
                 onSelectSlashCommand = controller.selectSlashCommand,
                 onSelectFile = controller.selectFile,
+                onDraftChange = onDraftChange,
             )
             ComposerInputBar(
                 state = state,

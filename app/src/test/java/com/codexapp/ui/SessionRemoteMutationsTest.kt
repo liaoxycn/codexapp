@@ -13,6 +13,7 @@ import com.codexapp.model.ConnectionStatus
 import com.codexapp.model.MessageBlock
 import com.codexapp.model.MessageRole
 import com.codexapp.model.SessionRemoteState
+import com.codexapp.model.StateDiagnostics
 import com.codexapp.model.ThreadMessage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -124,6 +125,7 @@ class SessionRemoteMutationsTest {
             isManualRefreshing = true,
             isGenerating = true,
             pendingApproval = "允许执行命令？",
+            diagnostics = busyDiagnostics(),
             messages = listOf(message("user-1", MessageRole.USER))
         ).withDisconnectedGateway("")
 
@@ -147,7 +149,8 @@ class SessionRemoteMutationsTest {
             isLoadingOlder = true,
             isManualRefreshing = true,
             isGenerating = true,
-            pendingApproval = "允许执行命令？"
+            pendingApproval = "允许执行命令？",
+            diagnostics = busyDiagnostics()
         ).withConnectionFailure("连接失败")
 
         assertEquals(ConnectionStatus.ERROR, next.connectionStatus)
@@ -192,7 +195,8 @@ class SessionRemoteMutationsTest {
             isLoadingOlder = true,
             isManualRefreshing = true,
             isGenerating = true,
-            pendingApproval = "允许执行命令？"
+            pendingApproval = "允许执行命令？",
+            diagnostics = busyDiagnostics()
         )
     }
 
@@ -202,7 +206,28 @@ class SessionRemoteMutationsTest {
         assertFalse(state.isThreadSwitching)
         assertFalse(state.isLoadingOlder)
         assertFalse(state.isManualRefreshing)
+        assertFalse(state.diagnostics.isGenerating)
+        assertTrue(state.diagnostics.runningThreadIds.isEmpty())
+        assertEquals("", state.diagnostics.pendingSelectionThreadId)
+        assertEquals("", state.diagnostics.actionTraceId)
+        assertEquals("", state.diagnostics.actionType)
+        assertEquals("", state.diagnostics.actionStatus)
+        assertEquals(0L, state.diagnostics.actionStartedAt)
+        assertEquals(0L, state.diagnostics.actionFinishedAt)
     }
+
+    private fun busyDiagnostics() = StateDiagnostics(
+        selectedThreadId = "thread-1",
+        pendingSelectionThreadId = "thread-2",
+        isGenerating = true,
+        runningThreadIds = listOf("thread-1"),
+        snapshotRevision = 7L,
+        actionTraceId = "trace-7",
+        actionType = "refresh_threads",
+        actionStatus = "succeeded",
+        actionStartedAt = 100L,
+        actionFinishedAt = 180L
+    )
 
     private fun message(id: String, role: MessageRole): ThreadMessage {
         return ThreadMessage(

@@ -75,6 +75,12 @@ export async function startThread(
   if (options.reasoningEffort) {
     params.reasoningEffort = options.reasoningEffort;
   }
+  if (options.approvalPolicy) {
+    params.approvalPolicy = options.approvalPolicy;
+  }
+  if (options.approvalsReviewer) {
+    params.approvalsReviewer = options.approvalsReviewer;
+  }
   if (options.sandboxMode) {
     params.sandbox = options.sandboxMode;
   }
