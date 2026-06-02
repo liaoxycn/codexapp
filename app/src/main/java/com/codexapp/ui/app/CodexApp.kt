@@ -99,6 +99,7 @@ fun CodexApp(
                         TopBar(
                             title = selectedThreadChrome.title,
                             status = selectedThreadChrome.status,
+                            tokenUsage = state.tokenUsage,
                             onOpenDrawer = controller.openDrawer,
                         )
                     }

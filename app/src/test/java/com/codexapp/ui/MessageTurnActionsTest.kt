@@ -33,8 +33,8 @@ class MessageTurnActionsTest {
 
         val items = messages.toTurnMessageItems(currentTurnRunning = true)
 
-        assertEquals(listOf("u1", "status", "reasoning", "streaming-text"), items.map { it.message.id })
-        assertEquals(emptyList<ThreadMessage>(), items.last().processMessages)
+        assertEquals(listOf("u1", "streaming-text"), items.map { it.message.id })
+        assertEquals(listOf("status", "reasoning"), items.last().processMessages.map { it.id })
         assertEquals(5_000L, items.last().message.durationMs)
     }
 

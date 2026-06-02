@@ -18,6 +18,7 @@ import com.codexapp.model.ThreadGroupKind
 import com.codexapp.model.ThreadMessage
 import com.codexapp.model.ThreadStatus
 import com.codexapp.model.ThreadSummary
+import com.codexapp.model.TokenUsageState
 
 internal fun String.toThreadStatus(): ThreadStatus = when (this.lowercase()) {
     "running", "inprogress" -> ThreadStatus.RUNNING
@@ -61,6 +62,7 @@ internal fun emptyRemoteState(
     cwd = "",
     permissionSummary = "",
     sessionConfig = SessionConfig(),
+    tokenUsage = null,
     configOptions = GatewayConfigOptions(),
     connectionStatus = ConnectionStatus.DISCONNECTED,
     connectionDetail = if (config.url.isBlank()) "未连接 desktop gateway" else "未连接 ${config.url}",
@@ -99,6 +101,7 @@ internal fun GatewaySnapshotMessage.applyTo(
         cwd = cwd.orEmpty(),
         permissionSummary = permissionSummary.orEmpty(),
         sessionConfig = sessionConfig.toSessionConfig(),
+        tokenUsage = tokenUsage?.toTokenUsageState(),
         configOptions = configOptions.toConfigOptions(),
         desktopRestartRequired = desktopRestartRequired,
         operationalNotices = operationalNotices.toOperationalNotices(),
@@ -159,6 +162,11 @@ internal fun GatewaySnapshotPatchMessage.applyTo(
             sessionConfig?.toSessionConfig() ?: SessionConfig()
         } else {
             previous.sessionConfig
+        },
+        tokenUsage = if (acceptSelectedSnapshot && "tokenUsage" in changedFields) {
+            tokenUsage?.toTokenUsageState()
+        } else {
+            previous.tokenUsage
         },
         configOptions = if ("configOptions" in changedFields) {
             configOptions?.toConfigOptions() ?: GatewayConfigOptions()
@@ -382,6 +390,16 @@ internal fun GatewaySessionConfigPayload.toSessionConfig(): SessionConfig {
         provider = provider.orEmpty(),
         model = model.orEmpty(),
         reasoningEffort = reasoningEffort.orEmpty()
+    )
+}
+
+private fun GatewayTokenUsagePayload.toTokenUsageState(): TokenUsageState {
+    return TokenUsageState(
+        totalTokens = totalTokens.coerceAtLeast(0L),
+        inputTokens = inputTokens.coerceAtLeast(0L),
+        outputTokens = outputTokens.coerceAtLeast(0L),
+        reasoningTokens = reasoningTokens.coerceAtLeast(0L),
+        contextPercent = contextPercent?.coerceIn(0, 100)
     )
 }
 

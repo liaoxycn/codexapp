@@ -141,6 +141,7 @@ export interface GatewaySnapshotMessage {
   configOptions: GatewayConfigOptionsPayload;
   operationalNotices?: GatewayOperationalNoticePayload[];
   desktopRestartRequired?: boolean;
+  tokenUsage?: GatewayTokenUsagePayload | null;
   diagnostics?: GatewayDiagnosticsPayload;
   isGenerating: boolean;
 }
@@ -164,6 +165,7 @@ export interface GatewaySnapshotPatchMessage {
   configOptions?: GatewayConfigOptionsPayload;
   operationalNotices?: GatewayOperationalNoticePayload[];
   desktopRestartRequired?: boolean;
+  tokenUsage?: GatewayTokenUsagePayload | null;
   diagnostics?: GatewayDiagnosticsPayload;
   isGenerating?: boolean;
 }
@@ -172,6 +174,14 @@ export interface GatewayOperationalNoticePayload {
   id: string;
   text: string;
   createdAt: number;
+}
+
+export interface GatewayTokenUsagePayload {
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  contextPercent?: number;
 }
 
 export interface GatewayDiagnosticsPayload {
@@ -278,6 +288,7 @@ export interface ClientSnapshot {
   configOptions: GatewayConfigOptionsPayload;
   operationalNotices?: GatewayOperationalNoticePayload[];
   desktopRestartRequired?: boolean;
+  tokenUsage?: GatewayTokenUsagePayload | null;
   diagnostics?: GatewayDiagnosticsPayload;
   isGenerating: boolean;
 }

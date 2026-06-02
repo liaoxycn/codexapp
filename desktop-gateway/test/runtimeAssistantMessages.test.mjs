@@ -17,7 +17,23 @@ function createState(messages = []) {
   };
 }
 
-test("appendAssistantDelta replaces live placeholder text instead of prefixing thinking status", () => {
+test("ensureActiveAssistantMessage inserts stable reasoning placeholder", () => {
+  const state = createState();
+
+  ensureActiveAssistantMessage(state, "turn-1");
+
+  assert.equal(state.activeAssistantMessageId, "assistant-live-turn-1");
+  assert.equal(state.liveAssistantItemId, null);
+  assert.deepEqual(state.snapshot.messages, [
+    {
+      id: "assistant-live-turn-1",
+      role: "assistant",
+      blocks: [{ kind: "reasoning", value: "正在思考" }],
+    },
+  ]);
+});
+
+test("appendAssistantDelta reuses live placeholder and keeps reasoning block", () => {
   const state = createState();
 
   ensureActiveAssistantMessage(state, "turn-1");
@@ -29,7 +45,10 @@ test("appendAssistantDelta replaces live placeholder text instead of prefixing t
     {
       id: "item-1",
       role: "assistant",
-      blocks: [{ kind: "text", value: "hello" }],
+      blocks: [
+        { kind: "reasoning", value: "正在思考" },
+        { kind: "text", value: "hello" },
+      ],
     },
   ]);
 });

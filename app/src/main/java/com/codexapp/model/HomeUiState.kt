@@ -22,6 +22,7 @@ data class HomeUiState(
     val cwd: String,
     val permissionSummary: String,
     val sessionConfig: SessionConfig = SessionConfig(),
+    val tokenUsage: TokenUsageState? = null,
     val isForkingThread: Boolean = false,
     val connectionStatus: ConnectionStatus,
     val connectionDetail: String,

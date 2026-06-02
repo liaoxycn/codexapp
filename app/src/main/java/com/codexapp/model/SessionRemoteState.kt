@@ -18,6 +18,7 @@ data class SessionRemoteState(
     val cwd: String = "",
     val permissionSummary: String = "",
     val sessionConfig: SessionConfig = SessionConfig(),
+    val tokenUsage: TokenUsageState? = null,
     val connectionStatus: ConnectionStatus = ConnectionStatus.DISCONNECTED,
     val connectionDetail: String = "未连接 gateway",
     val gatewayConfig: GatewayConfig = GatewayConfig(),
@@ -27,6 +28,14 @@ data class SessionRemoteState(
     val snapshotRevision: Long = 0L,
     val configOptions: GatewayConfigOptions = GatewayConfigOptions(),
     val diagnostics: StateDiagnostics = StateDiagnostics()
+)
+
+data class TokenUsageState(
+    val totalTokens: Long,
+    val inputTokens: Long,
+    val outputTokens: Long,
+    val reasoningTokens: Long,
+    val contextPercent: Int? = null
 )
 
 data class OperationalNotice(

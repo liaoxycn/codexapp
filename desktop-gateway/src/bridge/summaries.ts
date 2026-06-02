@@ -57,6 +57,7 @@ export function mapThreadToSnapshot(
     sessionConfig: buildSessionConfig(thread, resume),
     configOptions: emptyConfigOptions(),
     operationalNotices: [],
+    tokenUsage: null,
     isGenerating: threadIsGenerating,
   };
 }
@@ -173,6 +174,7 @@ export function emptySnapshot(): ClientSnapshot {
     sessionConfig: {},
     configOptions: emptyConfigOptions(),
     operationalNotices: [],
+    tokenUsage: null,
     isGenerating: false,
   };
 }

@@ -8,20 +8,23 @@ import {
 } from "./messageMerging.js";
 import { buildCommandExecutionBlocks, mapItemToMessages } from "./messageMapping.js";
 import {
+  renameMessageId,
   replaceOrAppendMessage,
 } from "./runtimeMessageStore.js";
 import type { ThreadRuntimeState } from "./types.js";
 
 export function mergeThreadItem(state: ThreadRuntimeState, item: AppServerThreadItem, preferLiveAssistantId = false): void {
   if (item.type === "agentMessage") {
-    const messageId = preferLiveAssistantId ? resolveLiveAssistantMessageId(state, item.id) : item.id;
-    state.activeAssistantMessageId = messageId;
+    const messageId = item.id;
+    if (preferLiveAssistantId) {
+      const liveId = resolveLiveAssistantMessageId(state, item.id);
+      if (liveId !== item.id) {
+        renameMessageId(state, liveId, item.id);
+      }
+    }
+    state.activeAssistantMessageId = item.id;
     state.liveAssistantItemId = item.id;
-    replaceOrAppendMessage(state, {
-      id: messageId,
-      role: "assistant",
-      blocks: [{ kind: "text", value: asString(item.text) }],
-    });
+    replaceOrAppendMessage(state, mergeWithExistingAssistantMessage(state, messageId, [{ kind: "text", value: asString(item.text) }]));
     return;
   }
 
@@ -55,8 +58,33 @@ export function mergeThreadItem(state: ThreadRuntimeState, item: AppServerThread
     if (replaceOptimisticUserMessage(state, message)) {
       continue;
     }
+    if (message.role === "assistant" && preferLiveAssistantId) {
+      replaceOrReuseLiveAssistantMessage(state, message);
+      continue;
+    }
     replaceOrAppendMessage(state, message);
   }
+}
+
+export function replaceOrReuseLiveAssistantMessage(
+  state: ThreadRuntimeState,
+  message: GatewayMessagePayload
+): void {
+  const canReuseLiveAssistant =
+    message.role === "assistant" &&
+    message.blocks.some((block) => block.kind === "text" || block.kind === "reasoning");
+  if (!canReuseLiveAssistant) {
+    replaceOrAppendMessage(state, message);
+    return;
+  }
+
+  const liveId = resolveLiveAssistantMessageId(state, message.id);
+  if (liveId !== message.id) {
+    renameMessageId(state, liveId, message.id);
+  }
+  state.activeAssistantMessageId = message.id;
+  state.liveAssistantItemId = message.id;
+  replaceOrAppendMessage(state, mergeWithExistingAssistantMessage(state, message.id, message.blocks));
 }
 
 function replaceOptimisticUserMessage(state: ThreadRuntimeState, message: GatewayMessagePayload): boolean {
@@ -78,10 +106,34 @@ function resolveLiveAssistantMessageId(state: ThreadRuntimeState, itemId: string
   if (!current) {
     return itemId;
   }
-  if (current === itemId || current.startsWith("assistant-live-")) {
+  if (current === itemId || current.startsWith("assistant-live-") || canReuseAssistantProcessMessage(state, current)) {
     return current;
   }
   return itemId;
+}
+
+function canReuseAssistantProcessMessage(state: ThreadRuntimeState, messageId: string): boolean {
+  const message = state.snapshot.messages.find((entry) => entry.id === messageId);
+  return (
+    message?.role === "assistant" &&
+    message.blocks.length > 0 &&
+    message.blocks.every((block) => block.kind !== "text")
+  );
+}
+
+function mergeWithExistingAssistantMessage(
+  state: ThreadRuntimeState,
+  messageId: string,
+  nextBlocks: GatewayMessagePayload["blocks"]
+): GatewayMessagePayload {
+  const existing = state.snapshot.messages.find((entry) => entry.id === messageId);
+  const nextKinds = new Set(nextBlocks.map((block) => block.kind));
+  const existingProcessBlocks = existing?.blocks.filter((block) => block.kind !== "text" && !nextKinds.has(block.kind)) ?? [];
+  return {
+    id: messageId,
+    role: "assistant",
+    blocks: [...existingProcessBlocks, ...nextBlocks],
+  };
 }
 
 function replaceMessageAt(state: ThreadRuntimeState, index: number, message: GatewayMessagePayload): void {

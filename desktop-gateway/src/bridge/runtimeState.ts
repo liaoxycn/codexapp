@@ -113,12 +113,14 @@ export function upsertThreadState({
     approvalsReviewer: resume?.approvalsReviewer ?? existing?.approvalsReviewer ?? null,
     sandbox: resume?.sandbox ?? existing?.sandbox ?? null,
     reasoningEffort: resume?.reasoningEffort ?? existing?.reasoningEffort ?? null,
+    tokenUsage: retainRuntimeOverlay ? existing?.tokenUsage ?? null : null,
     snapshot: {
       ...baseSnapshot,
       selectedThreadId: thread.id,
       messages: trimMessagesToWindow(mergedMessages, historyWindow),
       hasMoreHistory: mergedMessages.length > historyWindow,
       pendingApproval: existing?.pendingApproval?.text ?? null,
+      tokenUsage: retainRuntimeOverlay ? existing?.tokenUsage ?? null : null,
       isGenerating,
     },
   };

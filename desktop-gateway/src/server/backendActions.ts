@@ -44,6 +44,7 @@ export function buildSnapshotMessage(snapshot: ClientSnapshot): GatewaySnapshotM
     configOptions: snapshot.configOptions,
     operationalNotices: snapshot.operationalNotices ?? [],
     desktopRestartRequired: snapshot.desktopRestartRequired ?? false,
+    tokenUsage: snapshot.tokenUsage ?? null,
     diagnostics: snapshot.diagnostics ?? {
       selectedThreadId: snapshot.selectedThreadId,
       isGenerating: snapshot.isGenerating,
@@ -71,6 +72,7 @@ const PATCH_FIELDS: SnapshotPatchField[] = [
   "configOptions",
   "operationalNotices",
   "desktopRestartRequired",
+  "tokenUsage",
   "diagnostics",
   "isGenerating",
 ];

@@ -9,6 +9,7 @@ import com.codexapp.data.gateway.GatewaySessionConfigPayload
 import com.codexapp.data.gateway.GatewaySnapshotMessage
 import com.codexapp.data.gateway.GatewaySnapshotPatchMessage
 import com.codexapp.data.gateway.GatewayStatusMessage
+import com.codexapp.data.gateway.GatewayTokenUsagePayload
 import com.codexapp.data.gateway.applyTo
 import com.codexapp.data.gateway.decodeGatewayInboundMessage
 import com.codexapp.data.gateway.emptyRemoteState
@@ -103,6 +104,13 @@ class GatewaySnapshotMapperTest {
                 model = "gpt-5",
                 reasoningEffort = "high"
             ),
+            tokenUsage = GatewayTokenUsagePayload(
+                totalTokens = 12345L,
+                inputTokens = 10000L,
+                outputTokens = 2345L,
+                reasoningTokens = 345L,
+                contextPercent = 62
+            ),
             desktopRestartRequired = true,
             isGenerating = true
         )
@@ -126,6 +134,11 @@ class GatewaySnapshotMapperTest {
         assertEquals("openai", next.sessionConfig.provider)
         assertEquals("gpt-5", next.sessionConfig.model)
         assertEquals("high", next.sessionConfig.reasoningEffort)
+        assertEquals(12345L, next.tokenUsage?.totalTokens)
+        assertEquals(10000L, next.tokenUsage?.inputTokens)
+        assertEquals(2345L, next.tokenUsage?.outputTokens)
+        assertEquals(345L, next.tokenUsage?.reasoningTokens)
+        assertEquals(62, next.tokenUsage?.contextPercent)
         assertTrue(next.desktopRestartRequired)
         assertEquals("trace-7", next.diagnostics.actionTraceId)
         assertEquals("send_prompt", next.diagnostics.actionType)
@@ -155,6 +168,7 @@ class GatewaySnapshotMapperTest {
                 "isGenerating",
                 "permissionSummary",
                 "sessionConfig",
+                "tokenUsage",
                 "desktopRestartRequired",
                 "operationalNotices"
             ),
@@ -165,6 +179,13 @@ class GatewaySnapshotMapperTest {
                 provider = "openai",
                 model = "gpt-5.1",
                 reasoningEffort = "medium"
+            ),
+            tokenUsage = GatewayTokenUsagePayload(
+                totalTokens = 2222L,
+                inputTokens = 2000L,
+                outputTokens = 222L,
+                reasoningTokens = 12L,
+                contextPercent = 140
             ),
             operationalNotices = listOf(
                 GatewayOperationalNoticePayload(id = "account-updated", text = "账号状态已更新: chatgpt · pro", createdAt = 9L)
@@ -182,6 +203,8 @@ class GatewaySnapshotMapperTest {
         assertEquals("openai", next.sessionConfig.provider)
         assertEquals("gpt-5.1", next.sessionConfig.model)
         assertEquals("medium", next.sessionConfig.reasoningEffort)
+        assertEquals(2222L, next.tokenUsage?.totalTokens)
+        assertEquals(100, next.tokenUsage?.contextPercent)
         assertEquals("account-updated", next.operationalNotices.single().id)
         assertTrue(next.desktopRestartRequired)
         assertEquals("README.md", next.files.single().label)

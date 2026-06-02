@@ -58,6 +58,7 @@ internal fun SessionRemoteState.toHomeState(
         } else {
             sessionConfig
         },
+        tokenUsage = if (isNewThreadDraft) null else tokenUsage,
         isForkingThread = isForkingThread,
         connectionStatus = connectionStatus,
         connectionDetail = connectionDetail,

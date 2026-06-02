@@ -134,6 +134,7 @@ export function createPlaceholderThreadRuntimeState(
     approvalsReviewer: null,
     sandbox: null,
     reasoningEffort: null,
+    tokenUsage: null,
     snapshot: {
       ...emptySnapshot(),
       threads: summaries,

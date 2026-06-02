@@ -253,10 +253,14 @@ test("handleBridgeNotification surfaces thread token usage updates", async () =>
   );
 
   assert.equal(context.emitCount, 1);
-  assert.deepEqual(
-    state.snapshot.messages.map((message) => message.blocks[0].value),
-    ["Token: 总计 12,345 · 输入 10,000 · 输出 2,345 · 推理 345 · 上下文 62%"]
-  );
+  assert.deepEqual(state.snapshot.messages, []);
+  assert.deepEqual(state.snapshot.tokenUsage, {
+    totalTokens: 12345,
+    inputTokens: 10000,
+    outputTokens: 2345,
+    reasoningTokens: 345,
+    contextPercent: 62,
+  });
 });
 
 test("handleBridgeNotification surfaces hook run updates", async () => {

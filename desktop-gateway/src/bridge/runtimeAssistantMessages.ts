@@ -12,7 +12,7 @@ export function ensureActiveAssistantMessage(state: ThreadRuntimeState, turnId: 
   state.snapshot.messages = state.snapshot.messages.concat({
     id,
     role: "assistant",
-    blocks: [{ kind: "status", value: "思考中" }],
+    blocks: [{ kind: "reasoning", value: "正在思考" }],
   });
 }
 
@@ -23,7 +23,10 @@ export function appendAssistantDelta(state: ThreadRuntimeState, itemId: string, 
   replaceOrAppendMessage(state, {
     id: messageId,
     role: "assistant",
-    blocks: [{ kind: "text", value: currentText + delta }],
+    blocks: [
+      ...(current?.blocks.filter((block) => block.kind !== "text") ?? []),
+      { kind: "text", value: currentText + delta },
+    ],
   });
 }
 
@@ -58,7 +61,7 @@ function normalizeLiveAssistantMessageId(state: ThreadRuntimeState, itemId: stri
     state.liveAssistantItemId = itemId;
     return current;
   }
-  if (current.startsWith("assistant-live-")) {
+  if (current.startsWith("assistant-live-") || canReuseAssistantProcessMessage(state, current)) {
     renameMessageId(state, current, itemId);
     state.activeAssistantMessageId = itemId;
     state.liveAssistantItemId = itemId;
@@ -67,4 +70,13 @@ function normalizeLiveAssistantMessageId(state: ThreadRuntimeState, itemId: stri
 
   state.liveAssistantItemId = itemId;
   return current;
+}
+
+function canReuseAssistantProcessMessage(state: ThreadRuntimeState, messageId: string): boolean {
+  const message = state.snapshot.messages.find((entry) => entry.id === messageId);
+  return (
+    message?.role === "assistant" &&
+    message.blocks.length > 0 &&
+    message.blocks.every((block) => block.kind !== "text")
+  );
 }

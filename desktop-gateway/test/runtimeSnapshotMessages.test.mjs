@@ -71,7 +71,7 @@ test("mergeSnapshotMessages drops live assistant placeholder after real assistan
     {
       id: "assistant-live-turn-1",
       role: "assistant",
-      blocks: [{ kind: "status", value: "思考中" }],
+      blocks: [{ kind: "reasoning", value: "正在思考" }],
     },
   ];
 

@@ -31,6 +31,14 @@ export interface PendingApproval {
   }>;
 }
 
+export interface ThreadTokenUsage {
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  contextPercent?: number;
+}
+
 export interface ThreadRuntimeState {
   summary: GatewayThreadPayload;
   thread: AppServerThread | null;
@@ -58,7 +66,8 @@ export interface ThreadRuntimeState {
   approvalPolicy: AppServerApprovalPolicy | null;
   approvalsReviewer: string | null;
   sandbox: AppServerSandboxPolicy | null;
-  reasoningEffort: string | null;
+  reasoningEffort: string | null;
+  tokenUsage: ThreadTokenUsage | null;
   snapshot: ClientSnapshot;
 }
 

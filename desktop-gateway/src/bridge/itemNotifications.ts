@@ -9,7 +9,7 @@ import {
   appendOrMergeMessage,
   replaceOrAppendMessage,
 } from "./runtimeMessageStore.js";
-import { mergeThreadItem } from "./runtimeMessages.js";
+import { mergeThreadItem, replaceOrReuseLiveAssistantMessage } from "./runtimeMessages.js";
 import { markRunningSignal } from "./runningLease.js";
 import { markRuntimeTurnStarted, resolveRuntimeStatus } from "./runtimeStatusRegistry.js";
 import { touchThreadActivity } from "./summaries.js";
@@ -334,7 +334,7 @@ export function handleRawResponseItemCompleted(
   if (!message) {
     return;
   }
-  replaceOrAppendMessage(state, message);
+  replaceOrReuseLiveAssistantMessage(state, message);
   deps.emitChanged();
 }
 

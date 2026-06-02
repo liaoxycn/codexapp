@@ -43,8 +43,10 @@ export function pruneCompletedArtifacts(state: ThreadRuntimeState): void {
       return true;
     }
 
-    const onlyStatus = message.blocks.every((block) => block.kind === "status");
-    const onlyThinking = onlyStatus && message.blocks.every((block) => block.value.trim() === "思考中");
+    const onlyThinking = message.blocks.every((block) =>
+      (block.kind === "status" && block.value.trim() === "思考中") ||
+      (block.kind === "reasoning" && block.value.trim() === "正在思考")
+    );
     return !onlyThinking;
   });
 }

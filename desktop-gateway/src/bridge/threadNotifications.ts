@@ -231,7 +231,7 @@ export function handleThreadTokenUsageUpdated(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
 ): void {
-  const { threadId, turnId, tokenUsage } = notification.params as {
+  const { threadId, tokenUsage } = notification.params as {
     threadId: string;
     turnId: string;
     tokenUsage?: {
@@ -249,21 +249,18 @@ export function handleThreadTokenUsageUpdated(
   const window = Number.isFinite(tokenUsage?.modelContextWindow)
     ? Number(tokenUsage?.modelContextWindow)
     : null;
-  const totalTokens = formatTokenCount(total?.totalTokens);
-  const inputTokens = formatTokenCount(total?.inputTokens);
-  const outputTokens = formatTokenCount(total?.outputTokens);
-  const reasoningTokens = formatTokenCount(total?.reasoningOutputTokens);
-  const context = window && Number.isFinite(total?.totalTokens)
-    ? ` · 上下文 ${Math.round((Number(total?.totalTokens) / window) * 100)}%`
-    : "";
-
-  replaceOrAppendMessage(
-    state,
-    systemStatus(
-      `Token: 总计 ${totalTokens} · 输入 ${inputTokens} · 输出 ${outputTokens} · 推理 ${reasoningTokens}${context}`,
-      `thread-token-usage-${turnId}`
-    )
-  );
+  const totalTokens = finiteTokenCount(total?.totalTokens);
+  const contextPercent = window && totalTokens > 0
+    ? Math.round((totalTokens / window) * 100)
+    : undefined;
+  state.tokenUsage = {
+    totalTokens,
+    inputTokens: finiteTokenCount(total?.inputTokens),
+    outputTokens: finiteTokenCount(total?.outputTokens),
+    reasoningTokens: finiteTokenCount(total?.reasoningOutputTokens),
+    ...(contextPercent != null ? { contextPercent } : {}),
+  };
+  state.snapshot.tokenUsage = state.tokenUsage;
   deps.emitChanged();
 }
 
@@ -487,8 +484,8 @@ interface HookRunSummary {
   entries?: Array<{ kind?: string | null; text?: string | null }> | null;
 }
 
-function formatTokenCount(value: unknown): string {
-  return Number.isFinite(value) ? Number(value).toLocaleString("en-US") : "0";
+function finiteTokenCount(value: unknown): number {
+  return Number.isFinite(value) ? Math.max(0, Math.round(Number(value))) : 0;
 }
 
 function isActiveGoalStatus(status: string): boolean {

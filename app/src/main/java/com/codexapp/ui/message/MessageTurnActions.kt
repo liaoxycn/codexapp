@@ -30,7 +30,20 @@ internal fun List<ThreadMessage>.toTurnMessageItems(currentTurnRunning: Boolean 
             index += 1
         }
         if (currentTurnRunning && index == size) {
-            items += turnMessages.map { TurnMessageItem(it, assistantActionsEnabled = false) }
+            val streamingAssistantIndex = turnMessages.indexOfLast { it.isAssistantReplyText() }
+            if (streamingAssistantIndex < 0) {
+                items += turnMessages.map { TurnMessageItem(it, assistantActionsEnabled = false) }
+            } else {
+                val processMessages = turnMessages.take(streamingAssistantIndex)
+                val streamingMessage = turnMessages[streamingAssistantIndex]
+                items += TurnMessageItem(
+                    message = streamingMessage,
+                    processMessages = processMessages,
+                    assistantActionsEnabled = false
+                )
+                items += turnMessages.drop(streamingAssistantIndex + 1)
+                    .map { TurnMessageItem(it, assistantActionsEnabled = false) }
+            }
             continue
         }
         val finalAssistantIndex = turnMessages.indexOfLast { it.isFinalAssistantReply() }
@@ -69,7 +82,11 @@ private fun List<ThreadMessage>.nextVisibleRole(index: Int): MessageRole? {
 }
 
 internal fun ThreadMessage.isFinalAssistantReply(): Boolean {
-    return role == MessageRole.ASSISTANT && isFinal && blocks.any { block ->
+    return role == MessageRole.ASSISTANT && isFinal && isAssistantReplyText()
+}
+
+private fun ThreadMessage.isAssistantReplyText(): Boolean {
+    return role == MessageRole.ASSISTANT && blocks.any { block ->
         block is MessageBlock.Text && block.value.isNotBlank()
     }
 }
