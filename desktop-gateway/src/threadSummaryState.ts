@@ -182,20 +182,28 @@ export function shouldRetainThreadRuntimeOverlay(
   if (shouldRetainLiveThreadRuntime(thread)) {
     return true;
   }
+  const nowMs = Date.now();
+  const runningLeaseActive = Boolean(
+    (existingRuntime?.runningSignalUntilMs ?? 0) > nowMs ||
+      (existingRuntime?.turnCompletionGraceUntilMs ?? 0) > nowMs
+  );
   const hasLiveOverlay = Boolean(
     existingRuntime?.isGenerating ||
       existingRuntime?.snapshot?.isGenerating ||
       existingRuntime?.currentTurnId ||
       existingRuntime?.transientOperation ||
       existingRuntime?.pendingApproval?.text ||
-      (existingRuntime?.runningSignalUntilMs ?? 0) > Date.now() ||
-      (existingRuntime?.turnCompletionGraceUntilMs ?? 0) > Date.now()
+      runningLeaseActive
   );
   if (!hasLiveOverlay) {
     return false;
   }
   const incomingActivityAtMs = getThreadLatestActivityAtMs(thread);
-  return incomingActivityAtMs > 0 && incomingActivityAtMs < (existingRuntime?.lastActivityAtMs ?? 0);
+  const localActivityAtMs = existingRuntime?.lastActivityAtMs ?? 0;
+  if (runningLeaseActive) {
+    return incomingActivityAtMs <= 0 || localActivityAtMs <= 0 || incomingActivityAtMs <= localActivityAtMs;
+  }
+  return incomingActivityAtMs > 0 && incomingActivityAtMs < localActivityAtMs;
 }
 
 export function resolveLifecycleStatus(

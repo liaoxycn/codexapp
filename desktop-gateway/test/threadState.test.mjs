@@ -478,3 +478,36 @@ test("older idle refresh keeps newer live runtime overlay stored on snapshot", (
     true
   );
 });
+
+test("active running lease keeps live overlay across same-timestamp idle refresh", () => {
+  const activitySeconds = Math.floor(Date.now() / 1000);
+  const activityMs = activitySeconds * 1000;
+  assert.equal(
+    shouldRetainThreadRuntimeOverlay(
+      thread({
+        status: "idle",
+        updatedAt: activitySeconds,
+        turns: [
+          {
+            id: "turn-goal-1",
+            status: "completed",
+            startedAt: activitySeconds - 1,
+            completedAt: activitySeconds,
+            items: [
+              { type: "agentMessage", id: "item-goal-1", text: "loop done" },
+            ],
+          },
+        ],
+      }),
+      {
+        snapshot: { isGenerating: true },
+        currentTurnId: "turn-goal-2",
+        transientOperation: null,
+        pendingApproval: null,
+        lastActivityAtMs: activityMs,
+        runningSignalUntilMs: Date.now() + 60_000,
+      }
+    ),
+    true
+  );
+});

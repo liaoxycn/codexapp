@@ -183,9 +183,10 @@ export function handleThreadGoalUpdated(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
 ): void {
-  const { threadId, goal } = notification.params as {
+  const { threadId, turnId, goal } = notification.params as {
     threadId: string;
-    goal?: { objective?: string | null; status?: string | null };
+    turnId?: string | null;
+    goal?: { objective?: string | null; status?: string | null; updatedAt?: number | null };
   };
   const state = deps.threads.get(threadId);
   if (!state) {
@@ -196,6 +197,15 @@ export function handleThreadGoalUpdated(
   const status = asString(goal?.status).trim();
   const suffix = status ? ` · ${status}` : "";
   replaceOrAppendMessage(state, systemStatus(`目标: ${objective || "已更新"}${suffix}`, "thread-goal"));
+  if (isActiveGoalStatus(status)) {
+    if (turnId) {
+      state.currentTurnId = turnId;
+    }
+    state.snapshot.isGenerating = true;
+    markRunningSignal(state);
+    touchThreadActivity(state, goal?.updatedAt ?? Date.now());
+    deps.updateSummaryStatus(threadId, "running");
+  }
   deps.emitChanged();
 }
 
@@ -473,6 +483,10 @@ interface HookRunSummary {
 
 function formatTokenCount(value: unknown): string {
   return Number.isFinite(value) ? Number(value).toLocaleString("en-US") : "0";
+}
+
+function isActiveGoalStatus(status: string): boolean {
+  return status.toLowerCase() === "active";
 }
 
 function formatHookStatus(status: string): string {
