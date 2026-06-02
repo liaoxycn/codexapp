@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -46,6 +47,7 @@ internal fun ConnectionBanner(
         ConnectionStatus.ERROR -> "连接异常"
         ConnectionStatus.DISCONNECTED -> "未连接 Desktop Gateway"
     }
+    val detailText = connectionBannerDetailText(state)
     val statusColor = when (state.connectionStatus) {
         ConnectionStatus.CONNECTED -> Color(0xFF059669)
         ConnectionStatus.CONNECTING -> Color(0xFF2563EB)
@@ -70,33 +72,46 @@ internal fun ConnectionBanner(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
+        Column(
             modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(if (detailText == null) 0.dp else 3.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(if (compact) 6.dp else 8.dp)
-                    .clip(CircleShape)
-                    .background(statusColor)
-            )
-            Spacer(Modifier.width(if (compact) 6.dp else 8.dp))
-            Text(
-                text = statusText,
-                color = CodexTheme.colors.textPrimary,
-                fontSize = if (compact) 9.sp else 11.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (state.isGenerating) {
-                Spacer(Modifier.width(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(if (compact) 6.dp else 8.dp)
+                        .clip(CircleShape)
+                        .background(statusColor)
+                )
+                Spacer(Modifier.width(if (compact) 6.dp else 8.dp))
                 Text(
-                    text = "运行中",
-                    color = Color(0xFF2563EB),
-                    fontSize = if (compact) 8.sp else 10.sp,
+                    text = statusText,
+                    color = CodexTheme.colors.textPrimary,
+                    fontSize = if (compact) 9.sp else 11.sp,
                     fontWeight = FontWeight.Medium,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (state.isGenerating) {
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "运行中",
+                        color = Color(0xFF2563EB),
+                        fontSize = if (compact) 8.sp else 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1
+                    )
+                }
+            }
+            if (detailText != null) {
+                Text(
+                    text = detailText,
+                    color = CodexTheme.colors.textSecondary,
+                    fontSize = if (compact) 8.sp else 10.sp,
+                    lineHeight = if (compact) 11.sp else 13.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = if (compact) 12.dp else 16.dp)
                 )
             }
         }
@@ -122,5 +137,18 @@ internal fun ConnectionBanner(
                 )
             }
         }
+    }
+}
+
+internal fun connectionBannerDetailText(state: HomeUiState): String? {
+    return when (state.connectionStatus) {
+        ConnectionStatus.ERROR -> state.connectionDetail.takeIf { it.isNotBlank() && it != "连接异常" }
+        ConnectionStatus.DISCONNECTED -> state.connectionDetail.takeIf {
+            it.isNotBlank() &&
+                it != "未连接 gateway" &&
+                it != "未连接 desktop gateway" &&
+                !it.startsWith("未连接 ")
+        }
+        else -> null
     }
 }

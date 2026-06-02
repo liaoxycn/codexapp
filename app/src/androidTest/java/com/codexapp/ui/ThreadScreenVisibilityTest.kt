@@ -224,6 +224,37 @@ class ThreadScreenVisibilityTest {
     }
 
     @Test
+    fun connectionBannerShowsSpecificErrorDetail() {
+        rule.setContent {
+            MaterialTheme {
+                ThreadScreen(
+                    state = sampleState(
+                        hasMoreHistory = false,
+                        isLoadingOlder = false,
+                        messageCount = 0
+                    ).copy(
+                        connectionStatus = ConnectionStatus.ERROR,
+                        connectionDetail = "网关消息解析失败: bad json"
+                    ),
+                    compactMode = false,
+                    onOpenConnection = {},
+                    onRefreshCurrent = {},
+                    onLoadOlderMessages = {},
+                    onEditUserMessage = { _, _ -> },
+                    onResendUserMessage = { _, _ -> },
+                    onForkFromMessage = {},
+                    onNewThreadDraftChange = {},
+                    onApprovePending = {},
+                    onRejectPending = {}
+                )
+            }
+        }
+
+        rule.onNodeWithText("连接异常").assertIsDisplayed()
+        rule.onNodeWithText("网关消息解析失败: bad json").assertIsDisplayed()
+    }
+
+    @Test
     fun hidesOlderHintWhenHistoryIsNotLoading() {
         rule.setContent {
             MaterialTheme {

@@ -8,10 +8,12 @@ import com.codexapp.model.NewThreadDraft
 import com.codexapp.model.ThreadMessage
 import com.codexapp.model.ThreadSummary
 import com.codexapp.ui.thread.calculateThreadListMetrics
+import com.codexapp.ui.thread.connectionBannerDetailText
 import com.codexapp.ui.thread.restoredHistoryAnchorIndex
 import com.codexapp.ui.thread.shouldTriggerHistoryLoad
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -52,6 +54,36 @@ class ThreadScreenStateTest {
 
         assertTrue(metrics.showConnectionBanner)
         assertFalse(metrics.showJumpToBottom)
+    }
+
+    @Test
+    fun connectionBannerShowsDisconnectReasonWhenAvailable() {
+        val state = homeUiState(
+            connectionStatus = ConnectionStatus.DISCONNECTED,
+            connectionDetail = "desktop gateway 已断开"
+        )
+
+        assertEquals("desktop gateway 已断开", connectionBannerDetailText(state))
+    }
+
+    @Test
+    fun connectionBannerHidesGenericDisconnectedDetail() {
+        val state = homeUiState(
+            connectionStatus = ConnectionStatus.DISCONNECTED,
+            connectionDetail = "未连接 desktop gateway"
+        )
+
+        assertNull(connectionBannerDetailText(state))
+    }
+
+    @Test
+    fun connectionBannerShowsErrorDetailWhenAvailable() {
+        val state = homeUiState(
+            connectionStatus = ConnectionStatus.ERROR,
+            connectionDetail = "网关消息解析失败: bad json"
+        )
+
+        assertEquals("网关消息解析失败: bad json", connectionBannerDetailText(state))
     }
 
     @Test
@@ -123,6 +155,7 @@ class ThreadScreenStateTest {
         pendingApproval: String? = null,
         showComposerDetails: Boolean = false,
         connectionStatus: ConnectionStatus = ConnectionStatus.CONNECTED,
+        connectionDetail: String = "",
     ) = HomeUiState(
         threads = threads,
         selectedThreadId = "thread-1",
@@ -144,7 +177,7 @@ class ThreadScreenStateTest {
         cwd = "",
         permissionSummary = "",
         connectionStatus = connectionStatus,
-        connectionDetail = "",
+        connectionDetail = connectionDetail,
         gatewayConfig = GatewayConfig(),
         desktopRestartRequired = false,
         isDemoMode = false,
