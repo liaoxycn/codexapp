@@ -11,9 +11,11 @@ import {
 } from "./runtimeMessageStore.js";
 import { mergeThreadItem } from "./runtimeMessages.js";
 import { markRunningSignal } from "./runningLease.js";
+import { markRuntimeTurnStarted, resolveRuntimeStatus } from "./runtimeStatusRegistry.js";
 import { touchThreadActivity } from "./summaries.js";
 import type { BridgeNotificationDeps } from "./notifications.js";
 import { asString } from "./appServerValues.js";
+import type { ThreadRuntimeState } from "./types.js";
 
 export function handleAgentMessageDelta(
   notification: JsonRpcNotification,
@@ -30,11 +32,9 @@ export function handleAgentMessageDelta(
     return;
   }
 
-  state.currentTurnId = turnId;
-  state.snapshot.isGenerating = true;
-  markRunningSignal(state);
+  markRuntimeActivity(state, turnId);
   appendAssistantDelta(state, itemId, delta);
-  deps.updateSummaryStatus(threadId, "running");
+  deps.updateSummaryStatus(threadId, resolveRuntimeStatus(state));
   deps.emitChanged();
 }
 
@@ -42,7 +42,7 @@ export function handleReasoningSummaryDelta(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
 ): void {
-  const { threadId, itemId, delta } = notification.params as {
+  const { threadId, turnId, itemId, delta } = notification.params as {
     threadId: string;
     turnId: string;
     itemId: string;
@@ -53,7 +53,7 @@ export function handleReasoningSummaryDelta(
     return;
   }
 
-  markRunningSignal(state);
+  markRuntimeActivity(state, turnId);
   appendOrMergeMessage(
     state,
     itemId,
@@ -68,7 +68,7 @@ export function handleReasoningSummaryPartAdded(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
 ): void {
-  const { threadId, itemId, summaryIndex } = notification.params as {
+  const { threadId, turnId, itemId, summaryIndex } = notification.params as {
     threadId: string;
     turnId: string;
     itemId: string;
@@ -79,7 +79,7 @@ export function handleReasoningSummaryPartAdded(
     return;
   }
 
-  markRunningSignal(state);
+  markRuntimeActivity(state, turnId);
   appendOrMergeMessage(
     state,
     itemId,
@@ -94,7 +94,7 @@ export function handleReasoningTextDelta(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
 ): void {
-  const { threadId, itemId, delta } = notification.params as {
+  const { threadId, turnId, itemId, delta } = notification.params as {
     threadId: string;
     turnId: string;
     itemId: string;
@@ -105,7 +105,7 @@ export function handleReasoningTextDelta(
     return;
   }
 
-  markRunningSignal(state);
+  markRuntimeActivity(state, turnId);
   appendOrMergeMessage(
     state,
     itemId,
@@ -120,7 +120,7 @@ export function handlePlanDelta(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
 ): void {
-  const { threadId, itemId, delta } = notification.params as {
+  const { threadId, turnId, itemId, delta } = notification.params as {
     threadId: string;
     turnId: string;
     itemId: string;
@@ -131,7 +131,7 @@ export function handlePlanDelta(
     return;
   }
 
-  markRunningSignal(state);
+  markRuntimeActivity(state, turnId);
   appendOrMergeMessage(
     state,
     itemId,
@@ -146,7 +146,7 @@ export function handleCommandExecutionOutputDelta(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
 ): void {
-  const { threadId, itemId, delta } = notification.params as {
+  const { threadId, turnId, itemId, delta } = notification.params as {
     threadId: string;
     turnId: string;
     itemId: string;
@@ -157,7 +157,7 @@ export function handleCommandExecutionOutputDelta(
     return;
   }
 
-  markRunningSignal(state);
+  markRuntimeActivity(state, turnId);
   appendOrMergeCodeMessage(state, itemId, delta, "shell", "命令执行中");
   deps.emitChanged();
 }
@@ -166,7 +166,7 @@ export function handleTerminalInteraction(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
 ): void {
-  const { threadId, itemId, stdin } = notification.params as {
+  const { threadId, turnId, itemId, stdin } = notification.params as {
     threadId: string;
     turnId: string;
     itemId: string;
@@ -178,7 +178,7 @@ export function handleTerminalInteraction(
     return;
   }
 
-  markRunningSignal(state);
+  markRuntimeActivity(state, turnId);
   appendOrMergeCodeMessage(state, itemId, `\nstdin> ${stdin}`, "shell", "终端交互");
   deps.emitChanged();
 }
@@ -187,7 +187,7 @@ export function handleFileChangeOutputDelta(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
 ): void {
-  const { threadId, itemId, delta } = notification.params as {
+  const { threadId, turnId, itemId, delta } = notification.params as {
     threadId: string;
     turnId: string;
     itemId: string;
@@ -198,7 +198,7 @@ export function handleFileChangeOutputDelta(
     return;
   }
 
-  markRunningSignal(state);
+  markRuntimeActivity(state, turnId);
   appendOrMergeCodeMessage(state, itemId, delta, "diff", "文件改动中");
   deps.emitChanged();
 }
@@ -207,7 +207,7 @@ export function handleFileChangePatchUpdated(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
 ): void {
-  const { threadId, itemId, changes } = notification.params as {
+  const { threadId, turnId, itemId, changes } = notification.params as {
     threadId: string;
     turnId: string;
     itemId: string;
@@ -230,7 +230,7 @@ export function handleMcpToolCallProgress(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
 ): void {
-  const { threadId, itemId, message } = notification.params as {
+  const { threadId, turnId, itemId, message } = notification.params as {
     threadId: string;
     turnId: string;
     itemId: string;
@@ -241,7 +241,7 @@ export function handleMcpToolCallProgress(
     return;
   }
 
-  markRunningSignal(state);
+  markRuntimeActivity(state, turnId);
   replaceOrAppendMessage(state, {
     id: itemId,
     role: "assistant",
@@ -279,8 +279,7 @@ export async function handleItemLifecycle(
     return;
   }
 
-  state.currentTurnId = turnId;
-  markRunningSignal(state);
+  markRuntimeActivity(state, turnId);
   mergeThreadItem(state, item, true);
   deps.emitChanged();
 }
@@ -289,7 +288,7 @@ export function handleGuardianApprovalReview(
   notification: JsonRpcNotification,
   deps: BridgeNotificationDeps
 ): void {
-  const { threadId, reviewId, review, action } = notification.params as {
+  const { threadId, turnId, reviewId, review, action } = notification.params as {
     threadId: string;
     turnId: string;
     reviewId: string;
@@ -310,7 +309,7 @@ export function handleGuardianApprovalReview(
     risk ? `风险: ${formatRiskLevel(risk)}` : "",
     rationale,
   ].filter(Boolean);
-  markRunningSignal(state);
+  markRuntimeActivity(state, turnId);
   replaceOrAppendMessage(state, {
     id: `auto-approval-review-${reviewId}`,
     role: "system",
@@ -355,14 +354,14 @@ export function handleRealtimeNotification(
     if (!item) {
       return;
     }
-    markRunningSignal(state);
+    markRuntimeActivity(state, `realtime-${threadId}`);
     mergeThreadItem(state, item, true);
     deps.emitChanged();
     return;
   }
 
   if (notification.method === "thread/realtime/transcript/delta") {
-    markRunningSignal(state);
+    markRuntimeActivity(state, `realtime-${threadId}`);
     appendOrMergeMessage(
       state,
       `realtime-transcript-${asString(params.role, "assistant")}`,
@@ -376,7 +375,7 @@ export function handleRealtimeNotification(
 
   if (notification.method === "thread/realtime/transcript/done") {
     const role = params.role === "user" ? "user" : "assistant";
-    markRunningSignal(state);
+    markRuntimeActivity(state, `realtime-${threadId}`);
     replaceOrAppendMessage(state, {
       id: `realtime-transcript-${asString(params.role, "assistant")}`,
       role,
@@ -390,7 +389,7 @@ export function handleRealtimeNotification(
   if (!status) {
     return;
   }
-  markRunningSignal(state);
+  markRuntimeActivity(state, `realtime-${threadId}`);
   replaceOrAppendMessage(state, {
     id: "thread-realtime-status",
     role: "system",
@@ -621,4 +620,12 @@ function formatRealtimeStatus(notification: JsonRpcNotification): string | null 
     default:
       return null;
   }
+}
+
+function markRuntimeActivity(state: ThreadRuntimeState, turnId?: string | null): void {
+  if (turnId) {
+    state.currentTurnId = turnId;
+    markRuntimeTurnStarted(state, turnId);
+  }
+  markRunningSignal(state);
 }

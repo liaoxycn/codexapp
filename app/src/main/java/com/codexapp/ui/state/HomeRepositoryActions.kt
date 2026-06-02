@@ -11,28 +11,28 @@ internal class HomeRepositoryActions(
     private val onManualDisconnect: () -> Unit,
     private val runAnimatedRefresh: () -> Unit,
 ) {
-    fun selectThread(id: String) {
-        launch { repository.selectThread(id) }
+    fun selectThread(id: String, onComplete: (Boolean) -> Unit = {}) {
+        launch { onComplete(repository.selectThread(id)) }
     }
 
-    fun createThread(cwd: String? = null, draft: NewThreadDraft? = null) {
-        launch { repository.createThread(cwd, draft) }
+    fun createThread(cwd: String? = null, draft: NewThreadDraft? = null, onComplete: (Boolean) -> Unit = {}) {
+        launch { onComplete(repository.createThread(cwd, draft)) }
     }
 
-    fun forkThread(id: String, numTurns: Int? = null) {
-        launch { repository.forkThread(id, numTurns) }
+    fun forkThread(id: String, numTurns: Int? = null, onComplete: (Boolean) -> Unit = {}) {
+        launch { onComplete(repository.forkThread(id, numTurns)) }
     }
 
-    fun renameThread(id: String, name: String) {
-        launch { repository.renameThread(id, name) }
+    fun renameThread(id: String, name: String, onComplete: (Boolean) -> Unit = {}) {
+        launch { onComplete(repository.renameThread(id, name)) }
     }
 
-    fun archiveThread(id: String) {
-        launch { repository.archiveThread(id) }
+    fun archiveThread(id: String, onComplete: (Boolean) -> Unit = {}) {
+        launch { onComplete(repository.archiveThread(id)) }
     }
 
-    fun unarchiveThread(id: String) {
-        launch { repository.unarchiveThread(id) }
+    fun unarchiveThread(id: String, onComplete: (Boolean) -> Unit = {}) {
+        launch { onComplete(repository.unarchiveThread(id)) }
     }
 
     fun refreshThreads() {

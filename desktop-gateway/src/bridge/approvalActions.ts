@@ -2,6 +2,14 @@ import { AppServerClient } from "../appServerClient.js";
 import type { ClientSnapshot } from "../protocol.js";
 import { systemStatus } from "./runtimeMessageStore.js";
 import { clearRunningLease, markRunningSignal } from "./runningLease.js";
+import {
+  markRuntimeApprovalPending,
+  markRuntimeApprovalResolved,
+  markRuntimeFailed,
+  markRuntimeIdle,
+  markRuntimeTurnStarted,
+  resolveRuntimeStatus,
+} from "./runtimeStatusRegistry.js";
 import { buildApprovalResponse } from "./summaries.js";
 import type {
   PendingApproval,
@@ -49,15 +57,18 @@ export async function handleCurrentApproval({
       state.snapshot.messages = state.snapshot.messages.concat(systemStatus("审批已拒绝"));
       state.transientOperation = null;
       clearRunningLease(state);
-      updateSummaryStatus(threadId, "idle");
+      markRuntimeIdle(state);
+      updateSummaryStatus(threadId, resolveRuntimeStatus(state));
       emitChanged();
       return getSnapshot(threadId);
     }
 
     state.snapshot.messages = state.snapshot.messages.concat(systemStatus("审批已允许"));
     state.snapshot.isGenerating = true;
+    markRuntimeApprovalResolved(state);
+    markRuntimeTurnStarted(state, `shell-${threadId}`);
     markRunningSignal(state);
-    updateSummaryStatus(threadId, "running");
+    updateSummaryStatus(threadId, resolveRuntimeStatus(state));
     emitChanged();
 
     void appServer.threadShellCommand(threadId, pending.command ?? "").catch((error) => {
@@ -68,10 +79,11 @@ export async function handleCurrentApproval({
 
       latest.snapshot.isGenerating = false;
       clearRunningLease(latest);
+      markRuntimeFailed(latest);
       latest.snapshot.messages = latest.snapshot.messages.concat(
         systemStatus(`shell 命令执行失败: ${error instanceof Error ? error.message : "unknown"}`)
       );
-      updateSummaryStatus(threadId, latest.pendingApproval ? "needs_approval" : "failed");
+      updateSummaryStatus(threadId, resolveRuntimeStatus(latest));
       emitChanged();
     });
     return getSnapshot(threadId);
@@ -83,7 +95,8 @@ export async function handleCurrentApproval({
   state.snapshot.messages = state.snapshot.messages.concat(
     systemStatus(allow ? "审批已允许" : "审批已拒绝")
   );
-  updateSummaryStatus(threadId, state.snapshot.isGenerating ? "running" : "idle");
+  markRuntimeApprovalResolved(state);
+  updateSummaryStatus(threadId, resolveRuntimeStatus(state));
   emitChanged();
   return getSnapshot(threadId);
 }
@@ -101,5 +114,6 @@ export function applyPendingApprovalState(
 
   state.pendingApproval = approval;
   state.snapshot.pendingApproval = approval.text;
-  updateSummaryStatus(threadId, "needs_approval");
+  markRuntimeApprovalPending(state);
+  updateSummaryStatus(threadId, resolveRuntimeStatus(state));
 }

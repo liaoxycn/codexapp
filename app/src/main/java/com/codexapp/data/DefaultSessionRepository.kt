@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 
 class DefaultSessionRepository(
@@ -27,6 +29,7 @@ class DefaultSessionRepository(
         explicitNulls = false
     }
     private val commandSender = GatewayCommandSender(json, gatewayClient::send)
+    private val commandMutex = Mutex()
     private val _state = MutableStateFlow(
         emptyRemoteState(settingsStore.load())
     )
@@ -62,63 +65,63 @@ class DefaultSessionRepository(
         connection.disconnect()
     }
 
-    override suspend fun createThread(cwd: String?, draft: NewThreadDraft?) {
+    override suspend fun createThread(cwd: String?, draft: NewThreadDraft?): Boolean = commandMutex.withLock {
         commandActions.createThread(cwd, draft)
     }
 
-    override suspend fun selectThread(id: String) {
+    override suspend fun selectThread(id: String): Boolean = commandMutex.withLock {
         commandActions.selectThread(id)
     }
 
-    override suspend fun forkThread(id: String, numTurns: Int?) {
+    override suspend fun forkThread(id: String, numTurns: Int?): Boolean = commandMutex.withLock {
         commandActions.forkThread(id, numTurns)
     }
 
-    override suspend fun renameThread(id: String, name: String) {
+    override suspend fun renameThread(id: String, name: String): Boolean = commandMutex.withLock {
         commandActions.renameThread(id, name)
     }
 
-    override suspend fun archiveThread(id: String) {
+    override suspend fun archiveThread(id: String): Boolean = commandMutex.withLock {
         commandActions.archiveThread(id)
     }
 
-    override suspend fun unarchiveThread(id: String) {
+    override suspend fun unarchiveThread(id: String): Boolean = commandMutex.withLock {
         commandActions.unarchiveThread(id)
     }
 
-    override suspend fun refreshThreads() {
+    override suspend fun refreshThreads(): Boolean = commandMutex.withLock {
         commandActions.refreshThreads()
     }
 
-    override suspend fun loadOlderMessages() {
+    override suspend fun loadOlderMessages(): Boolean = commandMutex.withLock {
         commandActions.loadOlderMessages()
     }
 
     override suspend fun sendPrompt(prompt: String, draft: NewThreadDraft?, newThread: Boolean): Boolean {
-        return commandActions.sendPrompt(prompt, draft, newThread)
+        return commandMutex.withLock { commandActions.sendPrompt(prompt, draft, newThread) }
     }
 
     override suspend fun rollbackThread(numTurns: Int): Boolean {
-        return commandActions.rollbackThread(numTurns)
+        return commandMutex.withLock { commandActions.rollbackThread(numTurns) }
     }
 
     override suspend fun resendPrompt(prompt: String, rollbackNumTurns: Int, draft: NewThreadDraft?): Boolean {
-        return commandActions.resendPrompt(prompt, rollbackNumTurns, draft)
+        return commandMutex.withLock { commandActions.resendPrompt(prompt, rollbackNumTurns, draft) }
     }
 
-    override suspend fun stopTurn() {
+    override suspend fun stopTurn(): Boolean = commandMutex.withLock {
         commandActions.stopTurn()
     }
 
-    override suspend fun approvePending() {
+    override suspend fun approvePending(): Boolean = commandMutex.withLock {
         commandActions.approvePending()
     }
 
-    override suspend fun rejectPending() {
+    override suspend fun rejectPending(): Boolean = commandMutex.withLock {
         commandActions.rejectPending()
     }
 
-    override suspend fun restartDesktop() {
+    override suspend fun restartDesktop(): Boolean = commandMutex.withLock {
         commandActions.restartDesktop()
     }
 

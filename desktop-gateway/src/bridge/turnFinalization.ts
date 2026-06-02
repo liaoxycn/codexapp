@@ -8,6 +8,10 @@ import {
   rebaseSnapshotMessagesFromThread,
 } from "./runtimeSnapshotMessages.js";
 import { clearRunningLease, hasRunningLease } from "./runningLease.js";
+import {
+  markRuntimeIdle,
+  resolveRuntimeStatus,
+} from "./runtimeStatusRegistry.js";
 import type {
   ThreadLifecycleStatus,
   ThreadRuntimeState,
@@ -52,7 +56,7 @@ export async function finalizeTurnRuntimeState({
     const nextTurnStarted =
       completedTurnId != null && state.currentTurnId != null && state.currentTurnId !== completedTurnId;
     const keepRunning =
-      nextTurnStarted || (!shouldShowStopped && turnStatus !== "failed" && hasRunningLease(state));
+      nextTurnStarted || (!shouldShowStopped && turnStatus !== "failed" && resolveRuntimeStatus(state) === "running" && hasRunningLease(state));
     if (!nextTurnStarted) {
       state.currentTurnId = null;
       state.activeAssistantMessageId = null;
@@ -62,6 +66,9 @@ export async function finalizeTurnRuntimeState({
     if (!keepRunning) {
       state.snapshot.isGenerating = false;
       clearRunningLease(state);
+      if (!state.pendingApproval && turnStatus !== "failed") {
+        markRuntimeIdle(state);
+      }
     } else {
       state.snapshot.isGenerating = true;
     }
@@ -73,7 +80,7 @@ export async function finalizeTurnRuntimeState({
 
     updateSummaryStatus(
       threadId,
-      keepRunning ? "running" : turnStatus === "failed" ? "failed" : state.pendingApproval ? "needs_approval" : "idle"
+      keepRunning ? "running" : turnStatus === "failed" ? "failed" : resolveRuntimeStatus(state)
     );
     emitChanged();
   } finally {
@@ -112,9 +119,10 @@ export async function finalizeCompactRuntimeState({
     state.liveAssistantItemId = null;
     state.snapshot.isGenerating = false;
     clearRunningLease(state);
+    markRuntimeIdle(state);
     pruneCompletedArtifacts(state);
     normalizeCompactMessages(state, true);
-    updateSummaryStatus(threadId, state.pendingApproval ? "needs_approval" : "idle");
+    updateSummaryStatus(threadId, resolveRuntimeStatus(state));
     emitChanged();
   } finally {
     const state = threads.get(threadId);

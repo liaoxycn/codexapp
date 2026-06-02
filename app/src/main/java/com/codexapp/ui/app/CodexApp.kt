@@ -79,8 +79,9 @@ fun CodexApp(
                     controller.closeDrawer()
                 },
                 onArchiveThread = { id ->
-                    viewModel.archiveThread(id)
-                    controller.closeDrawer()
+                    viewModel.archiveThread(id) {
+                        if (it) controller.closeDrawer()
+                    }
                 },
                 onRestartDesktop = viewModel::restartDesktop,
                 onDownloadUpdate = viewModel::downloadAppUpdate,

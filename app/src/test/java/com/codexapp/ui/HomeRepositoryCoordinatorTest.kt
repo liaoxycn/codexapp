@@ -219,23 +219,24 @@ class HomeRepositoryCoordinatorTest {
 
         override suspend fun disconnect() = Unit
 
-        override suspend fun createThread(cwd: String?, draft: NewThreadDraft?) = Unit
+        override suspend fun createThread(cwd: String?, draft: NewThreadDraft?): Boolean = true
 
-        override suspend fun selectThread(id: String) = Unit
+        override suspend fun selectThread(id: String): Boolean = true
 
-        override suspend fun forkThread(id: String, numTurns: Int?) = Unit
+        override suspend fun forkThread(id: String, numTurns: Int?): Boolean = true
 
-        override suspend fun renameThread(id: String, name: String) = Unit
+        override suspend fun renameThread(id: String, name: String): Boolean = true
 
-        override suspend fun archiveThread(id: String) = Unit
+        override suspend fun archiveThread(id: String): Boolean = true
 
-        override suspend fun unarchiveThread(id: String) = Unit
+        override suspend fun unarchiveThread(id: String): Boolean = true
 
-        override suspend fun refreshThreads() {
+        override suspend fun refreshThreads(): Boolean {
             refreshCalls += 1
+            return true
         }
 
-        override suspend fun loadOlderMessages() = Unit
+        override suspend fun loadOlderMessages(): Boolean = true
 
         override fun markManualRefreshing(refreshing: Boolean) = Unit
 
@@ -245,12 +246,12 @@ class HomeRepositoryCoordinatorTest {
 
         override suspend fun resendPrompt(prompt: String, rollbackNumTurns: Int, draft: NewThreadDraft?): Boolean = true
 
-        override suspend fun stopTurn() = Unit
+        override suspend fun stopTurn(): Boolean = true
 
-        override suspend fun approvePending() = Unit
+        override suspend fun approvePending(): Boolean = true
 
-        override suspend fun rejectPending() = Unit
+        override suspend fun rejectPending(): Boolean = true
 
-        override suspend fun restartDesktop() = Unit
+        override suspend fun restartDesktop(): Boolean = true
     }
 }

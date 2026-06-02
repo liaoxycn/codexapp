@@ -9,6 +9,13 @@ import {
 import { ensureActiveAssistantMessage } from "./runtimeAssistantMessages.js";
 import { upsertThreadState } from "./runtimeState.js";
 import { clearRunningLease, markRunningSignal } from "./runningLease.js";
+import {
+  markRuntimeApprovalPending,
+  markRuntimeFailed,
+  markRuntimeIdle,
+  markRuntimeTurnStarted,
+  resolveRuntimeStatus,
+} from "./runtimeStatusRegistry.js";
 import type {
   ThreadLifecycleStatus,
   ThreadRuntimeState,
@@ -71,10 +78,11 @@ export async function handlePromptSubmission({
       latest.transientOperation = null;
       latest.snapshot.isGenerating = false;
       clearRunningLease(latest);
+      markRuntimeFailed(latest);
       latest.snapshot.messages = latest.snapshot.messages.concat(
         systemStatus(`上下文压缩失败: ${error instanceof Error ? error.message : "unknown"}`)
       );
-      updateSummaryStatus(threadId, latest.pendingApproval ? "needs_approval" : "failed");
+      updateSummaryStatus(threadId, resolveRuntimeStatus(latest));
       emitChanged();
     });
 
@@ -90,6 +98,7 @@ export async function handlePromptSubmission({
     state.snapshot.isGenerating = false;
     clearRunningLease(state);
     clearRunningLease(state);
+    markRuntimeIdle(state);
 
     try {
       const rolledBack = await appServer.threadRollback(threadId, 1);
@@ -102,12 +111,14 @@ export async function handlePromptSubmission({
       if (latest && !hasTrailingSystemStatus(latest, "已回滚最近 1 轮")) {
         latest.snapshot.messages = latest.snapshot.messages.concat(systemStatus("已回滚最近 1 轮"));
       }
+      markRuntimeIdle(latest ?? state);
       updateSummaryStatus(threadId, "idle");
     } catch (error) {
       const latest = threads.get(threadId) ?? state;
       latest.snapshot.messages = latest.snapshot.messages.concat(
         systemStatus(`回滚失败: ${error instanceof Error ? error.message : "unknown"}`)
       );
+      markRuntimeFailed(latest);
       updateSummaryStatus(threadId, "failed");
     } finally {
       const latest = threads.get(threadId) ?? state;
@@ -126,7 +137,8 @@ export async function handlePromptSubmission({
       command: trimmed.substring(1).trim(),
     };
     state.snapshot.pendingApproval = state.pendingApproval.text;
-    updateSummaryStatus(threadId, "needs_approval");
+    markRuntimeApprovalPending(state);
+    updateSummaryStatus(threadId, resolveRuntimeStatus(state));
     emitChanged();
     return getSnapshot(threadId);
   }
@@ -142,9 +154,10 @@ export async function handlePromptSubmission({
   const turnId = await appServer.turnStart(threadId, text, options);
   state.currentTurnId = turnId;
   state.snapshot.isGenerating = true;
+  markRuntimeTurnStarted(state, turnId);
   markRunningSignal(state);
   ensureActiveAssistantMessage(state, turnId);
-  updateSummaryStatus(threadId, "running");
+  updateSummaryStatus(threadId, resolveRuntimeStatus(state));
   emitChanged();
   return getSnapshot(threadId);
 }
@@ -167,6 +180,7 @@ export async function rollbackThreadTurns({
   state.snapshot.pendingApproval = null;
   state.snapshot.isGenerating = false;
   clearRunningLease(state);
+  markRuntimeIdle(state);
 
   try {
     const rolledBack = await appServer.threadRollback(threadId, rollbackCount);
@@ -175,12 +189,14 @@ export async function rollbackThreadTurns({
       thread: rolledBack.thread,
       preserveLiveMessages: false,
     });
+    markRuntimeIdle(threads.get(threadId) ?? state);
     updateSummaryStatus(threadId, "idle");
   } catch (error) {
     const latest = threads.get(threadId) ?? state;
     latest.snapshot.messages = latest.snapshot.messages.concat(
       systemStatus(`回滚失败: ${error instanceof Error ? error.message : "unknown"}`)
     );
+    markRuntimeFailed(latest);
     updateSummaryStatus(threadId, "failed");
     throw error;
   } finally {

@@ -31,7 +31,7 @@ export interface PendingApproval {
   }>;
 }
 
-export interface ThreadRuntimeState {
+export interface ThreadRuntimeState {
   summary: GatewayThreadPayload;
   thread: AppServerThread | null;
   isSubscribed: boolean;
@@ -47,6 +47,11 @@ export interface ThreadRuntimeState {
   isFinalizing: boolean;
   runningSignalUntilMs: number;
   turnCompletionGraceUntilMs: number;
+  runtimeStatus: ThreadLifecycleStatus;
+  activeTurnIds: string[];
+  activeHookIds: string[];
+  runtimeStatusSeq: number;
+  runtimeTerminalSeq: number;
   model: string | null;
   modelProvider: string | null;
   instructionSources: string[];
@@ -57,5 +62,5 @@ export interface ThreadRuntimeState {
   snapshot: ClientSnapshot;
 }
 
-export type ThreadLifecycleStatus = "running" | "idle" | "failed" | "needs_approval";
+export type ThreadLifecycleStatus = "running" | "idle" | "failed" | "needs_approval";
 

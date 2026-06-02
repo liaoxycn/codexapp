@@ -225,7 +225,7 @@ class HomeUiStateStoreTest {
             )
             val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) { store.state.collect {} }
 
-            store.markThreadSelectionStarted("thread-new")
+            store.markThreadSelectionStarted("thread-new", "thread-new")
             yield()
 
             assertTrue(store.state.value.isNewThreadDraft)
@@ -267,7 +267,7 @@ class HomeUiStateStoreTest {
             )
             val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) { store.state.collect {} }
 
-            store.markThreadSelectionStarted("thread-current")
+            store.markThreadSelectionStarted("thread-current", "thread-current")
             store.syncRemoteSelection(remoteState.value)
             yield()
 

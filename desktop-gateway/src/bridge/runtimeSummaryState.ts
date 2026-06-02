@@ -1,10 +1,15 @@
 import {
-  resolveDisplayedThreadStatus,
   resolveLifecycleStatus,
   resolveThreadSummaryStatus,
 } from "../threadState.js";
 import type { GatewayThreadPayload } from "../protocol.js";
 import { systemStatus } from "./runtimeMessageStore.js";
+import {
+  applyRuntimeStatusToSnapshot,
+  initializeRuntimeStatus,
+  markRuntimeFailed,
+  resolveRuntimeStatus,
+} from "./runtimeStatusRegistry.js";
 import {
   dedupeSummaries,
   emptySnapshot,
@@ -27,14 +32,9 @@ export function buildRuntimeSummaries(
       entry.thread
         ? {
             ...mapThreadToSummary(entry.thread, entry.summary.archived, entry.lastActivityAtMs),
-            status: resolveDisplayedThreadStatus(resolveThreadSummaryStatus(entry.thread), {
-              isGenerating: entry.snapshot.isGenerating,
-              currentTurnId: entry.currentTurnId,
-              transientOperation: entry.transientOperation,
-              pendingApproval: entry.pendingApproval?.text ?? null,
-            }),
+            status: resolveRuntimeStatus(entry),
           }
-        : entry.summary
+        : { ...entry.summary, status: resolveRuntimeStatus(entry) }
     )
     .filter((value): value is GatewayThreadPayload => value != null);
   return dedupeSummaries(items);
@@ -48,6 +48,7 @@ export function syncSelectedThreadSnapshots(
   for (const [id, state] of threads) {
     state.snapshot.selectedThreadId = selectedThreadId;
     state.snapshot.threads = summaries;
+    applyRuntimeStatusToSnapshot(state);
     if (id === selectedThreadId) {
       state.snapshot.selectedThreadId = selectedThreadId;
     }
@@ -61,11 +62,13 @@ export function updateSummaryStatusForThread(
 ): void {
   for (const state of threads.values()) {
     if (state.summary.id === threadId) {
-      state.summary = { ...state.summary, status };
+      state.runtimeStatus = status;
+      state.summary = { ...state.summary, status: resolveRuntimeStatus(state) };
     }
     state.snapshot.threads = state.snapshot.threads.map((thread) =>
-      thread.id === threadId ? { ...thread, status } : thread
+      thread.id === threadId ? { ...thread, status: state.summary.id === threadId ? resolveRuntimeStatus(state) : status } : thread
     );
+    state.snapshot.isGenerating = resolveRuntimeStatus(state) === "running";
   }
 }
 
@@ -89,6 +92,11 @@ export function markAllThreadsFailedState(
     state.isFinalizing = false;
     state.runningSignalUntilMs = 0;
     state.turnCompletionGraceUntilMs = 0;
+    if (state.summary.archived) {
+      state.runtimeStatus = "idle";
+    } else {
+      markRuntimeFailed(state);
+    }
     updateSummaryStatusForThread(threads, state.summary.id, state.summary.archived ? "idle" : "failed");
   }
 }
@@ -98,7 +106,7 @@ export function createPlaceholderThreadRuntimeState(
   summaries: GatewayThreadPayload[],
   selectedThreadId: string
 ): ThreadRuntimeState {
-  return {
+  const state: ThreadRuntimeState = {
     summary,
     thread: null,
     lastActivityAtMs: summary.updatedAt ?? 0,
@@ -113,6 +121,11 @@ export function createPlaceholderThreadRuntimeState(
     isFinalizing: false,
     runningSignalUntilMs: 0,
     turnCompletionGraceUntilMs: 0,
+    runtimeStatus: resolveLifecycleStatus(summary.status, false),
+    activeTurnIds: [],
+    activeHookIds: [],
+    runtimeStatusSeq: 0,
+    runtimeTerminalSeq: 0,
     isSubscribed: false,
     model: null,
     modelProvider: null,
@@ -127,6 +140,8 @@ export function createPlaceholderThreadRuntimeState(
       selectedThreadId,
     },
   };
+  initializeRuntimeStatus(state, resolveLifecycleStatus(summary.status, false));
+  return state;
 }
 
 export function refreshSummarySnapshotEntry(
@@ -136,12 +151,8 @@ export function refreshSummarySnapshotEntry(
 ): void {
   state.summary = {
     ...summary,
-    status: resolveDisplayedThreadStatus(resolveLifecycleStatus(summary.status, state.pendingApproval != null), {
-      isGenerating: state.snapshot.isGenerating,
-      currentTurnId: state.currentTurnId,
-      transientOperation: state.transientOperation,
-      pendingApproval: state.pendingApproval?.text ?? null,
-    }),
+    status: resolveRuntimeStatus(state),
   };
   state.snapshot.threads = summaries;
+  applyRuntimeStatusToSnapshot(state);
 }

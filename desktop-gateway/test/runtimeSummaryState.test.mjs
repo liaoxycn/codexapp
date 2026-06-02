@@ -93,7 +93,7 @@ test("refreshSummarySnapshotEntry keeps runtime approval overlay in summary stat
   refreshSummarySnapshotEntry(state, summary("thread-1", { status: "idle" }), summaries);
 
   assert.equal(state.summary.status, "needs_approval");
-  assert.deepEqual(state.snapshot.threads, summaries);
+  assert.deepEqual(state.snapshot.threads, [{ ...summaries[0], status: "needs_approval" }]);
 });
 
 test("markAllThreadsFailedState clears live runtime state and preserves archived idle state", () => {

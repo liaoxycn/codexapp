@@ -116,36 +116,44 @@ class HomeRepositoryActionsTest {
             disconnectCalls += 1
         }
 
-        override suspend fun createThread(cwd: String?, draft: NewThreadDraft?) {
+        override suspend fun createThread(cwd: String?, draft: NewThreadDraft?): Boolean {
             createThreadCalls += cwd
+            return true
         }
 
-        override suspend fun selectThread(id: String) {
+        override suspend fun selectThread(id: String): Boolean {
             selectCalls += id
+            return true
         }
 
-        override suspend fun forkThread(id: String, numTurns: Int?) {
+        override suspend fun forkThread(id: String, numTurns: Int?): Boolean {
             forkThreadCalls += id to numTurns
+            return true
         }
 
-        override suspend fun renameThread(id: String, name: String) {
+        override suspend fun renameThread(id: String, name: String): Boolean {
             renameThreadCalls += id to name
+            return true
         }
 
-        override suspend fun archiveThread(id: String) {
+        override suspend fun archiveThread(id: String): Boolean {
             archiveThreadCalls += id
+            return true
         }
 
-        override suspend fun unarchiveThread(id: String) {
+        override suspend fun unarchiveThread(id: String): Boolean {
             unarchiveThreadCalls += id
+            return true
         }
 
-        override suspend fun refreshThreads() {
+        override suspend fun refreshThreads(): Boolean {
             refreshThreadsCalls += 1
+            return true
         }
 
-        override suspend fun loadOlderMessages() {
+        override suspend fun loadOlderMessages(): Boolean {
             loadOlderMessagesCalls += 1
+            return true
         }
 
         override fun markManualRefreshing(refreshing: Boolean) = Unit
@@ -156,20 +164,24 @@ class HomeRepositoryActionsTest {
 
         override suspend fun resendPrompt(prompt: String, rollbackNumTurns: Int, draft: NewThreadDraft?): Boolean = true
 
-        override suspend fun stopTurn() {
+        override suspend fun stopTurn(): Boolean {
             stopTurnCalls += 1
+            return true
         }
 
-        override suspend fun approvePending() {
+        override suspend fun approvePending(): Boolean {
             approveCalls += 1
+            return true
         }
 
-        override suspend fun rejectPending() {
+        override suspend fun rejectPending(): Boolean {
             rejectCalls += 1
+            return true
         }
 
-        override suspend fun restartDesktop() {
+        override suspend fun restartDesktop(): Boolean {
             restartDesktopCalls += 1
+            return true
         }
     }
 

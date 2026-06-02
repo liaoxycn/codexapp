@@ -1,7 +1,6 @@
 import type { AppServerThread, ThreadResumeResult } from "../appServerTypes.js";
 import {
   getActiveTurnId,
-  resolveDisplayedThreadStatus,
   resolveThreadSummaryStatus,
   shouldRetainThreadRuntimeOverlay,
 } from "../threadState.js";
@@ -19,6 +18,10 @@ import {
   syncSelectedThreadSnapshots,
 } from "./runtimeSummaryState.js";
 import { hasRunningLease } from "./runningLease.js";
+import {
+  initializeRuntimeStatus,
+  resolveRuntimeStatus,
+} from "./runtimeStatusRegistry.js";
 import {
   INITIAL_HISTORY_WINDOW,
   type ThreadRuntimeState,
@@ -68,19 +71,17 @@ export function upsertThreadState({
     ? existing?.currentTurnId ?? activeTurnId
     : null;
   const runningLeaseActive = existing ? hasRunningLease(existing) : false;
-  const isGenerating = retainRuntimeOverlay
+  const inferredIsGenerating = retainRuntimeOverlay
     ? Boolean(existing?.snapshot.isGenerating || activeTurnId != null || baseSnapshot.isGenerating || runningLeaseActive)
     : baseSnapshot.isGenerating;
+  const initialRuntimeStatus = existing?.runtimeStatus ?? resolvedSummaryStatus;
+  const runtimeStatus = existing ? resolveRuntimeStatus(existing) : initialRuntimeStatus;
+  const isGenerating = runtimeStatus === "running";
 
   const nextSummary = existing
     ? {
         ...mapThreadToSummary(thread, archived || existing.summary.archived, lastActivityAtMs),
-        status: resolveDisplayedThreadStatus(resolvedSummaryStatus, {
-          isGenerating,
-          currentTurnId,
-          transientOperation: retainRuntimeOverlay ? existing.transientOperation : null,
-          pendingApproval: retainRuntimeOverlay ? existing.pendingApproval?.text ?? null : null,
-        }),
+        status: runtimeStatus,
       }
     : mapThreadToSummary(thread, archived);
 
@@ -100,6 +101,11 @@ export function upsertThreadState({
     isFinalizing: retainRuntimeOverlay ? existing?.isFinalizing ?? false : false,
     runningSignalUntilMs: retainRuntimeOverlay ? existing?.runningSignalUntilMs ?? 0 : 0,
     turnCompletionGraceUntilMs: retainRuntimeOverlay ? existing?.turnCompletionGraceUntilMs ?? 0 : 0,
+    runtimeStatus,
+    activeTurnIds: retainRuntimeOverlay ? existing?.activeTurnIds ?? [] : [],
+    activeHookIds: retainRuntimeOverlay ? existing?.activeHookIds ?? [] : [],
+    runtimeStatusSeq: existing?.runtimeStatusSeq ?? 0,
+    runtimeTerminalSeq: existing?.runtimeTerminalSeq ?? 0,
     model: resume?.model ?? existing?.model ?? null,
     modelProvider: resume?.modelProvider ?? existing?.modelProvider ?? thread.modelProvider ?? null,
     instructionSources: resume?.instructionSources ?? existing?.instructionSources ?? [],
@@ -117,6 +123,9 @@ export function upsertThreadState({
     },
   };
 
+  if (!existing) {
+    initializeRuntimeStatus(runtimeState, inferredIsGenerating ? "running" : runtimeStatus);
+  }
   threads.set(thread.id, runtimeState);
   if (syncSelection) {
     syncSelectedThreadSnapshots(threads, thread.id);

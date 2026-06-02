@@ -20,9 +20,9 @@ class HomeViewModel(
 
     val state: StateFlow<HomeUiState> = delegate.state
 
-    fun selectThread(id: String) = delegate.selectThread(id)
+    fun selectThread(id: String, onComplete: (Boolean) -> Unit = {}) = delegate.selectThread(id, onComplete)
 
-    fun createThread(cwd: String? = null) = delegate.createThread(cwd)
+    fun createThread(cwd: String? = null, onComplete: (Boolean) -> Unit = {}) = delegate.createThread(cwd, onComplete)
 
     fun updateNewThreadDraft(transform: (NewThreadDraft) -> NewThreadDraft) = delegate.updateNewThreadDraft(transform)
 
@@ -33,7 +33,7 @@ class HomeViewModel(
 
     fun renameThread(id: String, name: String) = delegate.renameThread(id, name)
 
-    fun archiveThread(id: String) = delegate.archiveThread(id)
+    fun archiveThread(id: String, onComplete: (Boolean) -> Unit = {}) = delegate.archiveThread(id, onComplete)
 
     fun unarchiveThread(id: String) = delegate.unarchiveThread(id)
 

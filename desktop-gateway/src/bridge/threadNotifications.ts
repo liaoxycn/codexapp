@@ -2,7 +2,7 @@ import type {
   AppServerThreadStatus,
   JsonRpcNotification,
 } from "../appServerTypes.js";
-import { getThreadStatusType, isThreadActivelyGenerating, resolveLifecycleStatus } from "../threadState.js";
+import { getThreadStatusType, resolveLifecycleStatus } from "../threadState.js";
 import { asString } from "./appServerValues.js";
 import {
   replaceOrAppendMessage,
@@ -10,6 +10,17 @@ import {
 } from "./runtimeMessageStore.js";
 import { normalizeCompactMessages, pruneCompletedArtifacts } from "./runtimeSnapshotMessages.js";
 import { clearRunningLease, hasRunningLease, markRunningSignal, markTurnCompletionGrace } from "./runningLease.js";
+import {
+  applyRuntimeStatusToSnapshot,
+  markRuntimeApprovalResolved,
+  markRuntimeFailed,
+  markRuntimeHookFinished,
+  markRuntimeHookStarted,
+  markRuntimeIdle,
+  markRuntimeTurnFinished,
+  markRuntimeTurnStarted,
+  resolveRuntimeStatus,
+} from "./runtimeStatusRegistry.js";
 import { touchThreadActivity } from "./summaries.js";
 import type { BridgeNotificationDeps } from "./notifications.js";
 
@@ -26,43 +37,26 @@ export async function handleThreadStatusChanged(
     return;
   }
 
-  const nextType = getThreadStatusType(status);
-  if (nextType === "active") {
-    const compactInFlight = state.transientOperation === "compact";
-    const hasLiveTurn =
-      state.currentTurnId != null ||
-      state.snapshot.isGenerating ||
-      (state.thread != null && isThreadActivelyGenerating(state.thread));
-    if (!compactInFlight && !hasLiveTurn && !hasRunningLease(state)) {
-      state.snapshot.isGenerating = false;
-      deps.updateSummaryStatus(threadId, state.pendingApproval ? "needs_approval" : "idle");
-      deps.emitChanged();
-      return;
-    }
-
-    state.snapshot.isGenerating = !compactInFlight && (hasLiveTurn || hasRunningLease(state));
-    deps.updateSummaryStatus(
-      threadId,
-      compactInFlight ? (state.pendingApproval ? "needs_approval" : "idle") : "running"
-    );
-    deps.emitChanged();
-    return;
-  }
-
   if (state.transientOperation === "compact") {
-    state.snapshot.isGenerating = false;
-    deps.updateSummaryStatus(threadId, state.pendingApproval ? "needs_approval" : "idle");
+    markRuntimeIdle(state);
+    deps.updateSummaryStatus(threadId, resolveRuntimeStatus(state));
     deps.emitChanged();
     return;
   }
 
-  if (state.currentTurnId || state.snapshot.isGenerating || state.stopRequested || hasRunningLease(state)) {
+  if (state.currentTurnId || state.stopRequested || hasRunningLease(state)) {
     await deps.finalizeTurnState(threadId);
     return;
   }
 
-  state.snapshot.isGenerating = false;
-  deps.updateSummaryStatus(threadId, resolveLifecycleStatus(status, state.pendingApproval != null));
+  const nextStatus = resolveLifecycleStatus(status, state.pendingApproval != null);
+  if (nextStatus === "failed") {
+    markRuntimeFailed(state);
+  } else if (nextStatus === "idle") {
+    markRuntimeIdle(state);
+  }
+  applyRuntimeStatusToSnapshot(state);
+  deps.updateSummaryStatus(threadId, resolveRuntimeStatus(state));
   deps.emitChanged();
 }
 
@@ -80,6 +74,7 @@ export function handleTurnStarted(
   }
 
   state.currentTurnId = turn.id;
+  markRuntimeTurnStarted(state, turn.id);
   markRunningSignal(state);
   touchThreadActivity(state, turn.startedAt);
   if (state.transientOperation === "compact") {
@@ -89,7 +84,7 @@ export function handleTurnStarted(
   state.transientOperation = null;
   state.snapshot.isGenerating = true;
   deps.ensureActiveAssistantMessage(state, turn.id);
-  deps.updateSummaryStatus(threadId, "running");
+  deps.updateSummaryStatus(threadId, resolveRuntimeStatus(state));
   deps.emitChanged();
 }
 
@@ -114,6 +109,7 @@ export async function handleTurnCompleted(
 
   touchThreadActivity(state, turn.completedAt ?? turn.startedAt);
   markTurnCompletionGrace(state);
+  markRuntimeTurnFinished(state, turn.id, turn.status);
   await deps.finalizeTurnState(threadId, turn.status, turn.id);
 }
 
@@ -131,6 +127,11 @@ export function handleHookRunUpdated(
     return;
   }
 
+  if (notification.method === "hook/started") {
+    markRuntimeHookStarted(state, run.id);
+  } else {
+    markRuntimeHookFinished(state, run.id, run.status ?? undefined);
+  }
   const label = [asString(run.eventName, "hook"), asString(run.handlerType)].filter(Boolean).join(" ");
   const status = asString(run.status, notification.method === "hook/started" ? "running" : "completed");
   const detail = [
@@ -154,7 +155,8 @@ export function handleServerRequestResolved(
 
   state.pendingApproval = null;
   state.snapshot.pendingApproval = null;
-  deps.updateSummaryStatus(threadId, state.snapshot.isGenerating ? "running" : "idle");
+  markRuntimeApprovalResolved(state);
+  deps.updateSummaryStatus(threadId, resolveRuntimeStatus(state));
   deps.emitChanged();
 }
 
@@ -173,9 +175,10 @@ export function handleThreadCompacted(
   state.activeAssistantMessageId = null;
   state.snapshot.isGenerating = false;
   clearRunningLease(state);
+  markRuntimeIdle(state);
   pruneCompletedArtifacts(state);
   normalizeCompactMessages(state, true);
-  deps.updateSummaryStatus(threadId, state.pendingApproval ? "needs_approval" : "idle");
+  deps.updateSummaryStatus(threadId, resolveRuntimeStatus(state));
   deps.emitChanged();
 }
 
@@ -202,9 +205,10 @@ export function handleThreadGoalUpdated(
       state.currentTurnId = turnId;
     }
     state.snapshot.isGenerating = true;
+    markRuntimeTurnStarted(state, turnId ?? `goal-${threadId}`);
     markRunningSignal(state);
     touchThreadActivity(state, goal?.updatedAt ?? Date.now());
-    deps.updateSummaryStatus(threadId, "running");
+    deps.updateSummaryStatus(threadId, resolveRuntimeStatus(state));
   }
   deps.emitChanged();
 }
@@ -385,11 +389,13 @@ export function handleErrorNotification(
   state.snapshot.messages = state.snapshot.messages.concat(systemStatus(`错误: ${message || "unknown"}`));
   state.snapshot.isGenerating = Boolean(willRetry);
   if (willRetry) {
+    markRuntimeTurnStarted(state, asString((notification.params as Record<string, unknown>).turnId, `retry-${threadId}`));
     markRunningSignal(state);
   } else {
+    markRuntimeFailed(state);
     clearRunningLease(state);
   }
-  deps.updateSummaryStatus(threadId, willRetry ? "running" : "failed");
+  deps.updateSummaryStatus(threadId, resolveRuntimeStatus(state));
   deps.emitChanged();
 }
 

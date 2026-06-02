@@ -18,6 +18,7 @@ internal fun SessionRemoteState.toHomeState(
     isNewThreadDraft: Boolean,
     draftSubmissionInFlight: Boolean,
     isForkingThread: Boolean,
+    pendingThreadTitle: String? = null,
     newThreadDraft: NewThreadDraft,
     composerConfigDraftOverride: NewThreadDraft? = null,
     appUpdate: AppUpdateState = AppUpdateState()

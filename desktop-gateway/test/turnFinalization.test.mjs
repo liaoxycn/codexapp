@@ -4,6 +4,10 @@ import {
   finalizeCompactRuntimeState,
   finalizeTurnRuntimeState,
 } from "../dist/bridge/turnFinalization.js";
+import {
+  markRuntimeTurnFinished,
+  markRuntimeTurnStarted,
+} from "../dist/bridge/runtimeStatusRegistry.js";
 
 function createState(overrides = {}) {
   return {
@@ -90,10 +94,12 @@ test("finalizeTurnRuntimeState appends stopped status once and clears running st
   );
 });
 
-test("finalizeTurnRuntimeState keeps running during completion grace", async () => {
+test("finalizeTurnRuntimeState clears running after completed turn", async () => {
   const state = createState({
     turnCompletionGraceUntilMs: Date.now() + 5000,
   });
+  markRuntimeTurnStarted(state, "turn-1");
+  markRuntimeTurnFinished(state, "turn-1", "completed");
   const threads = new Map([["thread-1", state]]);
   const statuses = [];
 
@@ -109,9 +115,9 @@ test("finalizeTurnRuntimeState keeps running during completion grace", async () 
     },
   });
 
-  assert.equal(state.snapshot.isGenerating, true);
+  assert.equal(state.snapshot.isGenerating, false);
   assert.equal(state.currentTurnId, null);
-  assert.deepEqual(statuses, ["running"]);
+  assert.deepEqual(statuses, ["idle"]);
 });
 
 test("finalizeTurnRuntimeState does not clear a newer turn started during refresh", async () => {

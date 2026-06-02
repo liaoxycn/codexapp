@@ -13,6 +13,13 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.coroutines.async
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class GatewayRepositoryCommandActionsTest {
     private val json = Json {
@@ -73,9 +80,9 @@ class GatewayRepositoryCommandActionsTest {
 
         assertTrue(accepted)
         assertEquals("", state.selectedThreadId)
-        assertEquals("thread-2", state.pendingSelectionThreadId)
-        assertEquals("项目重构", state.pendingThreadTitle)
-        assertTrue(state.isThreadSwitching)
+        assertNull(state.pendingSelectionThreadId)
+        assertNull(state.pendingThreadTitle)
+        assertFalse(state.isThreadSwitching)
         assertTrue(sentMessages.single().contains("\"type\":\"select_thread\""))
     }
 
@@ -291,5 +298,40 @@ class GatewayRepositoryCommandActionsTest {
         assertFalse(accepted)
         assertFalse(state.isLoadingOlder)
         assertEquals("加载历史失败，gateway 连接已断开", state.connectionDetail)
+    }
+
+    @Test
+    fun sessionRepositorySerializesGatewayCommands() = runBlocking {
+        val releaseFirst = CountDownLatch(1)
+        val firstEntered = CountDownLatch(1)
+        val sendOrder = mutableListOf<String>()
+        val mutex = Mutex()
+        val json = Json {
+            encodeDefaults = true
+            ignoreUnknownKeys = true
+            explicitNulls = false
+        }
+        val commandSender = GatewayCommandSender(json) { payload ->
+            sendOrder += payload
+            if (sendOrder.size == 1) {
+                firstEntered.countDown()
+                releaseFirst.await(2, TimeUnit.SECONDS)
+            }
+            true
+        }
+
+        val first = async(Dispatchers.Default) {
+            mutex.withLock { commandSender.selectThread("thread-1") }
+        }
+        assertTrue(firstEntered.await(1, TimeUnit.SECONDS))
+        val second = async(Dispatchers.Default) {
+            mutex.withLock { commandSender.archiveThread("thread-2") }
+        }
+
+        assertFalse(second.isCompleted)
+        releaseFirst.countDown()
+        assertTrue(first.await())
+        assertTrue(second.await())
+        assertEquals(2, sendOrder.size)
     }
 }

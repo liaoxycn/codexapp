@@ -66,30 +66,33 @@ internal class HomeViewModelDelegate(
         }
     }
 
-    fun selectThread(id: String) {
-        if (canStartGatewayAction(id)) {
-            uiStateStore.markThreadSelectionStarted(id)
-            if (repository.state.value.selectedThreadId == id) {
-                uiStateStore.syncRemoteSelection(repository.state.value)
+    fun selectThread(id: String, onComplete: (Boolean) -> Unit = {}) {
+        repositoryActions.selectThread(id) { sent ->
+            if (sent && canStartGatewayAction(id)) {
+                val title = repository.state.value.threads.firstOrNull { it.id == id }?.title
+                uiStateStore.markThreadSelectionStarted(id, title)
+                if (repository.state.value.selectedThreadId == id) {
+                    uiStateStore.syncRemoteSelection(repository.state.value)
+                }
             }
+            onComplete(sent)
         }
-        repositoryActions.selectThread(id)
     }
 
-    fun createThread(cwd: String? = null) {
+    fun createThread(cwd: String? = null, onComplete: (Boolean) -> Unit = {}) {
         uiStateStore.startNewThreadDraft(cwd)
+        onComplete(true)
     }
 
     fun forkThread(id: String, numTurns: Int? = null) {
-        if (!canStartGatewayAction(id)) {
-            repositoryActions.forkThread(id, numTurns)
-            return
-        }
-        uiStateStore.markForkStarted(id)
-        repositoryActions.forkThread(id, numTurns)
-        scope.launch {
-            delay(12_000L)
-            uiStateStore.clearForkIfSource(id)
+        repositoryActions.forkThread(id, numTurns) { sent ->
+            if (sent && canStartGatewayAction(id)) {
+                uiStateStore.markForkStarted(id)
+                scope.launch {
+                    delay(12_000L)
+                    uiStateStore.clearForkIfSource(id)
+                }
+            }
         }
     }
 
@@ -97,11 +100,15 @@ internal class HomeViewModelDelegate(
         repositoryActions.renameThread(id, name)
     }
 
-    fun archiveThread(id: String) {
-        if (canStartGatewayAction(id)) {
-            uiStateStore.markArchiveStarted(id, repository.state.value)
+    fun archiveThread(id: String, onComplete: (Boolean) -> Unit = {}) {
+        val beforeSend = repository.state.value
+        repositoryActions.archiveThread(id) { sent ->
+            if (sent && canStartGatewayAction(id)) {
+                uiStateStore.markArchiveStarted(id, beforeSend)
+                uiStateStore.syncRemoteSelection(repository.state.value)
+            }
+            onComplete(sent)
         }
-        repositoryActions.archiveThread(id)
     }
 
     fun updateNewThreadDraft(transform: (com.codexapp.model.NewThreadDraft) -> com.codexapp.model.NewThreadDraft) {

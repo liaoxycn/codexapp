@@ -106,16 +106,19 @@ internal fun rememberCodexAppController(
             scope.launch { drawerState.open() }
         },
         createThread = {
-            viewModel.createThread()
-            scope.launch { drawerState.close() }
+            viewModel.createThread {
+                if (it) scope.launch { drawerState.close() }
+            }
         },
         createThreadInProject = { cwd ->
-            viewModel.createThread(cwd)
-            scope.launch { drawerState.close() }
+            viewModel.createThread(cwd) {
+                if (it) scope.launch { drawerState.close() }
+            }
         },
         selectThread = { threadId ->
-            viewModel.selectThread(threadId)
-            scope.launch { drawerState.close() }
+            viewModel.selectThread(threadId) {
+                if (it) scope.launch { drawerState.close() }
+            }
         },
         closeDrawer = {
             scope.launch { drawerState.close() }

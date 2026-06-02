@@ -34,10 +34,6 @@ internal class GatewayRepositoryCommandActions(
         if (id.isBlank()) return false
         return runConnectedAction(
             unavailableDetail = "未连接 gateway，无法切换会话",
-            beforeSend = {
-                val nextTitle = readState().threads.firstOrNull { it.id == id }?.title
-                updateState { it.startSelectingThread(id, nextTitle) }
-            },
             sendFailureDetail = "切换会话失败，gateway 连接已断开"
         ) {
             commandSender.selectThread(id)

@@ -26,6 +26,7 @@ internal class HomeUiStateStore(
     private val draftSubmissionInFlight = MutableStateFlow(false)
     private val forkingThreadId = MutableStateFlow<String?>(null)
     private val pendingThreadSelectionId = MutableStateFlow<String?>(null)
+    private val pendingThreadTitle = MutableStateFlow<String?>(null)
     private val pendingArchive = MutableStateFlow<PendingArchiveState?>(null)
     private val pendingEditResend = MutableStateFlow<PendingEditResendState?>(null)
     private val newThreadDraft = MutableStateFlow(NewThreadDraft())
@@ -38,6 +39,7 @@ internal class HomeUiStateStore(
         val isNewThreadDraft: Boolean,
         val draftSubmissionInFlight: Boolean,
         val forkingThreadId: String?,
+        val pendingThreadTitle: String?,
         val pendingEditResend: PendingEditResendState?,
         val newThreadDraft: NewThreadDraft,
         val currentThreadConfigDrafts: Map<String, NewThreadDraft>,
@@ -48,6 +50,7 @@ internal class HomeUiStateStore(
         val isNewThreadDraft: Boolean,
         val draftSubmissionInFlight: Boolean,
         val forkingThreadId: String?,
+        val pendingThreadTitle: String?,
         val pendingEditResend: PendingEditResendState?,
         val newThreadDraft: NewThreadDraft,
         val currentThreadConfigDrafts: Map<String, NewThreadDraft>,
@@ -84,12 +87,14 @@ internal class HomeUiStateStore(
         isNewThreadDraft,
         draftSubmissionInFlight,
         forkingThreadId,
+        pendingThreadTitle,
         editResendDraftState
-    ) { draftMode, submittingDraft, forkingId, editResendState ->
+    ) { draftMode, submittingDraft, forkingId, pendingTitle, editResendState ->
         DraftLocalState(
             isNewThreadDraft = draftMode,
             draftSubmissionInFlight = submittingDraft,
             forkingThreadId = forkingId,
+            pendingThreadTitle = pendingTitle,
             pendingEditResend = editResendState.pendingEditResend,
             newThreadDraft = editResendState.newThreadDraft,
             currentThreadConfigDrafts = editResendState.currentThreadConfigDrafts,
@@ -108,6 +113,7 @@ internal class HomeUiStateStore(
             isNewThreadDraft = draftState.isNewThreadDraft,
             draftSubmissionInFlight = draftState.draftSubmissionInFlight,
             forkingThreadId = draftState.forkingThreadId,
+            pendingThreadTitle = draftState.pendingThreadTitle,
             pendingEditResend = draftState.pendingEditResend,
             newThreadDraft = draftState.newThreadDraft,
             currentThreadConfigDrafts = draftState.currentThreadConfigDrafts,
@@ -128,6 +134,7 @@ internal class HomeUiStateStore(
             isNewThreadDraft = local.isNewThreadDraft,
             draftSubmissionInFlight = local.draftSubmissionInFlight,
             isForkingThread = local.forkingThreadId != null,
+            pendingThreadTitle = local.pendingThreadTitle,
             newThreadDraft = local.newThreadDraft,
             composerConfigDraftOverride = if (!local.isNewThreadDraft && remote.selectedThreadId.isNotBlank()) {
                 local.currentThreadConfigDrafts[remote.selectedThreadId]
@@ -147,6 +154,7 @@ internal class HomeUiStateStore(
             isNewThreadDraft = isNewThreadDraft.value,
             draftSubmissionInFlight = draftSubmissionInFlight.value,
             isForkingThread = forkingThreadId.value != null,
+            pendingThreadTitle = pendingThreadTitle.value,
             newThreadDraft = newThreadDraft.value,
             appUpdate = appUpdate.value
         )
@@ -175,6 +183,7 @@ internal class HomeUiStateStore(
         draftSubmissionInFlight.value = false
         isNewThreadDraft.value = true
         pendingThreadSelectionId.value = null
+        pendingThreadTitle.value = null
         pendingArchive.value = null
         requestComposerFocus()
     }
@@ -183,6 +192,7 @@ internal class HomeUiStateStore(
         draftSubmissionInFlight.value = false
         isNewThreadDraft.value = false
         pendingThreadSelectionId.value = null
+        pendingThreadTitle.value = null
         pendingArchive.value = null
     }
 
@@ -190,8 +200,9 @@ internal class HomeUiStateStore(
         draftSubmissionInFlight.value = true
     }
 
-    fun markThreadSelectionStarted(threadId: String) {
+    fun markThreadSelectionStarted(threadId: String, title: String?) {
         pendingThreadSelectionId.value = threadId.takeIf(String::isNotBlank)
+        pendingThreadTitle.value = title
     }
 
     fun markArchiveStarted(threadId: String, remote: SessionRemoteState) {
@@ -219,6 +230,7 @@ internal class HomeUiStateStore(
     fun syncRemoteSelection(remote: SessionRemoteState) {
         if (remote.connectionStatus != ConnectionStatus.CONNECTED) {
             pendingThreadSelectionId.value = null
+            pendingThreadTitle.value = null
             pendingArchive.value = null
         }
         val pendingArchiveState = pendingArchive.value
@@ -243,8 +255,10 @@ internal class HomeUiStateStore(
             remote.selectedThreadId == pendingSelectionId
         ) {
             pendingThreadSelectionId.value = null
+            pendingThreadTitle.value = null
             exitNewThreadDraft()
         } else if (draftSubmissionInFlight.value && remote.selectedThreadId.isNotBlank()) {
+            pendingThreadTitle.value = null
             exitNewThreadDraft()
         }
         val sourceThreadId = forkingThreadId.value
