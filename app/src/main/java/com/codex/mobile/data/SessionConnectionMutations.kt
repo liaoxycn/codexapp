@@ -42,6 +42,11 @@ internal fun SessionRemoteState.withDisconnectedGateway(reason: String): Session
         connectionStatus = ConnectionStatus.DISCONNECTED,
         connectionDetail = if (reason.isBlank()) "desktop gateway 已断开" else reason,
         isDemoMode = false,
+        pendingSelectionThreadId = null,
+        pendingThreadTitle = null,
+        isThreadSwitching = false,
+        isLoadingOlder = false,
+        isManualRefreshing = false,
         isGenerating = false,
         pendingApproval = null
     )
@@ -52,6 +57,11 @@ internal fun SessionRemoteState.withConnectionFailure(detail: String): SessionRe
         connectionStatus = ConnectionStatus.ERROR,
         connectionDetail = detail,
         isDemoMode = false,
+        pendingSelectionThreadId = null,
+        pendingThreadTitle = null,
+        isThreadSwitching = false,
+        isLoadingOlder = false,
+        isManualRefreshing = false,
         isGenerating = false,
         pendingApproval = null
     )
@@ -62,6 +72,11 @@ internal fun SessionRemoteState.withManualDisconnect(): SessionRemoteState {
         connectionStatus = ConnectionStatus.DISCONNECTED,
         connectionDetail = "已断开 desktop gateway",
         isDemoMode = true,
+        pendingSelectionThreadId = null,
+        pendingThreadTitle = null,
+        isThreadSwitching = false,
+        isLoadingOlder = false,
+        isManualRefreshing = false,
         isGenerating = false,
         pendingApproval = null
     )
@@ -91,6 +106,11 @@ internal fun SessionRemoteState.withInboundDecodeFailure(message: String?): Sess
         connectionStatus = ConnectionStatus.ERROR,
         connectionDetail = "网关消息解析失败: $message",
         isDemoMode = false,
+        pendingSelectionThreadId = null,
+        pendingThreadTitle = null,
+        isThreadSwitching = false,
+        isLoadingOlder = false,
+        isManualRefreshing = false,
         isGenerating = false,
         pendingApproval = null
     )

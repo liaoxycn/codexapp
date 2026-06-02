@@ -4,6 +4,8 @@ import com.codex.mobile.data.startCreatingThread
 import com.codex.mobile.data.startSelectingThread
 import com.codex.mobile.data.withConnectionFailure
 import com.codex.mobile.data.withDisconnectedGateway
+import com.codex.mobile.data.withInboundDecodeFailure
+import com.codex.mobile.data.withManualDisconnect
 import com.codex.mobile.data.withOptimisticPrompt
 import com.codex.mobile.data.withSendFailure
 import com.codex.mobile.data.withUnavailableAction
@@ -115,6 +117,11 @@ class SessionRemoteMutationsTest {
         val next = SessionRemoteState(
             connectionStatus = ConnectionStatus.CONNECTED,
             isDemoMode = false,
+            pendingSelectionThreadId = "thread-2",
+            pendingThreadTitle = "切换目标",
+            isThreadSwitching = true,
+            isLoadingOlder = true,
+            isManualRefreshing = true,
             isGenerating = true,
             pendingApproval = "允许执行命令？",
             messages = listOf(message("user-1", MessageRole.USER))
@@ -125,6 +132,7 @@ class SessionRemoteMutationsTest {
         assertFalse(next.isDemoMode)
         assertFalse(next.isGenerating)
         assertNull(next.pendingApproval)
+        assertClearedConnectionTransients(next)
         assertEquals(listOf("user-1"), next.messages.map { it.id })
     }
 
@@ -133,6 +141,11 @@ class SessionRemoteMutationsTest {
         val next = SessionRemoteState(
             connectionStatus = ConnectionStatus.CONNECTED,
             isDemoMode = false,
+            pendingSelectionThreadId = "thread-2",
+            pendingThreadTitle = "切换目标",
+            isThreadSwitching = true,
+            isLoadingOlder = true,
+            isManualRefreshing = true,
             isGenerating = true,
             pendingApproval = "允许执行命令？"
         ).withConnectionFailure("连接失败")
@@ -142,6 +155,53 @@ class SessionRemoteMutationsTest {
         assertFalse(next.isDemoMode)
         assertFalse(next.isGenerating)
         assertNull(next.pendingApproval)
+        assertClearedConnectionTransients(next)
+    }
+
+    @Test
+    fun manualDisconnectClearsTransientConnectionState() {
+        val next = switchingGeneratingState().withManualDisconnect()
+
+        assertEquals(ConnectionStatus.DISCONNECTED, next.connectionStatus)
+        assertEquals("已断开 desktop gateway", next.connectionDetail)
+        assertTrue(next.isDemoMode)
+        assertFalse(next.isGenerating)
+        assertNull(next.pendingApproval)
+        assertClearedConnectionTransients(next)
+    }
+
+    @Test
+    fun inboundDecodeFailureClearsTransientConnectionState() {
+        val next = switchingGeneratingState().withInboundDecodeFailure("bad json")
+
+        assertEquals(ConnectionStatus.ERROR, next.connectionStatus)
+        assertEquals("网关消息解析失败: bad json", next.connectionDetail)
+        assertFalse(next.isDemoMode)
+        assertFalse(next.isGenerating)
+        assertNull(next.pendingApproval)
+        assertClearedConnectionTransients(next)
+    }
+
+    private fun switchingGeneratingState(): SessionRemoteState {
+        return SessionRemoteState(
+            connectionStatus = ConnectionStatus.CONNECTED,
+            isDemoMode = false,
+            pendingSelectionThreadId = "thread-2",
+            pendingThreadTitle = "切换目标",
+            isThreadSwitching = true,
+            isLoadingOlder = true,
+            isManualRefreshing = true,
+            isGenerating = true,
+            pendingApproval = "允许执行命令？"
+        )
+    }
+
+    private fun assertClearedConnectionTransients(state: SessionRemoteState) {
+        assertNull(state.pendingSelectionThreadId)
+        assertNull(state.pendingThreadTitle)
+        assertFalse(state.isThreadSwitching)
+        assertFalse(state.isLoadingOlder)
+        assertFalse(state.isManualRefreshing)
     }
 
     private fun message(id: String, role: MessageRole): ThreadMessage {
