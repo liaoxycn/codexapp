@@ -72,7 +72,8 @@ class GatewayRepositoryCommandActionsTest {
         val accepted = actions.selectThread("thread-2")
 
         assertTrue(accepted)
-        assertEquals("thread-2", state.selectedThreadId)
+        assertEquals("", state.selectedThreadId)
+        assertEquals("thread-2", state.pendingSelectionThreadId)
         assertEquals("项目重构", state.pendingThreadTitle)
         assertTrue(state.isThreadSwitching)
         assertTrue(sentMessages.single().contains("\"type\":\"select_thread\""))

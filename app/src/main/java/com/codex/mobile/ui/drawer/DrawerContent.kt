@@ -38,7 +38,6 @@ internal fun DrawerContent(
     onSelectThread: (String) -> Unit,
     onRenameThread: (String, String) -> Unit,
     onArchiveThread: (String) -> Unit,
-    onUnarchiveThread: (String) -> Unit,
     onRestartDesktop: () -> Unit,
     onDownloadUpdate: () -> Unit = {},
 ) {
@@ -129,10 +128,6 @@ internal fun DrawerContent(
             onArchiveThread = { threadId ->
                 clearDrawerInput()
                 onArchiveThread(threadId)
-            },
-            onUnarchiveThread = { threadId ->
-                clearDrawerInput()
-                onUnarchiveThread(threadId)
             },
             onToggleProjectGroup = sectionsState.onToggleProjectGroup,
         )

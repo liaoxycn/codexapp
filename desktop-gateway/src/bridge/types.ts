@@ -1,8 +1,10 @@
 import type { AppServerApprovalPolicy, AppServerSandboxPolicy, AppServerThread } from "../appServerTypes.js";
 import type { ClientSnapshot, GatewayThreadPayload } from "../protocol.js";
 
-export const INITIAL_HISTORY_WINDOW = 24;
-export const HISTORY_WINDOW_STEP = 24;
+export const INITIAL_HISTORY_WINDOW = 80;
+export const HISTORY_WINDOW_STEP = 80;
+export const RUNNING_SIGNAL_LEASE_MS = 90_000;
+export const TURN_COMPLETION_GRACE_MS = 8_000;
 
 export interface PendingApproval {
   requestId?: string | number;
@@ -42,7 +44,9 @@ export interface ThreadRuntimeState {
   transientOperation: "compact" | "rollback" | "shell" | null;
   pendingApproval: PendingApproval | null;
   stopRequested: boolean;
-  isFinalizing: boolean;
+  isFinalizing: boolean;
+  runningSignalUntilMs: number;
+  turnCompletionGraceUntilMs: number;
   model: string | null;
   modelProvider: string | null;
   instructionSources: string[];

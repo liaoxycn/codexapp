@@ -3,9 +3,11 @@ package com.codex.mobile.ui.state
 import com.codex.mobile.data.SessionRepository
 import com.codex.mobile.model.HomeUiState
 import com.codex.mobile.model.AppUpdateStatus
+import com.codex.mobile.model.ConnectionStatus
 import com.codex.mobile.update.AppUpdateManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 internal class HomeViewModelDelegate(
@@ -68,7 +70,16 @@ internal class HomeViewModelDelegate(
     }
 
     fun forkThread(id: String, numTurns: Int? = null) {
+        if (id.isBlank() || uiStateStore.state.value.connectionStatus != ConnectionStatus.CONNECTED) {
+            repositoryActions.forkThread(id, numTurns)
+            return
+        }
+        uiStateStore.markForkStarted(id)
         repositoryActions.forkThread(id, numTurns)
+        scope.launch {
+            delay(12_000L)
+            uiStateStore.clearForkIfSource(id)
+        }
     }
 
     fun renameThread(id: String, name: String) {
@@ -202,7 +213,7 @@ internal class HomeViewModelDelegate(
 
     fun downloadAppUpdate() {
         val current = uiStateStore.state.value.appUpdate
-        if (current.status != AppUpdateStatus.AVAILABLE && current.status != AppUpdateStatus.ERROR) return
+        if (current.status != AppUpdateStatus.AVAILABLE) return
         uiStateStore.updateAppUpdate(appUpdateManager.enqueueSystemDownload(current))
     }
 }

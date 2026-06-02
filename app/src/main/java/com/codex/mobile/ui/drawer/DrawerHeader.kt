@@ -121,14 +121,21 @@ private fun AppUpdatePrompt(
             loading = false,
             onClick = {}
         )
+        AppUpdateStatus.RELEASE_PAGE_OPENED -> UpdateNoticeRow(
+            icon = Icons.Filled.Download,
+            title = state.message.ifBlank { "已打开 GitHub 发布页" },
+            action = "浏览器",
+            loading = false,
+            onClick = {}
+        )
         AppUpdateStatus.ERROR -> {
             if (state.latestVersion.isBlank() && state.downloadUrl.isBlank()) return
             UpdateNoticeRow(
                 icon = Icons.Filled.Warning,
                 title = state.message.ifBlank { "更新失败" },
-                action = "重试",
+                action = "发布页",
                 loading = false,
-                onClick = onDownload
+                onClick = {}
             )
         }
         else -> Unit

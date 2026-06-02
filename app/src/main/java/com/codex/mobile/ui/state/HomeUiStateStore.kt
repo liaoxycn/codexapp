@@ -21,6 +21,7 @@ internal class HomeUiStateStore(
     private val composerFocusRequest = MutableStateFlow(0L)
     private val isNewThreadDraft = MutableStateFlow(true)
     private val draftSubmissionInFlight = MutableStateFlow(false)
+    private val forkingThreadId = MutableStateFlow<String?>(null)
     private val newThreadDraft = MutableStateFlow(NewThreadDraft())
     private val appUpdate = MutableStateFlow(AppUpdateState())
 
@@ -29,6 +30,7 @@ internal class HomeUiStateStore(
         val composerFocusRequest: Long,
         val isNewThreadDraft: Boolean,
         val draftSubmissionInFlight: Boolean,
+        val forkingThreadId: String?,
         val newThreadDraft: NewThreadDraft,
         val appUpdate: AppUpdateState
     )
@@ -36,6 +38,7 @@ internal class HomeUiStateStore(
     private data class DraftLocalState(
         val isNewThreadDraft: Boolean,
         val draftSubmissionInFlight: Boolean,
+        val forkingThreadId: String?,
         val newThreadDraft: NewThreadDraft,
         val appUpdate: AppUpdateState
     )
@@ -43,12 +46,14 @@ internal class HomeUiStateStore(
     private val draftLocalState = combine(
         isNewThreadDraft,
         draftSubmissionInFlight,
+        forkingThreadId,
         newThreadDraft,
         appUpdate
-    ) { draftMode, submittingDraft, draft, update ->
+    ) { draftMode, submittingDraft, forkingId, draft, update ->
         DraftLocalState(
             isNewThreadDraft = draftMode,
             draftSubmissionInFlight = submittingDraft,
+            forkingThreadId = forkingId,
             newThreadDraft = draft,
             appUpdate = update
         )
@@ -64,6 +69,7 @@ internal class HomeUiStateStore(
             composerFocusRequest = focusRequest,
             isNewThreadDraft = draftState.isNewThreadDraft,
             draftSubmissionInFlight = draftState.draftSubmissionInFlight,
+            forkingThreadId = draftState.forkingThreadId,
             newThreadDraft = draftState.newThreadDraft,
             appUpdate = draftState.appUpdate
         )
@@ -80,6 +86,7 @@ internal class HomeUiStateStore(
             composerFocusRequest = local.composerFocusRequest,
             isNewThreadDraft = local.isNewThreadDraft,
             draftSubmissionInFlight = local.draftSubmissionInFlight,
+            isForkingThread = local.forkingThreadId != null,
             newThreadDraft = local.newThreadDraft,
             appUpdate = local.appUpdate
         )
@@ -92,6 +99,7 @@ internal class HomeUiStateStore(
             composerFocusRequest = composerFocusRequest.value,
             isNewThreadDraft = isNewThreadDraft.value,
             draftSubmissionInFlight = draftSubmissionInFlight.value,
+            isForkingThread = forkingThreadId.value != null,
             newThreadDraft = newThreadDraft.value,
             appUpdate = appUpdate.value
         )
@@ -127,8 +135,28 @@ internal class HomeUiStateStore(
         draftSubmissionInFlight.value = true
     }
 
+    fun markForkStarted(sourceThreadId: String) {
+        forkingThreadId.value = sourceThreadId.takeIf(String::isNotBlank)
+    }
+
+    fun clearForkIfSource(sourceThreadId: String) {
+        if (forkingThreadId.value == sourceThreadId) {
+            forkingThreadId.value = null
+        }
+    }
+
     fun syncRemoteSelection(remote: SessionRemoteState) {
         if (draftSubmissionInFlight.value && remote.selectedThreadId.isNotBlank()) {
+            exitNewThreadDraft()
+        }
+        val sourceThreadId = forkingThreadId.value
+        if (
+            sourceThreadId != null &&
+            remote.selectedThreadId.isNotBlank() &&
+            remote.selectedThreadId != sourceThreadId &&
+            remote.threads.any { it.id == remote.selectedThreadId }
+        ) {
+            forkingThreadId.value = null
             exitNewThreadDraft()
         }
     }

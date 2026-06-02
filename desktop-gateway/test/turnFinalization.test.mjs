@@ -19,6 +19,8 @@ function createState(overrides = {}) {
     pendingApproval: null,
     stopRequested: false,
     isFinalizing: false,
+    runningSignalUntilMs: 0,
+    turnCompletionGraceUntilMs: 0,
     model: null,
     instructionSources: [],
     approvalPolicy: null,
@@ -86,6 +88,56 @@ test("finalizeTurnRuntimeState appends stopped status once and clears running st
     state.snapshot.messages.at(-1)?.blocks?.[0]?.value,
     "已停止，本轮可继续补充输入。"
   );
+});
+
+test("finalizeTurnRuntimeState keeps running during completion grace", async () => {
+  const state = createState({
+    turnCompletionGraceUntilMs: Date.now() + 5000,
+  });
+  const threads = new Map([["thread-1", state]]);
+  const statuses = [];
+
+  await finalizeTurnRuntimeState({
+    threads,
+    threadId: "thread-1",
+    turnStatus: "completed",
+    completedTurnId: "turn-1",
+    emitChanged: () => {},
+    refreshThread: async () => {},
+    updateSummaryStatus: (_threadId, status) => {
+      statuses.push(status);
+    },
+  });
+
+  assert.equal(state.snapshot.isGenerating, true);
+  assert.equal(state.currentTurnId, null);
+  assert.deepEqual(statuses, ["running"]);
+});
+
+test("finalizeTurnRuntimeState does not clear a newer turn started during refresh", async () => {
+  const state = createState();
+  const threads = new Map([["thread-1", state]]);
+  const statuses = [];
+
+  await finalizeTurnRuntimeState({
+    threads,
+    threadId: "thread-1",
+    turnStatus: "completed",
+    completedTurnId: "turn-1",
+    emitChanged: () => {},
+    refreshThread: async () => {
+      state.currentTurnId = "turn-2";
+      state.snapshot.isGenerating = true;
+      state.runningSignalUntilMs = Date.now() + 5000;
+    },
+    updateSummaryStatus: (_threadId, status) => {
+      statuses.push(status);
+    },
+  });
+
+  assert.equal(state.snapshot.isGenerating, true);
+  assert.equal(state.currentTurnId, "turn-2");
+  assert.deepEqual(statuses, ["running"]);
 });
 
 test("finalizeCompactRuntimeState normalizes compact status and clears transient state", async () => {

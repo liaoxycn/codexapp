@@ -36,8 +36,8 @@ export async function handleBridgeBackendNotification(
     threads: deps.threads,
     emitChanged: deps.emitChanged,
     finalizeCompactState: async (threadId) => finalizeBridgeCompactState(threadId, deps),
-    finalizeTurnState: async (threadId, turnStatus) =>
-      finalizeBridgeTurnState(threadId, turnStatus, deps),
+    finalizeTurnState: async (threadId, turnStatus, completedTurnId) =>
+      finalizeBridgeTurnState(threadId, turnStatus, completedTurnId, deps),
     hydrateThreads: deps.hydrateThreads,
     ensureActiveAssistantMessage: deps.ensureActiveAssistantMessage,
     pushOperationalNotice: deps.pushOperationalNotice,
@@ -73,6 +73,7 @@ export function setBridgePendingApproval(
 export async function finalizeBridgeTurnState(
   threadId: string,
   turnStatus: string | undefined,
+  completedTurnId: string | undefined,
   deps: Pick<BridgeBackendLifecycleDeps, "threads" | "emitChanged" | "refreshThread" | "updateSummaryStatus">
 ): Promise<void> {
   await finalizeTurnRuntimeState({
@@ -81,6 +82,7 @@ export async function finalizeBridgeTurnState(
     threadId,
     threads: deps.threads,
     turnStatus,
+    completedTurnId,
     updateSummaryStatus: deps.updateSummaryStatus,
   });
 }

@@ -7,6 +7,7 @@ import {
 } from "./runtimeMessageStore.js";
 import { ensureActiveAssistantMessage } from "./runtimeAssistantMessages.js";
 import { upsertThreadState } from "./runtimeState.js";
+import { clearRunningLease, markRunningSignal } from "./runningLease.js";
 import type {
   ThreadLifecycleStatus,
   ThreadRuntimeState,
@@ -66,6 +67,7 @@ export async function handlePromptSubmission({
 
       latest.transientOperation = null;
       latest.snapshot.isGenerating = false;
+      clearRunningLease(latest);
       latest.snapshot.messages = latest.snapshot.messages.concat(
         systemStatus(`上下文压缩失败: ${error instanceof Error ? error.message : "unknown"}`)
       );
@@ -83,6 +85,8 @@ export async function handlePromptSubmission({
     state.liveAssistantItemId = null;
     state.activeAssistantMessageId = null;
     state.snapshot.isGenerating = false;
+    clearRunningLease(state);
+    clearRunningLease(state);
 
     try {
       const rolledBack = await appServer.threadRollback(threadId, 1);
@@ -134,6 +138,7 @@ export async function handlePromptSubmission({
   const turnId = await appServer.turnStart(threadId, text);
   state.currentTurnId = turnId;
   state.snapshot.isGenerating = true;
+  markRunningSignal(state);
   ensureActiveAssistantMessage(state, turnId);
   updateSummaryStatus(threadId, "running");
   emitChanged();
@@ -157,6 +162,7 @@ export async function rollbackThreadTurns({
   state.pendingApproval = null;
   state.snapshot.pendingApproval = null;
   state.snapshot.isGenerating = false;
+  clearRunningLease(state);
 
   try {
     const rolledBack = await appServer.threadRollback(threadId, rollbackCount);

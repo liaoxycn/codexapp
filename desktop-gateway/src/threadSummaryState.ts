@@ -175,6 +175,8 @@ export function shouldRetainThreadRuntimeOverlay(
     transientOperation?: string | null;
     pendingApproval?: { text?: string | null } | null;
     lastActivityAtMs?: number;
+    runningSignalUntilMs?: number;
+    turnCompletionGraceUntilMs?: number;
   } | null
 ): boolean {
   if (shouldRetainLiveThreadRuntime(thread)) {
@@ -185,7 +187,9 @@ export function shouldRetainThreadRuntimeOverlay(
       existingRuntime?.snapshot?.isGenerating ||
       existingRuntime?.currentTurnId ||
       existingRuntime?.transientOperation ||
-      existingRuntime?.pendingApproval?.text
+      existingRuntime?.pendingApproval?.text ||
+      (existingRuntime?.runningSignalUntilMs ?? 0) > Date.now() ||
+      (existingRuntime?.turnCompletionGraceUntilMs ?? 0) > Date.now()
   );
   if (!hasLiveOverlay) {
     return false;

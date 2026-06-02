@@ -31,7 +31,7 @@ internal fun rememberThreadHistoryPagingController(
     var topPullDistance by rememberSaveable(state.selectedThreadId) { mutableFloatStateOf(0f) }
     var topLoadAnchorId by rememberSaveable(state.selectedThreadId) { mutableStateOf<String?>(null) }
     var topLoadAnchorOffset by rememberSaveable(state.selectedThreadId) { mutableIntStateOf(0) }
-    val topPullThreshold = 120f
+    val topPullThreshold = 88f
 
     fun resetTopPull() {
         topPullDistance = 0f
@@ -77,8 +77,9 @@ internal fun rememberThreadHistoryPagingController(
                     resetTopPull()
                     return Offset.Zero
                 }
-                if (available.y > 0f) {
-                    topPullDistance = (topPullDistance + available.y).coerceAtMost(220f)
+                val downwardDrag = consumed.y.coerceAtLeast(available.y).coerceAtLeast(0f)
+                if (downwardDrag > 0f) {
+                    topPullDistance = (topPullDistance + downwardDrag).coerceAtMost(220f)
                     topLoadArmed = true
                     if (shouldTriggerHistoryLoad(
                             isAtTop = isAtTop,
@@ -95,7 +96,7 @@ internal fun rememberThreadHistoryPagingController(
                         resetTopPull()
                         onLoadOlderMessages()
                     }
-                } else if (available.y < 0f && topPullDistance > 0f) {
+                } else if ((consumed.y < 0f || available.y < 0f) && topPullDistance > 0f) {
                     resetTopPull()
                 }
                 return Offset.Zero

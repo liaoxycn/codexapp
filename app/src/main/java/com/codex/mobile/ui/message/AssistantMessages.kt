@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.clickable
-import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.Text
@@ -23,7 +22,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,7 +41,6 @@ import androidx.compose.ui.unit.sp
 import com.codex.mobile.model.MessageBlock
 import com.codex.mobile.model.ThreadMessage
 import com.codex.mobile.ui.theme.CodexTheme
-import kotlinx.coroutines.delay
 
 @Composable
 internal fun AssistantMessage(
@@ -55,7 +52,6 @@ internal fun AssistantMessage(
     onForkFromMessage: (Int) -> Unit
 ) {
     var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
-    var forking by rememberSaveable(message.id + ":forking") { mutableStateOf(false) }
     var reasoningExpanded by rememberSaveable(message.id + ":reasoning") { mutableStateOf(false) }
     var processExpanded by rememberSaveable(message.id + ":process") { mutableStateOf(false) }
     val cards = remember(message.blocks) { deriveAssistantMessageCards(message.blocks) }
@@ -65,12 +61,6 @@ internal fun AssistantMessage(
     val canCopy = showActions && message.isFinal && finalText.isNotBlank()
     val canFork = showActions && message.isFinal && forkNumTurns != null
     val showFooterActions = showActions && (canCopy || canFork || message.durationMs != null)
-    LaunchedEffect(forking) {
-        if (forking) {
-            delay(3500L)
-            forking = false
-        }
-    }
 
     Box(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -154,12 +144,10 @@ internal fun AssistantMessage(
                     durationMs = message.durationMs,
                     canCopy = canCopy,
                     canFork = canFork,
-                    forking = forking,
                     compactMode = compactMode,
                     onCopyFinalText = { context.copyTextToClipboard("Codex 回复", finalText) },
                     onForkFromMessage = {
                         if (forkNumTurns != null) {
-                            forking = true
                             onForkFromMessage(forkNumTurns)
                         }
                     }
@@ -228,7 +216,6 @@ private fun AssistantTurnFooterActions(
     durationMs: Long?,
     canCopy: Boolean,
     canFork: Boolean,
-    forking: Boolean,
     compactMode: Boolean,
     onCopyFinalText: () -> Unit,
     onForkFromMessage: () -> Unit
@@ -259,27 +246,18 @@ private fun AssistantTurnFooterActions(
         }
         if (canFork) {
             IconButton(
-                onClick = { if (!forking) onForkFromMessage() },
-                enabled = !forking,
+                onClick = onForkFromMessage,
                 modifier = Modifier
                     .size(24.dp)
                     .semantics { contentDescription = "从此处分叉" }
                     .testTag("assistant_turn_fork_$messageId")
             ) {
-                if (forking) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(13.dp),
-                        color = CodexTheme.colors.textTertiary,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.CallSplit,
-                        contentDescription = null,
-                        tint = CodexTheme.colors.textTertiary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.CallSplit,
+                    contentDescription = null,
+                    tint = CodexTheme.colors.textTertiary,
+                    modifier = Modifier.size(16.dp)
+                )
             }
         }
         buildAssistantFooterDuration(durationMs)?.let { duration ->

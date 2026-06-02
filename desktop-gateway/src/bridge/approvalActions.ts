@@ -1,6 +1,7 @@
 import { AppServerClient } from "../appServerClient.js";
 import type { ClientSnapshot } from "../protocol.js";
 import { systemStatus } from "./runtimeMessageStore.js";
+import { clearRunningLease, markRunningSignal } from "./runningLease.js";
 import { buildApprovalResponse } from "./summaries.js";
 import type {
   PendingApproval,
@@ -47,6 +48,7 @@ export async function handleCurrentApproval({
     if (!allow) {
       state.snapshot.messages = state.snapshot.messages.concat(systemStatus("审批已拒绝"));
       state.transientOperation = null;
+      clearRunningLease(state);
       updateSummaryStatus(threadId, "idle");
       emitChanged();
       return getSnapshot(threadId);
@@ -54,6 +56,7 @@ export async function handleCurrentApproval({
 
     state.snapshot.messages = state.snapshot.messages.concat(systemStatus("审批已允许"));
     state.snapshot.isGenerating = true;
+    markRunningSignal(state);
     updateSummaryStatus(threadId, "running");
     emitChanged();
 
@@ -64,6 +67,7 @@ export async function handleCurrentApproval({
       }
 
       latest.snapshot.isGenerating = false;
+      clearRunningLease(latest);
       latest.snapshot.messages = latest.snapshot.messages.concat(
         systemStatus(`shell 命令执行失败: ${error instanceof Error ? error.message : "unknown"}`)
       );

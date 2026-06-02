@@ -87,6 +87,8 @@ export function markAllThreadsFailedState(
     state.snapshot.isGenerating = false;
     state.stopRequested = false;
     state.isFinalizing = false;
+    state.runningSignalUntilMs = 0;
+    state.turnCompletionGraceUntilMs = 0;
     updateSummaryStatusForThread(threads, state.summary.id, state.summary.archived ? "idle" : "failed");
   }
 }
@@ -109,6 +111,8 @@ export function createPlaceholderThreadRuntimeState(
     pendingApproval: null,
     stopRequested: false,
     isFinalizing: false,
+    runningSignalUntilMs: 0,
+    turnCompletionGraceUntilMs: 0,
     isSubscribed: false,
     model: null,
     modelProvider: null,

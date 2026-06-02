@@ -13,8 +13,8 @@ class ThreadPullRefreshControllerTest {
                 isAtBottom = true,
                 isGenerating = false,
                 isManualRefreshing = false,
-                pullDistance = 170f,
-                pullThreshold = 160f,
+                pullDistance = 100f,
+                pullThreshold = 96f,
                 refreshTriggered = false
             )
         )

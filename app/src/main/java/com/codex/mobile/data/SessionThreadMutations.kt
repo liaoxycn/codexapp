@@ -4,6 +4,7 @@ import com.codex.mobile.model.SessionRemoteState
 
 internal fun SessionRemoteState.startCreatingThread(): SessionRemoteState {
     return copy(
+        pendingSelectionThreadId = null,
         pendingThreadTitle = "新会话",
         isThreadSwitching = true,
         selectedThreadId = "",
@@ -17,11 +18,9 @@ internal fun SessionRemoteState.startCreatingThread(): SessionRemoteState {
 
 internal fun SessionRemoteState.startSelectingThread(id: String, title: String?): SessionRemoteState {
     return copy(
-        selectedThreadId = id,
+        pendingSelectionThreadId = id,
         pendingThreadTitle = title,
         isThreadSwitching = true,
-        messages = emptyList(),
-        hasMoreHistory = false,
         isLoadingOlder = false,
         pendingApproval = null,
         isGenerating = false

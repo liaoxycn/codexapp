@@ -44,7 +44,8 @@ class SessionRemoteMutationsTest {
     fun startSelectingThreadPreservesResolvedTitle() {
         val next = SessionRemoteState().startSelectingThread("thread-2", "标题")
 
-        assertEquals("thread-2", next.selectedThreadId)
+        assertEquals("", next.selectedThreadId)
+        assertEquals("thread-2", next.pendingSelectionThreadId)
         assertEquals("标题", next.pendingThreadTitle)
         assertTrue(next.isThreadSwitching)
     }

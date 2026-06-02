@@ -3,6 +3,7 @@ package com.codex.mobile.model
 data class SessionRemoteState(
     val threads: List<ThreadSummary> = emptyList(),
     val selectedThreadId: String = "",
+    val pendingSelectionThreadId: String? = null,
     val pendingThreadTitle: String? = null,
     val isThreadSwitching: Boolean = false,
     val messages: List<ThreadMessage> = emptyList(),

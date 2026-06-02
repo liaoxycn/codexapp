@@ -1,22 +1,13 @@
-package com.codex.mobile.ui.drawer
+package com.codex.mobile.ui.app
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.AlertDialog
 import androidx.compose.material.Button
-import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
@@ -24,25 +15,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.codex.mobile.ui.theme.CodexTheme
-import kotlinx.coroutines.delay
 
 @Composable
-internal fun RestartDesktopConfirmDialog(
+internal fun ForkThreadConfirmDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
-    var restarting by remember { mutableStateOf(false) }
-    LaunchedEffect(restarting) {
-        if (restarting) {
-            delay(900L)
-            onDismiss()
-        }
-    }
     AlertDialog(
-        onDismissRequest = { if (!restarting) onDismiss() },
+        onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "重启 Codex Desktop？",
+                text = "从此处分叉？",
                 color = CodexTheme.colors.textPrimary,
                 fontSize = 19.sp,
                 lineHeight = 24.sp,
@@ -53,14 +36,14 @@ internal fun RestartDesktopConfirmDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "原因：移动端已执行发送消息、重命名、归档或分叉等会话变更，Codex Desktop 不会实时自动刷新这些外部变更。重启后 Desktop 会重新读取会话索引并同步最新列表。",
+                    text = "将以当前回复为边界创建一个新会话，并自动切换到分叉后的会话。",
                     color = CodexTheme.colors.textPrimary,
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
                     style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
                 )
                 Text(
-                    text = "警告：这会关闭并重新打开 Codex Desktop。未完成的桌面端输入、弹窗或本地操作可能被打断。",
+                    text = "警告：分叉会复制当前上下文，后续对话将在新会话中继续，原会话不会被修改。",
                     color = CodexTheme.colors.danger,
                     fontSize = 13.sp,
                     lineHeight = 19.sp,
@@ -71,29 +54,14 @@ internal fun RestartDesktopConfirmDialog(
         },
         confirmButton = {
             Button(
-                enabled = !restarting,
-                onClick = {
-                    restarting = true
-                    onConfirm()
-                },
+                onClick = onConfirm,
                 modifier = Modifier.defaultMinSize(minHeight = 44.dp)
             ) {
-                if (restarting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(15.dp),
-                        color = CodexTheme.colors.surface,
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("重启中", fontSize = 15.sp, lineHeight = 19.sp)
-                } else {
-                    Text("确认重启", fontSize = 15.sp, lineHeight = 19.sp)
-                }
+                Text("确认分叉", fontSize = 15.sp, lineHeight = 19.sp)
             }
         },
         dismissButton = {
             TextButton(
-                enabled = !restarting,
                 onClick = onDismiss,
                 modifier = Modifier.defaultMinSize(minHeight = 44.dp)
             ) {

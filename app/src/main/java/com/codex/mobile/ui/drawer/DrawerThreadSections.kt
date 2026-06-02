@@ -13,8 +13,7 @@ internal data class DrawerProjectGroup(
 
 internal data class DrawerThreadSections(
     val projectGroups: List<DrawerProjectGroup>,
-    val chatThreads: List<ThreadSummary>,
-    val archivedThreads: List<ThreadSummary>
+    val chatThreads: List<ThreadSummary>
 )
 
 internal fun buildDrawerThreadSections(
@@ -24,7 +23,6 @@ internal fun buildDrawerThreadSections(
 ): DrawerThreadSections {
     val activeThreads = threads.filterNot(ThreadSummary::archived)
     val listSortOrder = threadListSortOrder()
-    val archivedThreads = threads.filter(ThreadSummary::archived).sortedWith(listSortOrder)
     val selectedThread = threads.firstOrNull { it.id == selectedThreadId }
     val currentProjectGroupLabel = selectedThread
         ?.takeIf { it.groupKind == ThreadGroupKind.PROJECT && it.groupLabel.isNotBlank() }
@@ -49,8 +47,7 @@ internal fun buildDrawerThreadSections(
                 isExpanded = label == currentProjectGroupLabel || expandedProjectGroups.contains(label)
             )
         },
-        chatThreads = chatThreads,
-        archivedThreads = archivedThreads
+        chatThreads = chatThreads
     )
 }
 

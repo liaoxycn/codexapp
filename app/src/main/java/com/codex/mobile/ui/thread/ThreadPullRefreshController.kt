@@ -38,10 +38,7 @@ internal fun rememberThreadPullRefreshController(
     var pullHintVisibleUntil by rememberSaveable(selectedThreadId) { mutableStateOf(0L) }
     var pullGestureTick by rememberSaveable(selectedThreadId) { mutableIntStateOf(0) }
     var refreshTriggered by rememberSaveable(selectedThreadId) { mutableStateOf(false) }
-    val pullThreshold = remember(pullVelocity) {
-        val speedBoost = (pullVelocity / 900f).coerceIn(0f, 0.35f)
-        (160f * (1f - speedBoost)).coerceIn(110f, 160f)
-    }
+    val pullThreshold = remember { 96f }
     val rawProgress = (pullDistance / pullThreshold).coerceIn(0f, 1f)
     val pullProgress by animateFloatAsState(
         targetValue = rawProgress,
@@ -74,12 +71,13 @@ internal fun rememberThreadPullRefreshController(
                     }
                     return Offset.Zero
                 }
-                if (available.y < 0f) {
+                val upwardDrag = (-consumed.y).coerceAtLeast(-available.y).coerceAtLeast(0f)
+                if (upwardDrag > 0f) {
                     val now = SystemClock.uptimeMillis()
                     val elapsed = (now - lastPullSampleAt).coerceAtLeast(1L).toFloat()
-                    pullVelocity = ((-available.y) / elapsed) * 1000f
+                    pullVelocity = (upwardDrag / elapsed) * 1000f
                     lastPullSampleAt = now
-                    pullDistance = (pullDistance - available.y).coerceAtMost(260f)
+                    pullDistance = (pullDistance + upwardDrag).coerceAtMost(220f)
                     pullGestureTick += 1
                     if (shouldTriggerPullRefresh(
                             isAtBottom = isAtBottom,
@@ -96,7 +94,7 @@ internal fun rememberThreadPullRefreshController(
                         pullDistance = 0f
                         pullVelocity = 0f
                     }
-                } else if (available.y > 0f && pullDistance > 0f) {
+                } else if ((consumed.y > 0f || available.y > 0f) && pullDistance > 0f) {
                     pullDistance = 0f
                     pullVelocity = 0f
                     refreshTriggered = false

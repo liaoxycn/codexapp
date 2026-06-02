@@ -5,6 +5,8 @@ import com.codex.mobile.model.MessageBlock
 import com.codex.mobile.model.MessageRole
 import com.codex.mobile.model.SessionRemoteState
 import com.codex.mobile.model.ThreadMessage
+import com.codex.mobile.model.ThreadStatus
+import com.codex.mobile.model.ThreadSummary
 import com.codex.mobile.ui.state.HomeUiStateStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -175,11 +177,66 @@ class HomeUiStateStoreTest {
         }
     }
 
+    @Test
+    fun forkPendingClearsOnlyAfterNewSelectedThreadAppearsInCatalog() {
+        runBlocking {
+            val remoteState = MutableStateFlow(
+                SessionRemoteState(
+                    selectedThreadId = "thread-source",
+                    threads = listOf(summary("thread-source")),
+                    connectionStatus = ConnectionStatus.CONNECTED
+                )
+            )
+            val composerText = MutableStateFlow("")
+            val scope = CoroutineScope(Dispatchers.Unconfined + Job())
+            val store = HomeUiStateStore(
+                remoteState = remoteState,
+                composerText = composerText,
+                scope = scope
+            )
+            val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) { store.state.collect {} }
+
+            store.exitNewThreadDraft()
+            store.markForkStarted("thread-source")
+            yield()
+
+            assertTrue(store.state.value.isForkingThread)
+
+            remoteState.value = remoteState.value.copy(selectedThreadId = "thread-fork")
+            store.syncRemoteSelection(remoteState.value)
+            yield()
+
+            assertTrue(store.state.value.isForkingThread)
+
+            remoteState.value = remoteState.value.copy(
+                selectedThreadId = "thread-fork",
+                threads = listOf(summary("thread-source"), summary("thread-fork"))
+            )
+            store.syncRemoteSelection(remoteState.value)
+            yield()
+
+            assertFalse(store.state.value.isForkingThread)
+            assertEquals("thread-fork", store.state.value.selectedThreadId)
+            collector.cancel()
+            scope.coroutineContext[Job]?.cancel()
+        }
+    }
+
     private fun message(id: String): ThreadMessage {
         return ThreadMessage(
             id = id,
             role = MessageRole.USER,
             blocks = listOf(MessageBlock.Text(id))
+        )
+    }
+
+    private fun summary(id: String): ThreadSummary {
+        return ThreadSummary(
+            id = id,
+            title = id,
+            preview = "",
+            status = ThreadStatus.IDLE,
+            updatedAt = 1L
         )
     }
 }

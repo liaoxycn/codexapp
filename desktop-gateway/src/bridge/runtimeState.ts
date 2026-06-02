@@ -18,6 +18,7 @@ import {
   buildRuntimeSummaries,
   syncSelectedThreadSnapshots,
 } from "./runtimeSummaryState.js";
+import { hasRunningLease } from "./runningLease.js";
 import {
   INITIAL_HISTORY_WINDOW,
   type ThreadRuntimeState,
@@ -66,8 +67,9 @@ export function upsertThreadState({
   const currentTurnId = retainRuntimeOverlay
     ? existing?.currentTurnId ?? activeTurnId
     : null;
+  const runningLeaseActive = existing ? hasRunningLease(existing) : false;
   const isGenerating = retainRuntimeOverlay
-    ? Boolean(existing?.snapshot.isGenerating || activeTurnId != null || baseSnapshot.isGenerating)
+    ? Boolean(existing?.snapshot.isGenerating || activeTurnId != null || baseSnapshot.isGenerating || runningLeaseActive)
     : baseSnapshot.isGenerating;
 
   const nextSummary = existing
@@ -96,6 +98,8 @@ export function upsertThreadState({
     pendingApproval: retainRuntimeOverlay ? existing?.pendingApproval ?? null : null,
     stopRequested: retainRuntimeOverlay ? existing?.stopRequested ?? false : false,
     isFinalizing: retainRuntimeOverlay ? existing?.isFinalizing ?? false : false,
+    runningSignalUntilMs: retainRuntimeOverlay ? existing?.runningSignalUntilMs ?? 0 : 0,
+    turnCompletionGraceUntilMs: retainRuntimeOverlay ? existing?.turnCompletionGraceUntilMs ?? 0 : 0,
     model: resume?.model ?? existing?.model ?? null,
     modelProvider: resume?.modelProvider ?? existing?.modelProvider ?? thread.modelProvider ?? null,
     instructionSources: resume?.instructionSources ?? existing?.instructionSources ?? [],

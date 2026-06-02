@@ -25,7 +25,6 @@ class DrawerThreadSectionsTest {
 
         assertEquals(listOf("chat-2", "chat-1"), sections.chatThreads.map { it.id })
         assertEquals(listOf("项目A"), sections.projectGroups.map { it.label })
-        assertTrue(sections.archivedThreads.isEmpty())
     }
 
     @Test
@@ -101,7 +100,7 @@ class DrawerThreadSectionsTest {
     }
 
     @Test
-    fun separatesArchivedThreadsFromActiveSections() {
+    fun omitsArchivedThreadsFromDrawerSections() {
         val sections = buildDrawerThreadSections(
             threads = listOf(
                 summary("active-chat", updatedAt = 1_000L),
@@ -114,7 +113,6 @@ class DrawerThreadSectionsTest {
 
         assertEquals(listOf("active-chat"), sections.chatThreads.map { it.id })
         assertTrue(sections.projectGroups.isEmpty())
-        assertEquals(listOf("archived-project", "archived-chat"), sections.archivedThreads.map { it.id })
     }
 
     @Test

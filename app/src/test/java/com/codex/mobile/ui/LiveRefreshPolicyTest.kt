@@ -40,15 +40,17 @@ class LiveRefreshPolicyTest {
     }
 
     @Test
-    fun keepsPollingWhileThreadSwitching() {
+    fun doesNotPollOldThreadWhileSelectionIsPending() {
         val snapshot = connectedSnapshot(
             selectedThreadId = "thread-1",
             threads = listOf(summary("thread-1", ThreadStatus.IDLE)),
+            pendingSelectionThreadId = "thread-2",
             isThreadSwitching = true
         )
 
         assertTrue(selectedThreadNeedsLiveRefresh(snapshot))
-        assertTrue(shouldPollLiveRefresh(snapshot))
+        assertFalse(shouldPollLiveRefresh(snapshot))
+        assertFalse(shouldContinueLiveRefresh(snapshot, "thread-1"))
     }
 
     private fun connectedSnapshot(
@@ -56,10 +58,12 @@ class LiveRefreshPolicyTest {
         threads: List<ThreadSummary>,
         isGenerating: Boolean = false,
         pendingApproval: String? = null,
+        pendingSelectionThreadId: String? = null,
         isThreadSwitching: Boolean = false
     ) = SessionRemoteState(
         threads = threads,
         selectedThreadId = selectedThreadId,
+        pendingSelectionThreadId = pendingSelectionThreadId,
         isGenerating = isGenerating,
         pendingApproval = pendingApproval,
         isThreadSwitching = isThreadSwitching,

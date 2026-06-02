@@ -10,6 +10,7 @@ import {
   replaceOrAppendMessage,
 } from "./runtimeMessageStore.js";
 import { mergeThreadItem } from "./runtimeMessages.js";
+import { markRunningSignal } from "./runningLease.js";
 import { touchThreadActivity } from "./summaries.js";
 import type { BridgeNotificationDeps } from "./notifications.js";
 import { asString } from "./appServerValues.js";
@@ -31,6 +32,7 @@ export function handleAgentMessageDelta(
 
   state.currentTurnId = turnId;
   state.snapshot.isGenerating = true;
+  markRunningSignal(state);
   appendAssistantDelta(state, itemId, delta);
   deps.updateSummaryStatus(threadId, "running");
   deps.emitChanged();
@@ -51,6 +53,7 @@ export function handleReasoningSummaryDelta(
     return;
   }
 
+  markRunningSignal(state);
   appendOrMergeMessage(
     state,
     itemId,
@@ -76,6 +79,7 @@ export function handleReasoningSummaryPartAdded(
     return;
   }
 
+  markRunningSignal(state);
   appendOrMergeMessage(
     state,
     itemId,
@@ -101,6 +105,7 @@ export function handleReasoningTextDelta(
     return;
   }
 
+  markRunningSignal(state);
   appendOrMergeMessage(
     state,
     itemId,
@@ -126,6 +131,7 @@ export function handlePlanDelta(
     return;
   }
 
+  markRunningSignal(state);
   appendOrMergeMessage(
     state,
     itemId,
@@ -151,6 +157,7 @@ export function handleCommandExecutionOutputDelta(
     return;
   }
 
+  markRunningSignal(state);
   appendOrMergeCodeMessage(state, itemId, delta, "shell", "命令执行中");
   deps.emitChanged();
 }
@@ -171,6 +178,7 @@ export function handleTerminalInteraction(
     return;
   }
 
+  markRunningSignal(state);
   appendOrMergeCodeMessage(state, itemId, `\nstdin> ${stdin}`, "shell", "终端交互");
   deps.emitChanged();
 }
@@ -190,6 +198,7 @@ export function handleFileChangeOutputDelta(
     return;
   }
 
+  markRunningSignal(state);
   appendOrMergeCodeMessage(state, itemId, delta, "diff", "文件改动中");
   deps.emitChanged();
 }
@@ -232,6 +241,7 @@ export function handleMcpToolCallProgress(
     return;
   }
 
+  markRunningSignal(state);
   replaceOrAppendMessage(state, {
     id: itemId,
     role: "assistant",
@@ -270,6 +280,7 @@ export async function handleItemLifecycle(
   }
 
   state.currentTurnId = turnId;
+  markRunningSignal(state);
   mergeThreadItem(state, item, true);
   deps.emitChanged();
 }
@@ -299,6 +310,7 @@ export function handleGuardianApprovalReview(
     risk ? `风险: ${formatRiskLevel(risk)}` : "",
     rationale,
   ].filter(Boolean);
+  markRunningSignal(state);
   replaceOrAppendMessage(state, {
     id: `auto-approval-review-${reviewId}`,
     role: "system",
@@ -343,12 +355,14 @@ export function handleRealtimeNotification(
     if (!item) {
       return;
     }
+    markRunningSignal(state);
     mergeThreadItem(state, item, true);
     deps.emitChanged();
     return;
   }
 
   if (notification.method === "thread/realtime/transcript/delta") {
+    markRunningSignal(state);
     appendOrMergeMessage(
       state,
       `realtime-transcript-${asString(params.role, "assistant")}`,
@@ -362,6 +376,7 @@ export function handleRealtimeNotification(
 
   if (notification.method === "thread/realtime/transcript/done") {
     const role = params.role === "user" ? "user" : "assistant";
+    markRunningSignal(state);
     replaceOrAppendMessage(state, {
       id: `realtime-transcript-${asString(params.role, "assistant")}`,
       role,
@@ -375,6 +390,7 @@ export function handleRealtimeNotification(
   if (!status) {
     return;
   }
+  markRunningSignal(state);
   replaceOrAppendMessage(state, {
     id: "thread-realtime-status",
     role: "system",

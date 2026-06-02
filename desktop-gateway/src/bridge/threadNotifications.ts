@@ -9,6 +9,7 @@ import {
   systemStatus,
 } from "./runtimeMessageStore.js";
 import { normalizeCompactMessages, pruneCompletedArtifacts } from "./runtimeSnapshotMessages.js";
+import { clearRunningLease, hasRunningLease, markRunningSignal, markTurnCompletionGrace } from "./runningLease.js";
 import { touchThreadActivity } from "./summaries.js";
 import type { BridgeNotificationDeps } from "./notifications.js";
 
@@ -32,14 +33,14 @@ export async function handleThreadStatusChanged(
       state.currentTurnId != null ||
       state.snapshot.isGenerating ||
       (state.thread != null && isThreadActivelyGenerating(state.thread));
-    if (!compactInFlight && !hasLiveTurn) {
+    if (!compactInFlight && !hasLiveTurn && !hasRunningLease(state)) {
       state.snapshot.isGenerating = false;
       deps.updateSummaryStatus(threadId, state.pendingApproval ? "needs_approval" : "idle");
       deps.emitChanged();
       return;
     }
 
-    state.snapshot.isGenerating = !compactInFlight;
+    state.snapshot.isGenerating = !compactInFlight && (hasLiveTurn || hasRunningLease(state));
     deps.updateSummaryStatus(
       threadId,
       compactInFlight ? (state.pendingApproval ? "needs_approval" : "idle") : "running"
@@ -55,7 +56,7 @@ export async function handleThreadStatusChanged(
     return;
   }
 
-  if (state.currentTurnId || state.snapshot.isGenerating || state.stopRequested) {
+  if (state.currentTurnId || state.snapshot.isGenerating || state.stopRequested || hasRunningLease(state)) {
     await deps.finalizeTurnState(threadId);
     return;
   }
@@ -79,6 +80,7 @@ export function handleTurnStarted(
   }
 
   state.currentTurnId = turn.id;
+  markRunningSignal(state);
   touchThreadActivity(state, turn.startedAt);
   if (state.transientOperation === "compact") {
     return;
@@ -111,7 +113,8 @@ export async function handleTurnCompleted(
   }
 
   touchThreadActivity(state, turn.completedAt ?? turn.startedAt);
-  await deps.finalizeTurnState(threadId, turn.status);
+  markTurnCompletionGrace(state);
+  await deps.finalizeTurnState(threadId, turn.status, turn.id);
 }
 
 export function handleHookRunUpdated(
@@ -169,6 +172,7 @@ export function handleThreadCompacted(
   state.liveAssistantItemId = null;
   state.activeAssistantMessageId = null;
   state.snapshot.isGenerating = false;
+  clearRunningLease(state);
   pruneCompletedArtifacts(state);
   normalizeCompactMessages(state, true);
   deps.updateSummaryStatus(threadId, state.pendingApproval ? "needs_approval" : "idle");
@@ -370,6 +374,11 @@ export function handleErrorNotification(
     .join("\n");
   state.snapshot.messages = state.snapshot.messages.concat(systemStatus(`错误: ${message || "unknown"}`));
   state.snapshot.isGenerating = Boolean(willRetry);
+  if (willRetry) {
+    markRunningSignal(state);
+  } else {
+    clearRunningLease(state);
+  }
   deps.updateSummaryStatus(threadId, willRetry ? "running" : "failed");
   deps.emitChanged();
 }

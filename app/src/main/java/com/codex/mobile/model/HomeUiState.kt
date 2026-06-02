@@ -3,6 +3,7 @@ package com.codex.mobile.model
 data class HomeUiState(
     val threads: List<ThreadSummary>,
     val selectedThreadId: String,
+    val pendingSelectionThreadId: String?,
     val pendingThreadTitle: String?,
     val isThreadSwitching: Boolean,
     val messages: List<ThreadMessage>,
@@ -20,6 +21,7 @@ data class HomeUiState(
     val cwd: String,
     val permissionSummary: String,
     val sessionConfig: SessionConfig = SessionConfig(),
+    val isForkingThread: Boolean = false,
     val connectionStatus: ConnectionStatus,
     val connectionDetail: String,
     val gatewayConfig: GatewayConfig,

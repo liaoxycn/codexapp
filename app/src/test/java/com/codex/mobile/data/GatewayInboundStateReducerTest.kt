@@ -3,8 +3,13 @@ package com.codex.mobile.data
 import com.codex.mobile.data.gateway.emptyRemoteState
 import com.codex.mobile.model.ConnectionStatus
 import com.codex.mobile.model.GatewayConfig
+import com.codex.mobile.model.MessageBlock
+import com.codex.mobile.model.MessageRole
+import com.codex.mobile.model.SessionRemoteState
+import com.codex.mobile.model.ThreadMessage
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -101,6 +106,68 @@ class GatewayInboundStateReducerTest {
     }
 
     @Test
+    fun pendingThreadSelectionIgnoresOldThreadSnapshotUntilTargetArrives() {
+        val previous = SessionRemoteState(
+            selectedThreadId = "thread-old",
+            pendingSelectionThreadId = "thread-new",
+            pendingThreadTitle = "新会话",
+            isThreadSwitching = true,
+            messages = listOf(message("old-local")),
+            connectionStatus = ConnectionStatus.CONNECTED,
+            gatewayConfig = GatewayConfig(url = "ws://10.0.2.2:8765/mobile")
+        )
+        val oldRaw = """
+            {
+              "type": "snapshot",
+              "revision": 7,
+              "threads": [
+                { "id": "thread-old", "title": "旧会话", "preview": "", "status": "idle" },
+                { "id": "thread-new", "title": "新会话", "preview": "", "status": "idle" }
+              ],
+              "selectedThreadId": "thread-old",
+              "messages": [
+                { "id": "old-remote", "role": "assistant", "blocks": [{ "kind": "text", "value": "old" }] }
+              ],
+              "chips": [],
+              "slashCommands": [],
+              "isGenerating": false
+            }
+        """.trimIndent()
+
+        val stillSwitching = reduceGatewayInboundState(json, previous, oldRaw)
+
+        assertEquals("thread-old", stillSwitching.selectedThreadId)
+        assertEquals("thread-new", stillSwitching.pendingSelectionThreadId)
+        assertTrue(stillSwitching.isThreadSwitching)
+        assertEquals(listOf("old-local"), stillSwitching.messages.map { it.id })
+
+        val targetRaw = """
+            {
+              "type": "snapshot",
+              "revision": 8,
+              "threads": [
+                { "id": "thread-old", "title": "旧会话", "preview": "", "status": "idle" },
+                { "id": "thread-new", "title": "新会话", "preview": "", "status": "idle" }
+              ],
+              "selectedThreadId": "thread-new",
+              "messages": [
+                { "id": "new-remote", "role": "assistant", "blocks": [{ "kind": "text", "value": "new" }] }
+              ],
+              "chips": [],
+              "slashCommands": [],
+              "isGenerating": false
+            }
+        """.trimIndent()
+
+        val switched = reduceGatewayInboundState(json, stillSwitching, targetRaw)
+
+        assertEquals("thread-new", switched.selectedThreadId)
+        assertEquals(null, switched.pendingSelectionThreadId)
+        assertFalse(switched.isThreadSwitching)
+        assertEquals(listOf("new-remote"), switched.messages.map { it.id })
+    }
+
+    @Test
     fun reduceGatewayInboundStateRejectsStaleSnapshotPatchPayload() {
         val previous = emptyRemoteState(GatewayConfig(url = "ws://10.0.2.2:8765/mobile"))
             .copy(snapshotRevision = 5L)
@@ -137,5 +204,13 @@ class GatewayInboundStateReducerTest {
 
         assertEquals(ConnectionStatus.ERROR, next.connectionStatus)
         assertTrue(next.connectionDetail.startsWith("网关消息解析失败:"))
+    }
+
+    private fun message(id: String): ThreadMessage {
+        return ThreadMessage(
+            id = id,
+            role = MessageRole.ASSISTANT,
+            blocks = listOf(MessageBlock.Text(id))
+        )
     }
 }

@@ -81,8 +81,8 @@ class ThreadScreenStateTest {
                 isLoadingOlder = false,
                 isThreadSwitching = false,
                 hasMessages = true,
-                pullDistance = 130f,
-                pullThreshold = 120f,
+                pullDistance = 92f,
+                pullThreshold = 88f,
                 loadArmed = true
             )
         )
@@ -126,6 +126,7 @@ class ThreadScreenStateTest {
     ) = HomeUiState(
         threads = threads,
         selectedThreadId = "thread-1",
+        pendingSelectionThreadId = null,
         pendingThreadTitle = null,
         isThreadSwitching = false,
         messages = messages,

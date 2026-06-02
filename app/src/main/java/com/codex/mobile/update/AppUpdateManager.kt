@@ -2,6 +2,7 @@ package com.codex.mobile.update
 
 import android.app.DownloadManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -43,6 +44,7 @@ internal class AppUpdateManager(
                 val body = response.body?.string().orEmpty()
                 val release = json.decodeFromString(GitHubRelease.serializer(), body)
                 val latestVersion = release.tagName.trim().removePrefix("v")
+                val releasePageUrl = release.htmlUrl.ifBlank { LATEST_RELEASE_PAGE_URL }
                 val apkAsset = release.assets.firstOrNull { asset ->
                     asset.name.endsWith(".apk", ignoreCase = true) && asset.browserDownloadUrl.isNotBlank()
                 }
@@ -61,6 +63,7 @@ internal class AppUpdateManager(
                         status = AppUpdateStatus.ERROR,
                         latestVersion = latestVersion,
                         localVersion = localVersion,
+                        releasePageUrl = releasePageUrl,
                         message = "最新 release 未找到 APK"
                     )
                     else -> AppUpdateState(
@@ -69,6 +72,7 @@ internal class AppUpdateManager(
                         localVersion = localVersion,
                         assetName = apkAsset.name,
                         downloadUrl = apkAsset.browserDownloadUrl,
+                        releasePageUrl = releasePageUrl,
                         totalBytes = apkAsset.size
                     )
                 }
@@ -84,10 +88,10 @@ internal class AppUpdateManager(
 
     fun enqueueSystemDownload(available: AppUpdateState): AppUpdateState {
         if (available.downloadUrl.isBlank()) {
-            return available.copy(status = AppUpdateStatus.ERROR, message = "下载地址为空")
+            return openReleasePage(available, "下载地址为空")
         }
         val manager = context.getSystemService(DownloadManager::class.java)
-            ?: return available.copy(status = AppUpdateStatus.ERROR, message = "系统下载器不可用")
+            ?: return openReleasePage(available, "系统下载器不可用")
         return runCatching {
             val safeName = safeApkName(available)
             val request = DownloadManager.Request(Uri.parse(available.downloadUrl))
@@ -105,7 +109,30 @@ internal class AppUpdateManager(
                 message = "已交给系统下载器"
             )
         }.getOrElse { error ->
-            available.copy(status = AppUpdateStatus.ERROR, message = error.message ?: "启动系统下载失败")
+            openReleasePage(available, error.message ?: "启动系统下载失败")
+        }
+    }
+
+    fun openReleasePage(
+        state: AppUpdateState,
+        reason: String = "已打开发布页"
+    ): AppUpdateState {
+        val pageUrl = state.releasePageUrl.ifBlank { LATEST_RELEASE_PAGE_URL }
+        return runCatching {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(pageUrl))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            state.copy(
+                status = AppUpdateStatus.RELEASE_PAGE_OPENED,
+                releasePageUrl = pageUrl,
+                message = reason
+            )
+        }.getOrElse { error ->
+            state.copy(
+                status = AppUpdateStatus.ERROR,
+                releasePageUrl = pageUrl,
+                message = error.message ?: "无法打开发布页"
+            )
         }
     }
 
@@ -116,6 +143,7 @@ internal class AppUpdateManager(
 
     private companion object {
         const val LATEST_RELEASE_URL = "https://api.github.com/repos/liaoxycn/CodexMobileApp/releases/latest"
+        const val LATEST_RELEASE_PAGE_URL = "https://github.com/liaoxycn/CodexMobileApp/releases/latest"
         const val APK_MIME_TYPE = "application/vnd.android.package-archive"
     }
 }
@@ -164,6 +192,8 @@ private fun String.versionParts(): List<Int> {
 private data class GitHubRelease(
     @SerialName("tag_name")
     val tagName: String = "",
+    @SerialName("html_url")
+    val htmlUrl: String = "",
     val assets: List<GitHubAsset> = emptyList()
 )
 

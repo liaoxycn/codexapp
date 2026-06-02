@@ -73,9 +73,19 @@ internal fun GatewaySnapshotMessage.applyTo(
     previous: SessionRemoteState
 ): SessionRemoteState {
     val threads = threads.toThreadSummaries()
+    val incomingSelectedThreadId = selectedThreadId ?: threads.firstOrNull()?.id.orEmpty()
+    if (!previous.shouldAcceptSelectedThreadSnapshot(incomingSelectedThreadId, threads)) {
+        return previous.withDeferredSelectionSnapshot(
+            threads = threads,
+            desktopRestartRequired = desktopRestartRequired,
+            operationalNotices = operationalNotices.toOperationalNotices(),
+            revision = revision
+        )
+    }
     return previous.copy(
         threads = threads,
-        selectedThreadId = selectedThreadId ?: threads.firstOrNull()?.id.orEmpty(),
+        selectedThreadId = incomingSelectedThreadId,
+        pendingSelectionThreadId = null,
         pendingThreadTitle = null,
         isThreadSwitching = false,
         messages = previous.messages.mergeSnapshotMessages(messages.toThreadMessages()),
@@ -117,30 +127,33 @@ internal fun GatewaySnapshotPatchMessage.applyTo(
     } else {
         previous.threads
     }
+    val nextSelectedThreadId = if ("selectedThreadId" in changedFields) {
+        selectedThreadId ?: nextThreads.firstOrNull()?.id.orEmpty()
+    } else {
+        previous.selectedThreadId
+    }
+    val acceptSelectedSnapshot = previous.shouldAcceptSelectedThreadSnapshot(nextSelectedThreadId, nextThreads)
 
     return previous.copy(
         threads = nextThreads,
-        selectedThreadId = if ("selectedThreadId" in changedFields) {
-            selectedThreadId ?: nextThreads.firstOrNull()?.id.orEmpty()
-        } else {
-            previous.selectedThreadId
-        },
-        pendingThreadTitle = null,
-        isThreadSwitching = false,
-        messages = if ("messages" in changedFields) {
+        selectedThreadId = if (acceptSelectedSnapshot) nextSelectedThreadId else previous.selectedThreadId,
+        pendingSelectionThreadId = if (acceptSelectedSnapshot) null else previous.pendingSelectionThreadId,
+        pendingThreadTitle = if (acceptSelectedSnapshot) null else previous.pendingThreadTitle,
+        isThreadSwitching = if (acceptSelectedSnapshot) false else previous.isThreadSwitching,
+        messages = if (acceptSelectedSnapshot && "messages" in changedFields) {
             previous.messages.mergeSnapshotMessages(messages.orEmpty().toThreadMessages())
         } else {
             previous.messages
         },
-        hasMoreHistory = if ("hasMoreHistory" in changedFields) hasMoreHistory == true else previous.hasMoreHistory,
-        isLoadingOlder = false,
-        pendingApproval = if ("pendingApproval" in changedFields) pendingApproval else previous.pendingApproval,
-        chips = if ("chips" in changedFields) chips.orEmpty().toComposerChips() else previous.chips,
-        files = if ("files" in changedFields) files.orEmpty().toComposerFiles() else previous.files,
+        hasMoreHistory = if (acceptSelectedSnapshot && "hasMoreHistory" in changedFields) hasMoreHistory == true else previous.hasMoreHistory,
+        isLoadingOlder = if (acceptSelectedSnapshot) false else previous.isLoadingOlder,
+        pendingApproval = if (acceptSelectedSnapshot && "pendingApproval" in changedFields) pendingApproval else previous.pendingApproval,
+        chips = if (acceptSelectedSnapshot && "chips" in changedFields) chips.orEmpty().toComposerChips() else previous.chips,
+        files = if (acceptSelectedSnapshot && "files" in changedFields) files.orEmpty().toComposerFiles() else previous.files,
         slashCommands = if ("slashCommands" in changedFields) slashCommands.orEmpty() else previous.slashCommands,
-        cwd = if ("cwd" in changedFields) cwd.orEmpty() else previous.cwd,
-        permissionSummary = if ("permissionSummary" in changedFields) permissionSummary.orEmpty() else previous.permissionSummary,
-        sessionConfig = if ("sessionConfig" in changedFields) {
+        cwd = if (acceptSelectedSnapshot && "cwd" in changedFields) cwd.orEmpty() else previous.cwd,
+        permissionSummary = if (acceptSelectedSnapshot && "permissionSummary" in changedFields) permissionSummary.orEmpty() else previous.permissionSummary,
+        sessionConfig = if (acceptSelectedSnapshot && "sessionConfig" in changedFields) {
             sessionConfig?.toSessionConfig() ?: SessionConfig()
         } else {
             previous.sessionConfig
@@ -160,12 +173,37 @@ internal fun GatewaySnapshotPatchMessage.applyTo(
         } else {
             emptyList()
         },
-        isGenerating = if ("isGenerating" in changedFields) isGenerating == true else previous.isGenerating,
-        isManualRefreshing = false,
+        isGenerating = if (acceptSelectedSnapshot && "isGenerating" in changedFields) isGenerating == true else previous.isGenerating,
+        isManualRefreshing = if (acceptSelectedSnapshot) false else previous.isManualRefreshing,
         connectionStatus = ConnectionStatus.CONNECTED,
         connectionDetail = if (nextThreads.isEmpty()) "已连接，暂无会话" else "已同步 ${nextThreads.size} 个会话",
         isDemoMode = false,
         snapshotRevision = revision
+    )
+}
+
+private fun SessionRemoteState.shouldAcceptSelectedThreadSnapshot(
+    incomingSelectedThreadId: String,
+    threads: List<ThreadSummary>
+): Boolean {
+    val pendingSelection = pendingSelectionThreadId?.takeIf(String::isNotBlank) ?: return true
+    return incomingSelectedThreadId == pendingSelection && threads.any { it.id == pendingSelection }
+}
+
+private fun SessionRemoteState.withDeferredSelectionSnapshot(
+    threads: List<ThreadSummary>,
+    desktopRestartRequired: Boolean,
+    operationalNotices: List<OperationalNotice>,
+    revision: Long?
+): SessionRemoteState {
+    return copy(
+        threads = threads,
+        desktopRestartRequired = desktopRestartRequired,
+        operationalNotices = operationalNotices,
+        connectionStatus = ConnectionStatus.CONNECTED,
+        connectionDetail = if (threads.isEmpty()) "已连接，暂无会话" else "已同步 ${threads.size} 个会话",
+        isDemoMode = false,
+        snapshotRevision = revision ?: snapshotRevision
     )
 }
 

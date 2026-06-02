@@ -14,11 +14,13 @@ internal fun SessionRemoteState.toHomeState(
     composerFocusRequest: Long,
     isNewThreadDraft: Boolean,
     draftSubmissionInFlight: Boolean,
+    isForkingThread: Boolean,
     newThreadDraft: NewThreadDraft,
     appUpdate: AppUpdateState = AppUpdateState()
 ): HomeUiState = HomeUiState(
     threads = threads,
     selectedThreadId = if (isNewThreadDraft) "" else selectedThreadId,
+    pendingSelectionThreadId = if (isNewThreadDraft) null else pendingSelectionThreadId,
     pendingThreadTitle = if (isNewThreadDraft) null else pendingThreadTitle,
     isThreadSwitching = if (isNewThreadDraft) false else isThreadSwitching,
     messages = if (isNewThreadDraft && !draftSubmissionInFlight) emptyList() else messages,
@@ -46,6 +48,7 @@ internal fun SessionRemoteState.toHomeState(
     } else {
         sessionConfig
     },
+    isForkingThread = isForkingThread,
     connectionStatus = connectionStatus,
     connectionDetail = connectionDetail,
     gatewayConfig = gatewayConfig,

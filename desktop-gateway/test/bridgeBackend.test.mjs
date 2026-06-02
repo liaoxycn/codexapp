@@ -487,6 +487,51 @@ test("bridge backend keeps subscribed running status across stale refresh", asyn
   assert.equal(snapshot.threads.find((item) => item.id === "long-running-thread")?.status, "running");
 });
 
+test("bridge backend does not let stale turn completion clear a newer loop turn", async () => {
+  const backend = new AppServerBridgeBackend();
+  const staleThread = thread("loop-thread", {
+    cwd: "D:/Projects/Loop",
+    status: "idle",
+    turns: [
+      { id: "turn-1", status: "completed", completedAt: 210, items: [] },
+    ],
+  });
+  let releaseRead = () => {};
+  const readBlocked = new Promise((resolve) => {
+    releaseRead = resolve;
+  });
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("loop-thread", cwd, staleThread),
+    threadRead: async () => {
+      await readBlocked;
+      return staleThread;
+    },
+  };
+
+  await backend.createThread("D:/Projects/Loop");
+  await backend.handleNotification({
+    method: "turn/started",
+    params: { threadId: "loop-thread", turn: { id: "turn-1", startedAt: 200 } },
+  });
+
+  const completion = backend.handleNotification({
+    method: "turn/completed",
+    params: { threadId: "loop-thread", turn: { id: "turn-1", status: "completed", completedAt: 210 } },
+  });
+  await backend.handleNotification({
+    method: "turn/started",
+    params: { threadId: "loop-thread", turn: { id: "turn-2", startedAt: 211 } },
+  });
+  releaseRead();
+  await completion;
+
+  const state = backend.threads.get("loop-thread");
+  const snapshot = backend.getSnapshot("loop-thread");
+  assert.equal(state.currentTurnId, "turn-2");
+  assert.equal(snapshot.isGenerating, true);
+  assert.equal(snapshot.threads.find((item) => item.id === "loop-thread")?.status, "running");
+});
+
 test("bridge backend passes draft options to app-server thread start", async () => {
   const backend = new AppServerBridgeBackend();
   const calls = [];
@@ -987,5 +1032,5 @@ test("bridge backend loadOlderMessages expands history window", async () => {
 
   await backend.loadOlderMessages("history-thread");
 
-  assert.equal(backend.threads.get("history-thread").historyWindow, before + 24);
+  assert.equal(backend.threads.get("history-thread").historyWindow, before + 80);
 });

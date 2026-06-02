@@ -13,6 +13,9 @@ import androidx.compose.material.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.codex.mobile.model.ConnectionStatus
@@ -37,6 +40,7 @@ fun CodexApp(
         selectedThreadId = state.selectedThreadId,
         isNewThreadDraft = state.isNewThreadDraft,
     )
+    var pendingForkNumTurns by remember { mutableStateOf<Int?>(null) }
     BackHandler(enabled = true, onBack = controller.handleBackPress)
 
     if (controller.showGatewayDialog) {
@@ -46,6 +50,17 @@ fun CodexApp(
             onDismiss = controller.dismissGatewayDialog,
             onConnect = controller.connectGateway,
             onDisconnect = controller.disconnectGateway,
+        )
+    }
+    pendingForkNumTurns?.let { numTurns ->
+        ForkThreadConfirmDialog(
+            onDismiss = { pendingForkNumTurns = null },
+            onConfirm = {
+                pendingForkNumTurns = null
+                if (!state.isForkingThread) {
+                    viewModel.forkThread(state.selectedThreadId, numTurns)
+                }
+            }
         )
     }
 
@@ -65,10 +80,6 @@ fun CodexApp(
                 },
                 onArchiveThread = { id ->
                     viewModel.archiveThread(id)
-                    controller.closeDrawer()
-                },
-                onUnarchiveThread = { id ->
-                    viewModel.unarchiveThread(id)
                     controller.closeDrawer()
                 },
                 onRestartDesktop = viewModel::restartDesktop,
@@ -118,7 +129,7 @@ fun CodexApp(
                     onEditUserMessage = viewModel::editAndResendUserMessage,
                     onResendUserMessage = viewModel::resendUserMessage,
                     onForkFromMessage = { numTurns ->
-                        viewModel.forkThread(state.selectedThreadId, numTurns)
+                        pendingForkNumTurns = numTurns
                     },
                     onNewThreadDraftChange = { draft -> viewModel.updateNewThreadDraft { draft } },
                     onApprovePending = viewModel::approvePending,
@@ -126,6 +137,10 @@ fun CodexApp(
                 )
             }
             OperationalNoticeOverlay(notices = state.operationalNotices)
+            GlobalLoadingOverlay(
+                visible = state.isForkingThread || state.pendingSelectionThreadId != null,
+                text = if (state.isForkingThread) "正在生成分叉会话" else "正在切换会话"
+            )
         }
     }
 }

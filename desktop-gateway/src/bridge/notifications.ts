@@ -41,7 +41,7 @@ export interface BridgeNotificationDeps {
   threads: Map<string, ThreadRuntimeState>;
   emitChanged(): void;
   finalizeCompactState(threadId: string): Promise<void>;
-  finalizeTurnState(threadId: string, turnStatus?: string): Promise<void>;
+  finalizeTurnState(threadId: string, turnStatus?: string, completedTurnId?: string): Promise<void>;
   hydrateThreads(): Promise<void>;
   ensureActiveAssistantMessage(state: ThreadRuntimeState, turnId: string): void;
   pushOperationalNotice?(notice: GatewayOperationalNoticePayload): void;
