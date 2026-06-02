@@ -73,6 +73,29 @@ class ThreadScreenVisibilityTest {
     }
 
     @Test
+    fun operationalNoticeOverlayShowsNoticeDetails() {
+        rule.setContent {
+            CodexTheme {
+                OperationalNoticeOverlay(
+                    notices = listOf(
+                        OperationalNotice(
+                            id = "notice-1",
+                            text = "MCP 服务 github: 失败\n权限不足\n请重新登录",
+                            createdAt = 1L
+                        )
+                    )
+                )
+            }
+        }
+
+        rule.waitForIdle()
+        rule.onNodeWithTag("operational_notice_notice-1").assertIsDisplayed()
+        rule.onNodeWithText("MCP 服务 github: 失败", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("权限不足", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("请重新登录", substring = true).assertIsDisplayed()
+    }
+
+    @Test
     fun operationalNoticeOverlayLimitsVisibleToastCount() {
         rule.setContent {
             CodexTheme {

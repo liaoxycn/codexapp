@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -104,7 +105,7 @@ private fun OperationalNoticeItem(
         val noticeShape = RoundedCornerShape(14.dp)
         Box(modifier = Modifier.testTag("operational_notice")) {
             Text(
-                text = notice.text.lineSequence().firstOrNull().orEmpty(),
+                text = notice.text.trim(),
                 modifier = Modifier
                     .testTag("operational_notice_${notice.id}")
                     .widthIn(max = 300.dp)
@@ -123,7 +124,8 @@ private fun OperationalNoticeItem(
                 fontSize = 13.sp,
                 lineHeight = 17.sp,
                 fontWeight = FontWeight.Medium,
-                maxLines = 1,
+                textAlign = TextAlign.Start,
+                maxLines = 4,
                 overflow = TextOverflow.Ellipsis
             )
         }

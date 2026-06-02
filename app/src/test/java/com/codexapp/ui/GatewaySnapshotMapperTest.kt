@@ -76,7 +76,11 @@ class GatewaySnapshotMapperTest {
             chips = listOf(GatewayChipPayload(label = "app/Main.kt", icon = "file", path = "D:/Projects/app/Main.kt")),
             files = listOf(GatewayFilePayload(label = "app/src/Main.kt", path = "D:/Projects/app/app/src/Main.kt")),
             operationalNotices = listOf(
-                GatewayOperationalNoticePayload(id = "mcp-startup-playwright", text = "MCP 服务 playwright: 已就绪", createdAt = 1234L)
+                GatewayOperationalNoticePayload(
+                    id = "mcp-startup-playwright",
+                    text = "MCP 服务 playwright: 已就绪\n等待连接",
+                    createdAt = 1234L
+                )
             ),
             diagnostics = GatewayDiagnosticsPayload(
                 selectedThreadId = "thread-1",
@@ -116,7 +120,7 @@ class GatewaySnapshotMapperTest {
         assertEquals("app/src/Main.kt", next.files.single().label)
         assertEquals("D:/Projects/app/app/src/Main.kt", next.files.single().path)
         assertEquals("mcp-startup-playwright", next.operationalNotices.single().id)
-        assertEquals("MCP 服务 playwright: 已就绪", next.operationalNotices.single().text)
+        assertEquals("MCP 服务 playwright: 已就绪\n等待连接", next.operationalNotices.single().text)
         assertEquals(1234L, next.operationalNotices.single().createdAt)
         assertEquals("workspace-write", next.sessionConfig.permissionMode)
         assertEquals("openai", next.sessionConfig.provider)

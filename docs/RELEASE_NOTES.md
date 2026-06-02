@@ -1,1 +1,1 @@
-统一项目命名为 codexapp\n- GitHub 仓库改为 codexapp\n- App 显示名、APK 名、release 链接统一为 codexapp\n- desktop-gateway 包名与 app-server clientInfo 统一为 codexapp 标识\n- Android applicationId、namespace、源码包路径迁移到 com.codexapp\n- 同步更新 README、wiki、设计文档与发布配置
+收口全局通知体验\n- App 全局通知改为显示多行详情，不再只保留首行\n- MCP/账号/远控等通知里的错误细节可直接在移动端看到\n- 补充 notice 映射单测与定向 Android UI 测试
