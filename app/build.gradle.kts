@@ -14,8 +14,8 @@ android {
         applicationId = "com.codex.mobile"
         minSdk = 28
         targetSdk = 35
-        versionCode = 26
-        versionName = "0.2.6"
+        versionCode = 27
+        versionName = "0.2.7"
         ndk {
             abiFilters += "arm64-v8a"
         }
