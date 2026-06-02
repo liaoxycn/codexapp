@@ -7,7 +7,8 @@ import com.codexapp.model.ThreadMessage
 internal data class TurnMessageItem(
     val message: ThreadMessage,
     val processMessages: List<ThreadMessage> = emptyList(),
-    val assistantActionsEnabled: Boolean = true
+    val assistantActionsEnabled: Boolean = true,
+    val stableKey: String = message.id
 )
 
 internal fun List<ThreadMessage>.toTurnMessageItems(currentTurnRunning: Boolean = false): List<TurnMessageItem> {
@@ -21,7 +22,8 @@ internal fun List<ThreadMessage>.toTurnMessageItems(currentTurnRunning: Boolean 
             continue
         }
 
-        items += TurnMessageItem(message)
+        val userMessage = message
+        items += TurnMessageItem(userMessage)
         index += 1
 
         val turnMessages = mutableListOf<ThreadMessage>()
@@ -30,16 +32,29 @@ internal fun List<ThreadMessage>.toTurnMessageItems(currentTurnRunning: Boolean 
             index += 1
         }
         if (currentTurnRunning && index == size) {
+            val runningAssistantKey = "${userMessage.id}:assistant-running"
             val streamingAssistantIndex = turnMessages.indexOfLast { it.isAssistantReplyText() }
             if (streamingAssistantIndex < 0) {
-                items += turnMessages.map { TurnMessageItem(it, assistantActionsEnabled = false) }
+                if (turnMessages.isNotEmpty()) {
+                    items += TurnMessageItem(
+                        message = ThreadMessage(
+                            id = runningAssistantKey,
+                            role = MessageRole.ASSISTANT,
+                            blocks = emptyList()
+                        ),
+                        processMessages = turnMessages,
+                        assistantActionsEnabled = false,
+                        stableKey = runningAssistantKey
+                    )
+                }
             } else {
                 val processMessages = turnMessages.take(streamingAssistantIndex)
                 val streamingMessage = turnMessages[streamingAssistantIndex]
                 items += TurnMessageItem(
                     message = streamingMessage,
                     processMessages = processMessages,
-                    assistantActionsEnabled = false
+                    assistantActionsEnabled = false,
+                    stableKey = runningAssistantKey
                 )
                 items += turnMessages.drop(streamingAssistantIndex + 1)
                     .map { TurnMessageItem(it, assistantActionsEnabled = false) }

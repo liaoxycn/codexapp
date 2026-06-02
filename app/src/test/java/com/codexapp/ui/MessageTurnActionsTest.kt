@@ -18,8 +18,9 @@ class MessageTurnActionsTest {
 
         val items = messages.toTurnMessageItems(currentTurnRunning = true)
 
-        assertEquals(listOf("u1", "status", "reasoning"), items.map { it.message.id })
-        assertEquals(emptyList<ThreadMessage>(), items.last().processMessages)
+        assertEquals(listOf("u1", "u1:assistant-running"), items.map { it.message.id })
+        assertEquals(listOf("status", "reasoning"), items.last().processMessages.map { it.id })
+        assertEquals("u1:assistant-running", items.last().stableKey)
     }
 
     @Test
@@ -35,7 +36,25 @@ class MessageTurnActionsTest {
 
         assertEquals(listOf("u1", "streaming-text"), items.map { it.message.id })
         assertEquals(listOf("status", "reasoning"), items.last().processMessages.map { it.id })
+        assertEquals("u1:assistant-running", items.last().stableKey)
         assertEquals(5_000L, items.last().message.durationMs)
+    }
+
+    @Test
+    fun runningTurnKeepsSameAssistantKeyWhenTextArrivesAfterThinking() {
+        val thinkingOnly = listOf(
+            user("u1"),
+            assistant("reasoning", MessageBlock.Reasoning("正在思考"))
+        ).toTurnMessageItems(currentTurnRunning = true)
+        val streamingText = listOf(
+            user("u1"),
+            assistant("reasoning", MessageBlock.Reasoning("正在思考")),
+            assistant("streaming-text", MessageBlock.Text("开始输出"))
+        ).toTurnMessageItems(currentTurnRunning = true)
+
+        assertEquals("u1:assistant-running", thinkingOnly.last().stableKey)
+        assertEquals("u1:assistant-running", streamingText.last().stableKey)
+        assertEquals(listOf("reasoning"), streamingText.last().processMessages.map { it.id })
     }
 
     @Test

@@ -79,7 +79,7 @@ internal fun ThreadMessageList(
 
         itemsIndexed(
             items = turnItems,
-            key = { _, item -> item.message.id }
+            key = { _, item -> item.stableKey }
         ) { index, item ->
             MessageCard(
                 messages = turnItems.map { it.message },
