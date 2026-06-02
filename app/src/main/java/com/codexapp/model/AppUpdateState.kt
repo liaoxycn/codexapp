@@ -7,6 +7,7 @@ data class AppUpdateState(
     val assetName: String = "",
     val downloadUrl: String = "",
     val releasePageUrl: String = "",
+    val releaseNotes: String = "",
     val totalBytes: Long = 0L,
     val downloadId: Long = 0L,
     val message: String = ""

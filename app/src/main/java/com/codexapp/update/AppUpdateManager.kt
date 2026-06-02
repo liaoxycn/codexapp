@@ -45,6 +45,7 @@ internal class AppUpdateManager(
                 val release = json.decodeFromString(GitHubRelease.serializer(), body)
                 val latestVersion = release.tagName.trim().removePrefix("v")
                 val releasePageUrl = release.htmlUrl.ifBlank { LATEST_RELEASE_PAGE_URL }
+                val releaseNotes = release.body.trim()
                 val apkAsset = release.assets.firstOrNull { asset ->
                     asset.name.endsWith(".apk", ignoreCase = true) && asset.browserDownloadUrl.isNotBlank()
                 }
@@ -57,13 +58,15 @@ internal class AppUpdateManager(
                     compareVersions(latestVersion, localVersion) <= 0 -> AppUpdateState(
                         status = AppUpdateStatus.UP_TO_DATE,
                         latestVersion = latestVersion,
-                        localVersion = localVersion
+                        localVersion = localVersion,
+                        releaseNotes = releaseNotes
                     )
                     apkAsset == null -> AppUpdateState(
                         status = AppUpdateStatus.ERROR,
                         latestVersion = latestVersion,
                         localVersion = localVersion,
                         releasePageUrl = releasePageUrl,
+                        releaseNotes = releaseNotes,
                         message = "最新 release 未找到 APK"
                     )
                     else -> AppUpdateState(
@@ -73,6 +76,7 @@ internal class AppUpdateManager(
                         assetName = apkAsset.name,
                         downloadUrl = apkAsset.browserDownloadUrl,
                         releasePageUrl = releasePageUrl,
+                        releaseNotes = releaseNotes,
                         totalBytes = apkAsset.size
                     )
                 }
@@ -194,6 +198,7 @@ private data class GitHubRelease(
     val tagName: String = "",
     @SerialName("html_url")
     val htmlUrl: String = "",
+    val body: String = "",
     val assets: List<GitHubAsset> = emptyList()
 )
 

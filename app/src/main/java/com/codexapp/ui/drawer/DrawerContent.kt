@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import com.codexapp.model.HomeUiState
+import com.codexapp.model.AppUpdateStatus
 import com.codexapp.model.ThreadStatus
 import com.codexapp.model.ThreadSummary
 import com.codexapp.ui.theme.CodexTheme
@@ -44,6 +45,7 @@ internal fun DrawerContent(
 ) {
     var renamingThread by remember { mutableStateOf<ThreadSummary?>(null) }
     var confirmingDesktopRestart by remember { mutableStateOf(false) }
+    var confirmingAppUpdate by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val sectionsState = rememberDrawerSectionsState(
@@ -69,6 +71,20 @@ internal fun DrawerContent(
             onDismiss = { confirmingDesktopRestart = false },
             onConfirm = {
                 onRestartDesktop()
+            }
+        )
+    }
+    if (confirmingAppUpdate && state.appUpdate.status == AppUpdateStatus.AVAILABLE) {
+        AppUpdateConfirmDialog(
+            state = state.appUpdate,
+            onDismiss = { confirmingAppUpdate = false },
+            onDownloadWithSystem = {
+                clearDrawerInput()
+                onDownloadUpdate()
+            },
+            onOpenReleasePage = {
+                clearDrawerInput()
+                onOpenUpdateReleasePage()
             }
         )
     }
@@ -106,9 +122,9 @@ internal fun DrawerContent(
                 clearDrawerInput()
                 confirmingDesktopRestart = true
             },
-            onDownloadUpdate = {
+            onShowUpdateDialog = {
                 clearDrawerInput()
-                onDownloadUpdate()
+                confirmingAppUpdate = true
             },
             onOpenUpdateReleasePage = {
                 clearDrawerInput()

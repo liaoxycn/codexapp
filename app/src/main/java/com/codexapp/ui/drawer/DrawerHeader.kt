@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
@@ -59,7 +58,7 @@ internal fun DrawerHeader(
     onRefreshThreads: () -> Unit,
     onOpenConnection: () -> Unit,
     onRestartDesktop: () -> Unit,
-    onDownloadUpdate: () -> Unit,
+    onShowUpdateDialog: () -> Unit,
     onOpenUpdateReleasePage: () -> Unit,
 ) {
     val shouldShowRestartPrompt = desktopRestartRequired && !hasRunningThread
@@ -109,7 +108,7 @@ internal fun DrawerHeader(
             }
             AppUpdatePrompt(
                 state = appUpdate,
-                onDownload = onDownloadUpdate,
+                onShowUpdateDialog = onShowUpdateDialog,
                 onOpenReleasePage = onOpenUpdateReleasePage,
             )
             val diagnosticsNowMillis = rememberDiagnosticsClock(diagnostics)
@@ -235,17 +234,16 @@ private fun buildDiagnosticsText(diagnostics: StateDiagnostics): String {
 @Composable
 private fun AppUpdatePrompt(
     state: AppUpdateState,
-    onDownload: () -> Unit,
+    onShowUpdateDialog: () -> Unit,
     onOpenReleasePage: () -> Unit,
 ) {
     when (state.status) {
-        AppUpdateStatus.AVAILABLE -> UpdateNoticeActionsRow(
+        AppUpdateStatus.AVAILABLE -> UpdateNoticeRow(
             icon = Icons.Filled.Download,
             title = "发现新版本 ${state.latestVersion}",
-            actions = listOf(
-                UpdateNoticeAction(label = "系统下载", onClick = onDownload),
-                UpdateNoticeAction(label = "发布页", onClick = onOpenReleasePage)
-            )
+            action = "查看",
+            loading = false,
+            onClick = onShowUpdateDialog
         )
         AppUpdateStatus.DOWNLOAD_QUEUED -> UpdateNoticeRow(
             icon = Icons.Filled.Download,
@@ -274,11 +272,6 @@ private fun AppUpdatePrompt(
         else -> Unit
     }
 }
-
-private data class UpdateNoticeAction(
-    val label: String,
-    val onClick: (() -> Unit)? = null
-)
 
 @Composable
 private fun UpdateNoticeRow(
@@ -337,64 +330,6 @@ private fun UpdateNoticeRow(
             fontWeight = FontWeight.SemiBold,
             style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
         )
-    }
-}
-
-@Composable
-private fun UpdateNoticeActionsRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    actions: List<UpdateNoticeAction>
-) {
-    val warning = Color(0xFFD97706)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFFFFF7ED))
-            .border(1.dp, Color(0xFFFED7AA), RoundedCornerShape(8.dp))
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = warning,
-                modifier = Modifier.size(14.dp)
-            )
-            Text(
-                text = title,
-                color = Color(0xFF9A3412),
-                fontSize = 11.sp,
-                lineHeight = 14.sp,
-                fontWeight = FontWeight.Medium,
-                style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
-            )
-        }
-        Row(
-            modifier = Modifier.wrapContentWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            actions.forEach { action ->
-                val actionable = action.onClick != null
-                Text(
-                    text = action.label,
-                    color = if (actionable) warning else Color(0xFFB45309),
-                    fontSize = 11.sp,
-                    lineHeight = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.clickable(enabled = actionable) { action.onClick?.invoke() },
-                    style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
-                )
-            }
-        }
     }
 }
 
