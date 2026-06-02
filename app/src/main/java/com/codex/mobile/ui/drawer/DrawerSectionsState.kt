@@ -10,9 +10,7 @@ import androidx.compose.runtime.setValue
 import com.codex.mobile.model.ThreadSummary
 
 internal data class DrawerSectionsState(
-    val query: String,
     val sections: DrawerThreadSections,
-    val onQueryChange: (String) -> Unit,
     val onToggleProjectGroup: (DrawerProjectGroup) -> Unit,
 )
 
@@ -21,14 +19,12 @@ internal fun rememberDrawerSectionsState(
     threads: List<ThreadSummary>,
     selectedThreadId: String,
 ): DrawerSectionsState {
-    var query by rememberSaveable { mutableStateOf("") }
     var expandedProjectGroups by rememberSaveable { mutableStateOf(setOf<String>()) }
     var discoveredProjectGroups by rememberSaveable { mutableStateOf(setOf<String>()) }
-    val sections = remember(threads, selectedThreadId, query, expandedProjectGroups) {
+    val sections = remember(threads, selectedThreadId, expandedProjectGroups) {
         buildDrawerThreadSections(
             threads = threads,
             selectedThreadId = selectedThreadId,
-            query = query,
             expandedProjectGroups = expandedProjectGroups
         )
     }
@@ -45,9 +41,7 @@ internal fun rememberDrawerSectionsState(
     }
 
     return DrawerSectionsState(
-        query = query,
         sections = sections,
-        onQueryChange = { query = it },
         onToggleProjectGroup = { group ->
             if (!group.isCurrentProject) {
                 expandedProjectGroups = if (group.isExpanded) {

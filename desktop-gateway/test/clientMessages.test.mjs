@@ -147,12 +147,12 @@ test("handleClientMessage records negotiated snapshot patch support", async () =
 
 test("handleClientMessage restores requested selected thread from hello", async () => {
   const context = createContext({ selectedThreadId: "thread-default" });
-  const snapshotCalls = [];
+  const selectCalls = [];
   const { handlers, snapshots } = createHandlers({
     backend: createBackend({
       hasThread: (threadId) => threadId === "thread-2",
-      getSnapshot: (selectedThreadId = "thread-default") => {
-        snapshotCalls.push(selectedThreadId);
+      selectThread: async (selectedThreadId) => {
+        selectCalls.push(selectedThreadId);
         return createSnapshot({ selectedThreadId });
       },
     }),
@@ -165,8 +165,36 @@ test("handleClientMessage restores requested selected thread from hello", async 
   );
 
   assert.equal(context.selectedThreadId, "thread-2");
-  assert.deepEqual(snapshotCalls, ["thread-2"]);
+  assert.deepEqual(selectCalls, ["thread-2"]);
   assert.equal(snapshots.at(-1).selectedThreadId, "thread-2");
+});
+
+test("handleClientMessage resumes requested thread on hello so live status is restored", async () => {
+  const context = createContext({ selectedThreadId: "thread-default" });
+  const { handlers, snapshots } = createHandlers({
+    backend: createBackend({
+      hasThread: (threadId) => threadId === "thread-running",
+      getSnapshot: () => createSnapshot({
+        selectedThreadId: "thread-running",
+        threads: [{ id: "thread-running", status: "idle" }],
+      }),
+      selectThread: async (selectedThreadId) => createSnapshot({
+        selectedThreadId,
+        threads: [{ id: selectedThreadId, status: "running" }],
+        isGenerating: true,
+      }),
+    }),
+  });
+
+  await handleClientMessage(
+    context,
+    JSON.stringify({ type: "hello", client: "android", selectedThreadId: "thread-running" }),
+    handlers
+  );
+
+  assert.equal(context.selectedThreadId, "thread-running");
+  assert.equal(snapshots.at(-1).threads[0].status, "running");
+  assert.equal(snapshots.at(-1).isGenerating, true);
 });
 
 test("handleClientMessage falls back to default thread when select target is missing", async () => {

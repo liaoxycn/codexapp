@@ -449,3 +449,32 @@ test("older idle refresh keeps a newer live runtime overlay", () => {
     true
   );
 });
+
+test("older idle refresh keeps newer live runtime overlay stored on snapshot", () => {
+  assert.equal(
+    shouldRetainThreadRuntimeOverlay(
+      thread({
+        status: "idle",
+        turns: [
+          {
+            id: "turn-live",
+            status: "completed",
+            startedAt: 100,
+            completedAt: 100,
+            items: [
+              { type: "agentMessage", id: "item-stale", text: "old" },
+            ],
+          },
+        ],
+      }),
+      {
+        snapshot: { isGenerating: true },
+        currentTurnId: "turn-live",
+        transientOperation: null,
+        pendingApproval: null,
+        lastActivityAtMs: 200_000,
+      }
+    ),
+    true
+  );
+});

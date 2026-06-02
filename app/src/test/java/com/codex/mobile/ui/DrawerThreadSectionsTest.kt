@@ -12,7 +12,7 @@ import org.junit.Test
 
 class DrawerThreadSectionsTest {
     @Test
-    fun filtersThreadsByQueryAcrossTitleAndPreview() {
+    fun keepsAllThreadsWithoutSearchFiltering() {
         val sections = buildDrawerThreadSections(
             threads = listOf(
                 summary("chat-1", title = "Alpha", preview = "hello"),
@@ -20,17 +20,16 @@ class DrawerThreadSectionsTest {
                 summary("project-1", title = "Gamma", preview = "project body", groupKind = ThreadGroupKind.PROJECT, groupLabel = "项目A")
             ),
             selectedThreadId = "",
-            query = "match",
             expandedProjectGroups = emptySet()
         )
 
-        assertEquals(listOf("chat-2"), sections.chatThreads.map { it.id })
-        assertTrue(sections.projectGroups.isEmpty())
+        assertEquals(listOf("chat-2", "chat-1"), sections.chatThreads.map { it.id })
+        assertEquals(listOf("项目A"), sections.projectGroups.map { it.label })
         assertTrue(sections.archivedThreads.isEmpty())
     }
 
     @Test
-    fun filtersThreadsByProjectPathAndGitMetadata() {
+    fun keepsProjectGroupsIndependentOfPathAndGitMetadata() {
         val sections = buildDrawerThreadSections(
             threads = listOf(
                 summary("chat", title = "Alpha"),
@@ -51,50 +50,11 @@ class DrawerThreadSectionsTest {
                 )
             ),
             selectedThreadId = "",
-            query = "mobile-shell",
             expandedProjectGroups = emptySet()
         )
 
-        assertEquals(listOf("Mobile"), sections.projectGroups.map { it.label })
-        assertEquals(listOf("project-git"), sections.projectGroups.single().threads.map { it.id })
-        assertTrue(sections.chatThreads.isEmpty())
-    }
-
-    @Test
-    fun filtersThreadsByProjectGroupAndCwd() {
-        val groupSections = buildDrawerThreadSections(
-            threads = listOf(
-                summary("chat", title = "Alpha"),
-                summary(
-                    "project-label",
-                    title = "Beta",
-                    groupKind = ThreadGroupKind.PROJECT,
-                    groupLabel = "Codex Desktop",
-                    cwd = "D:/Projects/home/codexapp"
-                )
-            ),
-            selectedThreadId = "",
-            query = "desktop",
-            expandedProjectGroups = emptySet()
-        )
-        val cwdSections = buildDrawerThreadSections(
-            threads = listOf(
-                summary("chat", title = "Alpha"),
-                summary(
-                    "project-cwd",
-                    title = "Beta",
-                    groupKind = ThreadGroupKind.PROJECT,
-                    groupLabel = "Mobile",
-                    cwd = "D:/Projects/home/codexapp"
-                )
-            ),
-            selectedThreadId = "",
-            query = "codexapp",
-            expandedProjectGroups = emptySet()
-        )
-
-        assertEquals(listOf("project-label"), groupSections.projectGroups.single().threads.map { it.id })
-        assertEquals(listOf("project-cwd"), cwdSections.projectGroups.single().threads.map { it.id })
+        assertEquals(listOf("Home App", "Mobile"), sections.projectGroups.map { it.label })
+        assertEquals(listOf("chat"), sections.chatThreads.map { it.id })
     }
 
     @Test
@@ -106,7 +66,6 @@ class DrawerThreadSectionsTest {
                 summary("p1-new", updatedAt = 5_000L, groupKind = ThreadGroupKind.PROJECT, groupLabel = "项目A")
             ),
             selectedThreadId = "",
-            query = "",
             expandedProjectGroups = emptySet()
         )
 
@@ -114,49 +73,17 @@ class DrawerThreadSectionsTest {
     }
 
     @Test
-    fun searchPrioritizesProjectAndTitleMatchesBeforePreviewMatches() {
-        val sections = buildDrawerThreadSections(
-            threads = listOf(
-                summary(
-                    "current-preview-hit",
-                    updatedAt = 9_000L,
-                    title = "持续优化",
-                    preview = "继续测试 md2html 抽屉搜索",
-                    groupKind = ThreadGroupKind.PROJECT,
-                    groupLabel = "codexapp"
-                ),
-                summary(
-                    "target-project",
-                    updatedAt = 1_000L,
-                    title = "项目会话测试",
-                    preview = "Hello",
-                    groupKind = ThreadGroupKind.PROJECT,
-                    groupLabel = "md2html",
-                    cwd = "D:/Data/Documents/md2html"
-                )
-            ),
-            selectedThreadId = "current-preview-hit",
-            query = "md2html",
-            expandedProjectGroups = emptySet()
-        )
-
-        assertEquals(listOf("md2html", "codexapp"), sections.projectGroups.map { it.label })
-        assertEquals("target-project", sections.projectGroups.first().threads.single().id)
-    }
-
-    @Test
-    fun searchPrioritizesTitleMatchesWithinChatThreads() {
+    fun sortsChatThreadsByLatestUpdatedAt() {
         val sections = buildDrawerThreadSections(
             threads = listOf(
                 summary("preview-hit", updatedAt = 9_000L, title = "Recent", preview = "mentions weather"),
                 summary("title-hit", updatedAt = 1_000L, title = "Weather report", preview = "older")
             ),
             selectedThreadId = "",
-            query = "weather",
             expandedProjectGroups = emptySet()
         )
 
-        assertEquals(listOf("title-hit", "preview-hit"), sections.chatThreads.map { it.id })
+        assertEquals(listOf("preview-hit", "title-hit"), sections.chatThreads.map { it.id })
     }
 
     @Test
@@ -166,7 +93,6 @@ class DrawerThreadSectionsTest {
                 summary("project-1", updatedAt = 3_000L, groupKind = ThreadGroupKind.PROJECT, groupLabel = "项目A")
             ),
             selectedThreadId = "project-1",
-            query = "",
             expandedProjectGroups = emptySet()
         )
 
@@ -183,7 +109,6 @@ class DrawerThreadSectionsTest {
                 summary("archived-project", updatedAt = 3_000L, groupKind = ThreadGroupKind.PROJECT, groupLabel = "项目A", archived = true)
             ),
             selectedThreadId = "",
-            query = "",
             expandedProjectGroups = emptySet()
         )
 

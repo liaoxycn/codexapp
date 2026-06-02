@@ -33,19 +33,18 @@ codexapp/
 │  │     │  ├─ GatewayDialogState.kt     连接弹窗本地草稿状态
 │  │     │  ├─ GatewayDialogStatus.kt    连接状态提示条与说明文案
 │  │     │  └─ GatewayDialogFields.kt    地址/配对码输入字段
-│  │     ├─ drawer/                      会话抽屉、项目分组、搜索、排序、时间展示
+│  │     ├─ drawer/                      会话抽屉、项目分组、排序、时间展示
 │  │     │  ├─ DrawerContent.kt          抽屉顶层装配
 │  │     │  ├─ DrawerHeader.kt           抽屉标题、连接状态、header 操作按钮装配
-│  │     │  ├─ DrawerSectionsState.kt    抽屉搜索词、项目分组展开状态与 section 组合
+│  │     │  ├─ DrawerSectionsState.kt    项目分组展开状态与 section 组合
 │  │     │  ├─ DrawerThreadList.kt       项目区/普通会话区列表渲染
-│  │     │  ├─ DrawerThreadSections.kt   抽屉搜索/项目分组/展开策略纯函数
+│  │     │  ├─ DrawerThreadSections.kt   抽屉项目分组/展开策略纯函数
 │  │     │  ├─ DrawerFormatters.kt       会话排序与相对时间格式化纯函数
 │  │     │  ├─ DrawerSectionChrome.kt    抽屉 section 标题与 header 操作按钮
 │  │     │  ├─ DrawerConnectionStatus.kt 抽屉 gateway 连接状态行
 │  │     │  ├─ DrawerGroupHeader.kt      项目组标题装配与新建会话入口
 │  │     │  ├─ DrawerGroupHeaderContent.kt 项目标题、次级路径、展开箭头内容体
 │  │     │  ├─ DrawerGroupHeaderLogic.kt 项目组语义文案与标题尺寸纯函数
-│  │     │  ├─ DrawerSearchBar.kt        抽屉会话搜索框
 │  │     │  └─ DrawerThreadRow.kt        会话行渲染
 │  │     ├─ thread/                      线程消息列表、刷新、历史加载、连接横幅、空状态
 │  │     │  ├─ ThreadScreen.kt           线程页装配、连接横幅/下拉提示/滚到底部按钮

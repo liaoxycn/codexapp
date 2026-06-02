@@ -107,11 +107,6 @@ internal fun DrawerContent(
             },
         )
         Spacer(Modifier.height(10.dp))
-        DrawerSearchBar(
-            query = sectionsState.query,
-            onChange = sectionsState.onQueryChange
-        )
-        Spacer(Modifier.height(8.dp))
         DrawerThreadList(
             selectedThreadId = state.selectedThreadId,
             sections = sectionsState.sections,

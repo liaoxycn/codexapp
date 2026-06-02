@@ -41,7 +41,7 @@ export async function handleClientMessage(
   }
 
   if (message.type === "hello") {
-    handleHello(context, message, handlers);
+    await handleHello(context, message, handlers);
     return;
   }
 
@@ -67,11 +67,11 @@ export async function handleClientMessage(
   }
 }
 
-function handleHello(
+async function handleHello(
   context: ClientContext,
   message: GatewayHelloMessage,
-  handlers: Pick<ClientMessageHandlers, "backend" | "pairToken" | "sendSnapshot" | "sendStatus">
-): void {
+  handlers: Pick<ClientMessageHandlers, "backend" | "pairToken" | "sendSnapshot" | "sendStatus" | "runBackendAction">
+): Promise<void> {
   if (handlers.pairToken && message.pairToken !== handlers.pairToken) {
     console.log("[gateway] pair token rejected");
     handlers.sendStatus(context.socket, {
@@ -95,5 +95,9 @@ function handleHello(
     status: "connected",
     detail: `已配对 ${message.client ?? "android"} ${message.version ?? ""}`.trim(),
   });
+  if (context.selectedThreadId) {
+    await handlers.runBackendAction(context, () => handlers.backend().selectThread(context.selectedThreadId));
+    return;
+  }
   handlers.sendSnapshot(context, handlers.backend().getSnapshot(context.selectedThreadId));
 }

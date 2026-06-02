@@ -170,6 +170,7 @@ export function shouldRetainThreadRuntimeOverlay(
   thread: AppServerThread,
   existingRuntime?: {
     isGenerating?: boolean;
+    snapshot?: { isGenerating?: boolean } | null;
     currentTurnId?: string | null;
     transientOperation?: string | null;
     pendingApproval?: { text?: string | null } | null;
@@ -181,6 +182,7 @@ export function shouldRetainThreadRuntimeOverlay(
   }
   const hasLiveOverlay = Boolean(
     existingRuntime?.isGenerating ||
+      existingRuntime?.snapshot?.isGenerating ||
       existingRuntime?.currentTurnId ||
       existingRuntime?.transientOperation ||
       existingRuntime?.pendingApproval?.text
