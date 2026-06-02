@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.codexapp.model.MessageBlock
+import com.codexapp.model.MessageRole
 import com.codexapp.model.ThreadMessage
 import com.codexapp.ui.theme.CodexTheme
 
@@ -62,6 +64,24 @@ internal fun AssistantMessage(
     val canCopy = showActions && enableFinalActions && message.isFinal && finalText.isNotBlank()
     val canFork = showActions && enableFinalActions && message.isFinal && forkNumTurns != null
     val showFooterActions = showActions && (canCopy || canFork || message.durationMs != null)
+    val inlineProcessBlocks = remember(message.blocks, finalText) {
+        if (finalText.isBlank()) emptyList() else message.blocks.filter { it is MessageBlock.Reasoning || it is MessageBlock.Status }
+    }
+    val bodyBlocks = remember(message.blocks, finalText) {
+        if (finalText.isBlank()) message.blocks else message.blocks.filterNot { it is MessageBlock.Reasoning || it is MessageBlock.Status }
+    }
+    val stableProcessMessages = remember(processMessages, inlineProcessBlocks, message.id) {
+        if (inlineProcessBlocks.isEmpty()) {
+            processMessages
+        } else {
+            processMessages + ThreadMessage(
+                id = "${message.id}:inline-process",
+                role = MessageRole.ASSISTANT,
+                blocks = inlineProcessBlocks
+            )
+        }
+    }
+    val reservesProcessSlot = finalText.isNotBlank() || stableProcessMessages.isNotEmpty()
 
     Box(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -70,15 +90,6 @@ internal fun AssistantMessage(
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(if (compactMode) 3.dp else 5.dp)
         ) {
-            if (processMessages.isNotEmpty()) {
-                TurnProcessBlock(
-                    messages = processMessages,
-                    expanded = processExpanded,
-                    onToggle = { processExpanded = !processExpanded },
-                    compactMode = compactMode
-                )
-            }
-
             if (cards.hasFileChangeCard) {
                 FileChangeCard(
                     messageId = message.id,
@@ -100,7 +111,7 @@ internal fun AssistantMessage(
                 )
             }
 
-            message.blocks.forEach { block ->
+            bodyBlocks.forEach { block ->
                 when (block) {
                     is MessageBlock.Text -> ExpandableText(
                         text = block.value,
@@ -139,6 +150,15 @@ internal fun AssistantMessage(
                 }
             }
 
+            if (reservesProcessSlot) {
+                StableProcessSlot(
+                    messages = stableProcessMessages,
+                    expanded = processExpanded,
+                    onToggle = { processExpanded = !processExpanded },
+                    compactMode = compactMode
+                )
+            }
+
             if (showFooterActions) {
                 AssistantTurnFooterActions(
                     messageId = message.id,
@@ -156,6 +176,30 @@ internal fun AssistantMessage(
             }
         }
     }
+}
+
+@Composable
+private fun StableProcessSlot(
+    messages: List<ThreadMessage>,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    compactMode: Boolean
+) {
+    if (messages.isEmpty()) {
+        Spacer(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(processSlotMinHeight(compactMode))
+                .testTag("turn_process_reserved_slot")
+        )
+        return
+    }
+    TurnProcessBlock(
+        messages = messages,
+        expanded = expanded,
+        onToggle = onToggle,
+        compactMode = compactMode
+    )
 }
 
 @Composable
@@ -210,6 +254,8 @@ private fun TurnProcessBlock(
         }
     }
 }
+
+private fun processSlotMinHeight(compactMode: Boolean) = if (compactMode) 20.dp else 22.dp
 
 @Composable
 private fun AssistantTurnFooterActions(
