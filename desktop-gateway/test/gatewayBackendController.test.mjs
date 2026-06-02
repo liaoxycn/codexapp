@@ -39,6 +39,37 @@ function createBackend(overrides = {}) {
   };
 }
 
+function createSocket() {
+  return {
+    OPEN: 1,
+    readyState: 1,
+    sent: [],
+    send(payload) {
+      this.sent.push(JSON.parse(payload));
+    },
+  };
+}
+
+function createContext(overrides = {}) {
+  return {
+    socket: createSocket(),
+    selectedThreadId: "thread-1",
+    selectionVersion: 0,
+    authenticated: false,
+    unsubscribe: () => {},
+    snapshotTimer: null,
+    liveRefreshTimer: null,
+    listRefreshTimer: null,
+    lastSnapshotPayload: null,
+    lastSnapshotMessage: null,
+    snapshotRevision: 0,
+    supportsSnapshotPatch: false,
+    currentAction: null,
+    actionTraceType: null,
+    ...overrides,
+  };
+}
+
 test("GatewayBackendController switches to app backend after successful start", async () => {
   const appBackend = {
     ...createBackend(),
@@ -77,4 +108,38 @@ test("GatewayBackendController falls back to mock backend when app backend start
 
   assert.equal(controller.backend(), mockBackend);
   assert.equal(controller.backendLabel(), "mock");
+});
+
+test("GatewayBackendController serializes backend actions across clients", async () => {
+  const controller = new GatewayBackendController(
+    { workspacePath: "D:/Projects/Test" },
+    { mockBackend: createBackend() }
+  );
+  const calls = [];
+  let releaseFirst;
+  const firstDone = new Promise((resolve) => {
+    releaseFirst = resolve;
+  });
+
+  const first = controller.runBackendAction(createContext(), async () => {
+    calls.push("start:first");
+    await firstDone;
+    calls.push("end:first");
+    return createSnapshot({ selectedThreadId: "thread-1" });
+  });
+  const second = controller.runBackendAction(createContext(), async () => {
+    calls.push("start:second");
+    calls.push("end:second");
+    return createSnapshot({ selectedThreadId: "thread-2" });
+  });
+
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.deepEqual(calls, ["start:first"]);
+
+  releaseFirst();
+  await Promise.all([first, second]);
+
+  assert.deepEqual(calls, ["start:first", "end:first", "start:second", "end:second"]);
 });

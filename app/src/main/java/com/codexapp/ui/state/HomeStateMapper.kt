@@ -18,68 +18,75 @@ internal fun SessionRemoteState.toHomeState(
     isNewThreadDraft: Boolean,
     draftSubmissionInFlight: Boolean,
     isForkingThread: Boolean,
+    pendingSelectionThreadId: String? = null,
     pendingThreadTitle: String? = null,
     newThreadDraft: NewThreadDraft,
     composerConfigDraftOverride: NewThreadDraft? = null,
     appUpdate: AppUpdateState = AppUpdateState()
-): HomeUiState = HomeUiState(
-    threads = threads,
-    selectedThreadId = if (isNewThreadDraft) "" else selectedThreadId,
-    pendingSelectionThreadId = if (isNewThreadDraft) null else pendingSelectionThreadId,
-    pendingThreadTitle = if (isNewThreadDraft) null else pendingThreadTitle,
-    isThreadSwitching = if (isNewThreadDraft) false else isThreadSwitching,
-    messages = if (isNewThreadDraft && !draftSubmissionInFlight) emptyList() else messages,
-    hasMoreHistory = if (isNewThreadDraft) false else hasMoreHistory,
-    isLoadingOlder = if (isNewThreadDraft) false else isLoadingOlder,
-    composerText = composer,
-    composerFocusRequest = composerFocusRequest,
-    pendingEditResend = pendingEditResend,
-    isGenerating = if (isNewThreadDraft && !draftSubmissionInFlight) false else isGenerating,
-    showComposerDetails = composerExpanded,
-    chips = if (isNewThreadDraft) newThreadDraft.toComposerChips() else chips,
-    files = if (isNewThreadDraft) {
-        val draftCwd = newThreadDraft.cwd.replace('\\', '/').trimEnd('/')
-        files.filter { file ->
-            draftCwd.isNotBlank() && file.path.replace('\\', '/').startsWith("$draftCwd/")
-        }
-    } else {
-        files
-    },
-    slashCommands = slashCommands,
-    pendingApproval = if (isNewThreadDraft) null else pendingApproval,
-    cwd = if (isNewThreadDraft) newThreadDraft.cwd else cwd,
-    permissionSummary = if (isNewThreadDraft) newThreadDraft.permissionLabel else permissionSummary,
-    sessionConfig = if (isNewThreadDraft) {
-        newThreadDraft.toSessionConfig()
-    } else {
-        sessionConfig
-    },
-    isForkingThread = isForkingThread,
-    connectionStatus = connectionStatus,
-    connectionDetail = connectionDetail,
-    gatewayConfig = gatewayConfig,
-    desktopRestartRequired = desktopRestartRequired,
-    operationalNotices = operationalNotices,
-    appUpdate = appUpdate,
-    isDemoMode = isDemoMode,
-    isManualRefreshing = isManualRefreshing,
-    isNewThreadDraft = isNewThreadDraft,
-    newThreadDraft = newThreadDraft,
-    composerConfigDraft = resolveComposerConfigDraft(
+): HomeUiState {
+    val effectivePendingSelectionThreadId = pendingSelectionThreadId ?: this.pendingSelectionThreadId
+    val hasPendingSelection = !effectivePendingSelectionThreadId.isNullOrBlank()
+    return HomeUiState(
+        threads = threads,
+        selectedThreadId = if (isNewThreadDraft) "" else selectedThreadId,
+        pendingSelectionThreadId = effectivePendingSelectionThreadId,
+        pendingThreadTitle = pendingThreadTitle ?: this.pendingThreadTitle,
+        isThreadSwitching = hasPendingSelection || (!isNewThreadDraft && isThreadSwitching),
+        messages = if (isNewThreadDraft && !draftSubmissionInFlight) emptyList() else messages,
+        hasMoreHistory = if (isNewThreadDraft) false else hasMoreHistory,
+        isLoadingOlder = if (isNewThreadDraft) false else isLoadingOlder,
+        composerText = composer,
+        composerFocusRequest = composerFocusRequest,
+        pendingEditResend = pendingEditResend,
+        isGenerating = if (isNewThreadDraft && !draftSubmissionInFlight) false else isGenerating,
+        showComposerDetails = composerExpanded,
+        chips = if (isNewThreadDraft) newThreadDraft.toComposerChips() else chips,
+        files = if (isNewThreadDraft) {
+            val draftCwd = newThreadDraft.cwd.replace('\\', '/').trimEnd('/')
+            files.filter { file ->
+                draftCwd.isNotBlank() && file.path.replace('\\', '/').startsWith("$draftCwd/")
+            }
+        } else {
+            files
+        },
+        slashCommands = slashCommands,
+        pendingApproval = if (isNewThreadDraft) null else pendingApproval,
+        cwd = if (isNewThreadDraft) newThreadDraft.cwd else cwd,
+        permissionSummary = if (isNewThreadDraft) newThreadDraft.permissionLabel else permissionSummary,
+        sessionConfig = if (isNewThreadDraft) {
+            newThreadDraft.toSessionConfig()
+        } else {
+            sessionConfig
+        },
+        isForkingThread = isForkingThread,
+        connectionStatus = connectionStatus,
+        connectionDetail = connectionDetail,
+        gatewayConfig = gatewayConfig,
+        desktopRestartRequired = desktopRestartRequired,
+        operationalNotices = operationalNotices,
+        appUpdate = appUpdate,
+        isDemoMode = isDemoMode,
+        isManualRefreshing = isManualRefreshing,
         isNewThreadDraft = isNewThreadDraft,
         newThreadDraft = newThreadDraft,
-        overrideDraft = composerConfigDraftOverride,
-        sessionConfig = sessionConfig,
-        cwd = cwd,
-        configOptions = configOptions
-    ),
-    configOptions = configOptions,
-    diagnostics = diagnostics.copy(
-        selectedThreadId = if (isNewThreadDraft) "" else diagnostics.selectedThreadId,
-        pendingSelectionThreadId = if (isNewThreadDraft) "" else diagnostics.pendingSelectionThreadId,
-        isGenerating = if (isNewThreadDraft && !draftSubmissionInFlight) false else diagnostics.isGenerating
+        composerConfigDraft = resolveComposerConfigDraft(
+            isNewThreadDraft = isNewThreadDraft,
+            newThreadDraft = newThreadDraft,
+            overrideDraft = composerConfigDraftOverride,
+            sessionConfig = sessionConfig,
+            cwd = cwd,
+            configOptions = configOptions
+        ),
+        configOptions = configOptions,
+        diagnostics = diagnostics.copy(
+            selectedThreadId = if (isNewThreadDraft) "" else diagnostics.selectedThreadId,
+            pendingSelectionThreadId = effectivePendingSelectionThreadId.orEmpty().ifBlank {
+                if (isNewThreadDraft) "" else diagnostics.pendingSelectionThreadId
+            },
+            isGenerating = if (isNewThreadDraft && !draftSubmissionInFlight) false else diagnostics.isGenerating
+        )
     )
-)
+}
 
 private fun NewThreadDraft.toComposerChips(): List<ComposerChip> {
     return listOfNotNull(

@@ -56,10 +56,16 @@ export function attachGatewayClientSocket({
   handleMessage,
   onClosed,
 }: AttachGatewayClientSocketArgs): void {
+  let messageQueue = Promise.resolve();
   context.socket.on("message", (payload) => {
     const raw = payload.toString();
     console.log(`[gateway] inbound ${summarizeInboundMessage(raw)}`);
-    void handleMessage(context, raw);
+    messageQueue = messageQueue
+      .then(() => handleMessage(context, raw))
+      .catch((error) => {
+        const detail = error instanceof Error ? error.message : String(error);
+        console.error("[gateway] client message failed:", detail);
+      });
   });
 
   context.socket.on("close", () => {

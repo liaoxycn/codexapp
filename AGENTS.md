@@ -7,4 +7,4 @@
 ## 自测
 - 自测前(有代码功能改动)必须先运行 `node scripts/dev-run.mjs`，脚本包含重启后端、编译 APK、部署 APK、打开 App 等完整流程，确保测试的是最新代码
 - 自测时禁止对当前项目"codexapp"会话调试，防止打断当前会话
-- 每完成一个阶段性长任务完成后或用户主动说github发包，执行 `node scripts/github-release.mjs -Version <x.y.z> -VersionCode <正整数> -Notes "<更新说明>"`，脚本负责提交、push、release tag、触发流水线、日志记录、push/tag 三次重试；失败只写日志且对外正常结束。
+- 完成功能优化计划后或用户主动说发布，就执行发布脚本： `node scripts/github-release.mjs -Version <x.y.z> -VersionCode <正整数> -Notes "<更新说明>"`，脚本负责提交、push、release tag、触发流水线、日志记录、push/tag 三次重试；失败只写日志且对外正常结束。

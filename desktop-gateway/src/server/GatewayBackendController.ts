@@ -31,6 +31,7 @@ export class GatewayBackendController {
   private readonly restartDesktopFn: typeof restartCodexDesktop;
   private desktopRestartRequired = false;
   private useRealBackend = false;
+  private backendActionQueue = Promise.resolve();
 
   constructor(
     private readonly options: GatewayBackendControllerOptions,
@@ -84,13 +85,17 @@ export class GatewayBackendController {
     context: ClientContext,
     action: () => ClientSnapshot | Promise<ClientSnapshot>
   ): Promise<void> {
-    await runBackendAction(context, action, this.serverActionHandlers());
+    await this.enqueueBackendAction(() => runBackendAction(context, action, this.serverActionHandlers()));
   }
 
   async refreshSelectedThread(
     context: ClientContext,
     source: RefreshSource
   ): Promise<void> {
+    if (source === "manual") {
+      await this.enqueueBackendAction(() => refreshSelectedThread(context, source, this.serverActionHandlers()));
+      return;
+    }
     await refreshSelectedThread(context, source, this.serverActionHandlers());
   }
 
@@ -153,5 +158,19 @@ export class GatewayBackendController {
         this.refreshSelectedThread(context, source),
       refreshThreadList: (context: ClientContext) => this.refreshThreadList(context),
     };
+  }
+
+  private async enqueueBackendAction(action: () => Promise<void>): Promise<void> {
+    const previous = this.backendActionQueue;
+    let releaseCurrent: () => void;
+    this.backendActionQueue = new Promise((resolve) => {
+      releaseCurrent = resolve;
+    });
+    await previous;
+    try {
+      await action();
+    } finally {
+      releaseCurrent!();
+    }
   }
 }

@@ -230,6 +230,9 @@ class HomeUiStateStoreTest {
 
             assertTrue(store.state.value.isNewThreadDraft)
             assertEquals("", store.state.value.selectedThreadId)
+            assertEquals("thread-new", store.state.value.pendingSelectionThreadId)
+            assertEquals("thread-new", store.state.value.pendingThreadTitle)
+            assertTrue(store.state.value.isThreadSwitching)
 
             remoteState.value = remoteState.value.copy(selectedThreadId = "thread-old")
             store.syncRemoteSelection(remoteState.value)
@@ -237,6 +240,8 @@ class HomeUiStateStoreTest {
 
             assertTrue(store.state.value.isNewThreadDraft)
             assertEquals("", store.state.value.selectedThreadId)
+            assertEquals("thread-new", store.state.value.pendingSelectionThreadId)
+            assertTrue(store.state.value.isThreadSwitching)
 
             remoteState.value = remoteState.value.copy(selectedThreadId = "thread-new")
             store.syncRemoteSelection(remoteState.value)
@@ -244,6 +249,9 @@ class HomeUiStateStoreTest {
 
             assertFalse(store.state.value.isNewThreadDraft)
             assertEquals("thread-new", store.state.value.selectedThreadId)
+            assertEquals(null, store.state.value.pendingSelectionThreadId)
+            assertEquals(null, store.state.value.pendingThreadTitle)
+            assertFalse(store.state.value.isThreadSwitching)
             collector.cancel()
             scope.coroutineContext[Job]?.cancel()
         }
@@ -273,6 +281,40 @@ class HomeUiStateStoreTest {
 
             assertFalse(store.state.value.isNewThreadDraft)
             assertEquals("thread-current", store.state.value.selectedThreadId)
+            assertEquals(null, store.state.value.pendingSelectionThreadId)
+            assertEquals(null, store.state.value.pendingThreadTitle)
+            assertFalse(store.state.value.isThreadSwitching)
+            collector.cancel()
+            scope.coroutineContext[Job]?.cancel()
+        }
+    }
+
+    @Test
+    fun threadSelectionWithNoTitleStillTriggersPendingUiState() {
+        runBlocking {
+            val remoteState = MutableStateFlow(
+                SessionRemoteState(
+                    selectedThreadId = "thread-old",
+                    connectionStatus = ConnectionStatus.CONNECTED
+                )
+            )
+            val composerText = MutableStateFlow("")
+            val scope = CoroutineScope(Dispatchers.Unconfined + Job())
+            val store = HomeUiStateStore(
+                remoteState = remoteState,
+                composerText = composerText,
+                scope = scope
+            )
+            val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) { store.state.collect {} }
+
+            store.markThreadSelectionStarted("thread-new", null)
+            yield()
+
+            assertTrue(store.state.value.isNewThreadDraft)
+            assertEquals("", store.state.value.selectedThreadId)
+            assertEquals("thread-new", store.state.value.pendingSelectionThreadId)
+            assertEquals(null, store.state.value.pendingThreadTitle)
+            assertTrue(store.state.value.isThreadSwitching)
             collector.cancel()
             scope.coroutineContext[Job]?.cancel()
         }

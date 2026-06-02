@@ -3,7 +3,6 @@ package com.codexapp.ui.state
 import com.codexapp.data.SessionRepository
 import com.codexapp.model.HomeUiState
 import com.codexapp.model.AppUpdateStatus
-import com.codexapp.model.ConnectionStatus
 import com.codexapp.update.AppUpdateManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
@@ -68,7 +67,7 @@ internal class HomeViewModelDelegate(
 
     fun selectThread(id: String, onComplete: (Boolean) -> Unit = {}) {
         repositoryActions.selectThread(id) { sent ->
-            if (sent && canStartGatewayAction(id)) {
+            if (sent) {
                 val title = repository.state.value.threads.firstOrNull { it.id == id }?.title
                 uiStateStore.markThreadSelectionStarted(id, title)
                 if (repository.state.value.selectedThreadId == id) {
@@ -86,7 +85,7 @@ internal class HomeViewModelDelegate(
 
     fun forkThread(id: String, numTurns: Int? = null) {
         repositoryActions.forkThread(id, numTurns) { sent ->
-            if (sent && canStartGatewayAction(id)) {
+            if (sent) {
                 uiStateStore.markForkStarted(id)
                 scope.launch {
                     delay(12_000L)
@@ -103,7 +102,7 @@ internal class HomeViewModelDelegate(
     fun archiveThread(id: String, onComplete: (Boolean) -> Unit = {}) {
         val beforeSend = repository.state.value
         repositoryActions.archiveThread(id) { sent ->
-            if (sent && canStartGatewayAction(id)) {
+            if (sent) {
                 uiStateStore.markArchiveStarted(id, beforeSend)
                 uiStateStore.syncRemoteSelection(repository.state.value)
             }
@@ -241,10 +240,6 @@ internal class HomeViewModelDelegate(
         if (appUpdateManager.consumeStartupCheck()) {
             checkAppUpdate()
         }
-    }
-
-    private fun canStartGatewayAction(id: String): Boolean {
-        return id.isNotBlank() && uiStateStore.state.value.connectionStatus == ConnectionStatus.CONNECTED
     }
 
     fun downloadAppUpdate() {
