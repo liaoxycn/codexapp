@@ -34,6 +34,7 @@ internal fun rememberThreadPullRefreshController(
 ): ThreadPullRefreshController {
     var pullDistance by rememberSaveable(selectedThreadId) { mutableFloatStateOf(0f) }
     var pullVelocity by rememberSaveable(selectedThreadId) { mutableFloatStateOf(0f) }
+    var pullGestureObserved by rememberSaveable(selectedThreadId) { mutableStateOf(false) }
     var pullGestureStartedAtBottom by rememberSaveable(selectedThreadId) { mutableStateOf(false) }
     var lastPullSampleAt by rememberSaveable(selectedThreadId) { mutableStateOf(0L) }
     var pullHintVisibleUntil by rememberSaveable(selectedThreadId) { mutableStateOf(0L) }
@@ -63,22 +64,23 @@ internal fun rememberThreadPullRefreshController(
                 source: NestedScrollSource
             ): Offset {
                 if (isGenerating || isManualRefreshing) {
+                    pullDistance = 0f
+                    pullVelocity = 0f
+                    pullGestureObserved = false
+                    pullGestureStartedAtBottom = false
                     return Offset.Zero
                 }
-                if (!isAtBottom) {
-                    if (pullDistance != 0f || pullGestureStartedAtBottom) {
-                        pullDistance = 0f
-                        pullVelocity = 0f
-                        pullGestureStartedAtBottom = false
-                    }
-                    return Offset.Zero
-                }
-                val upwardDrag = (-consumed.y).coerceAtLeast(-available.y).coerceAtLeast(0f)
+                val upwardDrag = maxOf(-consumed.y, -available.y, 0f)
                 if (upwardDrag > 0f) {
-                    if (pullDistance <= 0f) {
-                        pullGestureStartedAtBottom = isAtBottom
-                    }
-                    if (!pullGestureStartedAtBottom) {
+                    val gesture = nextEdgePullGestureStart(
+                        observed = pullGestureObserved,
+                        startedAtEdge = pullGestureStartedAtBottom,
+                        isAtEdge = isAtBottom,
+                        dragDistance = upwardDrag
+                    )
+                    pullGestureObserved = gesture.observed
+                    pullGestureStartedAtBottom = gesture.startedAtEdge
+                    if (!shouldAccumulateEdgePull(isAtEdge = isAtBottom, gestureStartedAtEdge = pullGestureStartedAtBottom)) {
                         return Offset.Zero
                     }
                     val now = SystemClock.uptimeMillis()
@@ -102,11 +104,16 @@ internal fun rememberThreadPullRefreshController(
                         onRefreshCurrent()
                         pullDistance = 0f
                         pullVelocity = 0f
+                        pullGestureObserved = false
                         pullGestureStartedAtBottom = false
                     }
-                } else if ((consumed.y > 0f || available.y > 0f) && (pullDistance > 0f || pullGestureStartedAtBottom)) {
+                } else if (
+                    (consumed.y > 0f || available.y > 0f) &&
+                    (pullDistance > 0f || pullGestureObserved || pullGestureStartedAtBottom)
+                ) {
                     pullDistance = 0f
                     pullVelocity = 0f
+                    pullGestureObserved = false
                     pullGestureStartedAtBottom = false
                     refreshTriggered = false
                     pullGestureTick += 1
@@ -130,11 +137,13 @@ internal fun rememberThreadPullRefreshController(
                     onRefreshCurrent()
                     pullDistance = 0f
                     pullVelocity = 0f
+                    pullGestureObserved = false
                     pullGestureStartedAtBottom = false
                     return Velocity.Zero
                 }
                 pullDistance = 0f
                 pullVelocity = 0f
+                pullGestureObserved = false
                 pullGestureStartedAtBottom = false
                 return Velocity.Zero
             }
@@ -159,6 +168,7 @@ internal fun rememberThreadPullRefreshController(
         ) {
             pullDistance = 0f
             pullVelocity = 0f
+            pullGestureObserved = false
             pullGestureStartedAtBottom = false
         }
     }
@@ -186,3 +196,25 @@ internal fun shouldTriggerPullRefresh(
         !refreshTriggered &&
         pullDistance >= pullThreshold
 }
+
+internal data class EdgePullGestureStart(
+    val observed: Boolean,
+    val startedAtEdge: Boolean
+)
+
+internal fun nextEdgePullGestureStart(
+    observed: Boolean,
+    startedAtEdge: Boolean,
+    isAtEdge: Boolean,
+    dragDistance: Float
+): EdgePullGestureStart {
+    if (dragDistance <= 0f || observed) {
+        return EdgePullGestureStart(observed = observed, startedAtEdge = startedAtEdge)
+    }
+    return EdgePullGestureStart(observed = true, startedAtEdge = isAtEdge)
+}
+
+internal fun shouldAccumulateEdgePull(
+    isAtEdge: Boolean,
+    gestureStartedAtEdge: Boolean
+): Boolean = isAtEdge && gestureStartedAtEdge

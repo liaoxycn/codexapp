@@ -29,6 +29,7 @@ internal fun rememberThreadHistoryPagingController(
 ): ThreadHistoryPagingController {
     var topLoadArmed by rememberSaveable(state.selectedThreadId) { mutableStateOf(false) }
     var topPullDistance by rememberSaveable(state.selectedThreadId) { mutableFloatStateOf(0f) }
+    var topPullGestureObserved by rememberSaveable(state.selectedThreadId) { mutableStateOf(false) }
     var topPullStartedAtTop by rememberSaveable(state.selectedThreadId) { mutableStateOf(false) }
     var topLoadAnchorId by rememberSaveable(state.selectedThreadId) { mutableStateOf<String?>(null) }
     var topLoadAnchorOffset by rememberSaveable(state.selectedThreadId) { mutableIntStateOf(0) }
@@ -37,6 +38,7 @@ internal fun rememberThreadHistoryPagingController(
     fun resetTopPull() {
         topPullDistance = 0f
         topLoadArmed = false
+        topPullGestureObserved = false
         topPullStartedAtTop = false
     }
 
@@ -75,16 +77,17 @@ internal fun rememberThreadHistoryPagingController(
                     resetTopPull()
                     return Offset.Zero
                 }
-                if (!isAtTop) {
-                    resetTopPull()
-                    return Offset.Zero
-                }
-                val downwardDrag = consumed.y.coerceAtLeast(available.y).coerceAtLeast(0f)
+                val downwardDrag = maxOf(consumed.y, available.y, 0f)
                 if (downwardDrag > 0f) {
-                    if (topPullDistance <= 0f) {
-                        topPullStartedAtTop = isAtTop
-                    }
-                    if (!topPullStartedAtTop) {
+                    val gesture = nextEdgePullGestureStart(
+                        observed = topPullGestureObserved,
+                        startedAtEdge = topPullStartedAtTop,
+                        isAtEdge = isAtTop,
+                        dragDistance = downwardDrag
+                    )
+                    topPullGestureObserved = gesture.observed
+                    topPullStartedAtTop = gesture.startedAtEdge
+                    if (!shouldAccumulateEdgePull(isAtEdge = isAtTop, gestureStartedAtEdge = topPullStartedAtTop)) {
                         return Offset.Zero
                     }
                     topPullDistance = (topPullDistance + downwardDrag).coerceAtMost(220f)
@@ -105,7 +108,10 @@ internal fun rememberThreadHistoryPagingController(
                         resetTopPull()
                         onLoadOlderMessages()
                     }
-                } else if ((consumed.y < 0f || available.y < 0f) && topPullDistance > 0f) {
+                } else if (
+                    (consumed.y < 0f || available.y < 0f) &&
+                    (topPullDistance > 0f || topPullGestureObserved || topPullStartedAtTop)
+                ) {
                     resetTopPull()
                 }
                 return Offset.Zero
