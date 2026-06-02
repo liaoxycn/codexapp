@@ -1,7 +1,7 @@
 ## 本次更新
-- 修复 goal 目标会话多 turn 运行时移动端状态可能突然掉成空闲的问题。
-- active goal 更新现在会续租运行态并保留当前 turn，刷新不会被同秒 idle 快照误降级。
-- 修复 GitHub Release 更新说明发布链路，后续发版会自动带上 RELEASE_NOTES 内容。
+- 改造 GitHub 发版脚本，关键步骤写入 scripts/logs/github-release-*.log。
+- branch push 和 tag push 各自最多重试 3 次；失败只记录日志，脚本对外正常结束。
+- 更新 AGENTS 规范，外部 AI 只需传 Version、VersionCode、Notes 并等待脚本退出。
 
 ## Release 产物
 - CodexMobile.apk

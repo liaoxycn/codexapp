@@ -1,74 +1,153 @@
 #!/usr/bin/env node
 import { existsSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { isBlank, parseArgs, runCapture, runChecked } from "./script-utils.mjs";
+import { isBlank, parseArgs, runCapture } from "./script-utils.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(scriptDir, "..");
 const remote = "origin";
-const pushRetries = 5;
+const pushRetries = 3;
 
 async function main() {
+  const logger = await createReleaseLogger().catch(() => createConsoleLogger());
+  try {
+    await runRelease(logger);
+  } catch (error) {
+    await logger.log(`ERROR ${error.stack || error.message}`);
+    console.error(`[github-release] internal error recorded; see ${logger.relativePath}`);
+  } finally {
+    await logger.log("END");
+    console.log(`[github-release] log: ${logger.relativePath}`);
+  }
+}
+
+async function runRelease(logger) {
+  await logger.log("START");
   const options = parseReleaseArgs();
   validateOptions(options);
   const version = normalizeVersion(options.Version);
   const tag = `v${version}`;
-  const branch = await currentBranch();
+  const branch = await currentBranch(logger);
   const notes = await resolveNotes(options);
   const commitMessage = `Release ${tag}`;
-  const releaseState = await inspectReleaseState(tag, remote, pushRetries);
+  await logger.log(`release version=${version} versionCode=${options.VersionCode} tag=${tag} branch=${branch} notesLength=${notes.length}`);
+  const releaseState = await inspectReleaseState(tag, remote, pushRetries, logger);
+
+  if (releaseState.hasRemoteTag) {
+    await logger.log(`remote tag already exists; treat release as already triggered tag=${tag}`);
+    console.log(`[github-release] ${tag} already exists on ${remote}; nothing to trigger`);
+    return;
+  }
 
   if (!releaseState.hasLocalTag) {
+    await logger.log("update Android version and release notes");
     await updateAndroidVersion(version, options.VersionCode);
     await writeFile(path.join(root, "docs", "RELEASE_NOTES.md"), notes, "utf8");
 
-    await runChecked("git", ["add", "-A"], { cwd: root, displayName: "git add" });
-    await runChecked("git", ["commit", "-m", commitMessage], {
+    await runCheckedLogged("git", ["add", "-A"], { cwd: root, displayName: "git add", logger });
+    await runCheckedLogged("git", ["commit", "-m", commitMessage], {
       cwd: root,
       displayName: "git commit",
+      logger,
     });
   } else {
-    console.log(`[github-release] local ${tag} already points at HEAD; resuming push only`);
+    const message = `local ${tag} already points at HEAD; resuming push only`;
+    await logger.log(message);
+    console.log(`[github-release] ${message}`);
   }
-  await runCheckedWithRetry("git", ["push", remote, branch], {
+  const branchPushed = await runBestEffortWithRetry("git", ["push", remote, branch], {
     cwd: root,
     displayName: "git push branch",
     attempts: pushRetries,
+    logger,
   });
   if (!releaseState.hasLocalTag) {
-    await runChecked("git", ["tag", "-a", tag, "-m", commitMessage], {
+    await runCheckedLogged("git", ["tag", "-a", tag, "-m", commitMessage], {
       cwd: root,
       displayName: "git tag",
+      logger,
     });
   }
-  await runCheckedWithRetry("git", ["push", remote, tag], {
+  const tagPushed = await runBestEffortWithRetry("git", ["push", remote, tag], {
     cwd: root,
     displayName: "git push tag",
     attempts: pushRetries,
+    logger,
   });
 
-  console.log(`[github-release] pushed ${branch} and ${tag}`);
-  console.log("[github-release] tag push triggers GitHub Actions release build; not waiting for workflow completion");
+  await logger.log(`push result branch=${branchPushed ? "ok" : "failed"} tag=${tagPushed ? "ok" : "failed"}`);
+  console.log(`[github-release] branch push: ${branchPushed ? "ok" : "failed, recorded in log"}`);
+  console.log(`[github-release] tag push/action trigger: ${tagPushed ? "ok" : "failed after retries, recorded in log"}`);
+  console.log("[github-release] not waiting for workflow completion");
 }
 
-async function runCheckedWithRetry(file, args, { attempts, displayName, cwd }) {
+async function createReleaseLogger() {
+  const logDir = path.join(root, "scripts", "logs");
+  await mkdir(logDir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const filePath = path.join(logDir, `github-release-${stamp}.log`);
+  return {
+    filePath,
+    relativePath: path.relative(root, filePath),
+    async log(message) {
+      await appendFile(filePath, `[${new Date().toISOString()}] ${message}\n`, "utf8");
+    },
+  };
+}
+
+function createConsoleLogger() {
+  return {
+    relativePath: "console",
+    async log(message) {
+      console.error(`[github-release-log] ${message}`);
+    },
+  };
+}
+
+async function runCheckedLogged(file, args, { displayName, cwd, logger }) {
+  const result = await runCaptureLogged(file, args, { displayName, cwd, logger });
+  if (result.code !== 0) {
+    throw new Error(`${displayName || file} failed with exit code ${result.code}`);
+  }
+  return result;
+}
+
+async function runBestEffortWithRetry(file, args, { attempts, displayName, cwd, logger }) {
   const total = Math.max(1, Number.isInteger(attempts) ? attempts : 1);
-  let lastError;
   for (let attempt = 1; attempt <= total; attempt += 1) {
-    try {
-      await runChecked(file, args, { cwd, displayName });
-      return;
-    } catch (error) {
-      lastError = error;
-      if (attempt >= total) {
-        break;
-      }
-      console.warn(`[github-release] ${displayName} failed, retry ${attempt + 1}/${total}: ${error.message}`);
+    const result = await runCaptureLogged(file, args, { cwd, displayName: `${displayName} attempt ${attempt}/${total}`, logger });
+    if (result.code === 0) {
+      return true;
+    }
+    const detail = (result.stderr || result.stdout || `exit ${result.code}`).trim();
+    await logger.log(`${displayName} failed attempt=${attempt}/${total} detail=${detail}`);
+    if (attempt < total) {
+      console.warn(`[github-release] ${displayName} failed, retry ${attempt + 1}/${total}`);
     }
   }
-  throw lastError;
+  await logger.log(`${displayName} gave up after ${total} attempts`);
+  return false;
+}
+
+async function runCaptureLogged(file, args, { displayName, cwd, logger }) {
+  const label = displayName || `${file} ${args.join(" ")}`;
+  await logger.log(`RUN ${label}: ${file} ${args.map(quoteArg).join(" ")}`);
+  const result = await runCapture(file, args, { cwd });
+  await logger.log(`EXIT ${label}: code=${result.code} signal=${result.signal ?? ""}`);
+  if (result.stdout.trim()) {
+    await logger.log(`STDOUT ${label}:\n${result.stdout.trim()}`);
+  }
+  if (result.stderr.trim()) {
+    await logger.log(`STDERR ${label}:\n${result.stderr.trim()}`);
+  }
+  return result;
+}
+
+function quoteArg(value) {
+  const text = String(value);
+  return /\s/.test(text) ? JSON.stringify(text) : text;
 }
 
 function validateOptions(options) {
@@ -108,8 +187,12 @@ async function resolveNotes(options) {
   return `${trimmed}\n`;
 }
 
-async function currentBranch() {
-  const result = await runCapture("git", ["branch", "--show-current"], { cwd: root });
+async function currentBranch(logger) {
+  const result = await runCaptureLogged("git", ["branch", "--show-current"], {
+    cwd: root,
+    displayName: "git current branch",
+    logger,
+  });
   if (result.code !== 0) {
     throw new Error(result.stderr || "Failed to read current git branch");
   }
@@ -120,45 +203,63 @@ async function currentBranch() {
   return branch;
 }
 
-async function inspectReleaseState(tag, remote, attempts) {
+async function inspectReleaseState(tag, remote, attempts, logger) {
   const remoteTag = await runCaptureWithRetry("git", ["ls-remote", "--tags", remote, tag], {
     cwd: root,
     displayName: "git query remote tag",
     attempts,
+    logger,
   });
   if (remoteTag.stdout.trim()) {
-    throw new Error(`Remote tag already exists: ${tag}`);
+    return { hasLocalTag: false, hasRemoteTag: true };
   }
-  const localTag = await runCapture("git", ["rev-parse", "-q", "--verify", `refs/tags/${tag}`], { cwd: root });
+  const localTag = await runCaptureLogged("git", ["rev-parse", "-q", "--verify", `refs/tags/${tag}`], {
+    cwd: root,
+    displayName: "git query local tag",
+    logger,
+  });
   if (localTag.code !== 0) {
-    return { hasLocalTag: false };
+    return { hasLocalTag: false, hasRemoteTag: false };
   }
-  const tagCommit = await runCapture("git", ["rev-list", "-n", "1", tag], { cwd: root });
+  const tagCommit = await runCaptureLogged("git", ["rev-list", "-n", "1", tag], {
+    cwd: root,
+    displayName: "git resolve tag commit",
+    logger,
+  });
   if (tagCommit.code !== 0) {
     throw new Error(tagCommit.stderr || `Failed to resolve local tag: ${tag}`);
   }
-  const head = await runCapture("git", ["rev-parse", "HEAD"], { cwd: root });
+  const head = await runCaptureLogged("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    displayName: "git resolve HEAD",
+    logger,
+  });
   if (head.code !== 0) {
     throw new Error(head.stderr || "Failed to resolve HEAD");
   }
   if (tagCommit.stdout.trim() !== head.stdout.trim()) {
     throw new Error(`Local tag ${tag} exists but does not point at HEAD`);
   }
-  return { hasLocalTag: true };
+  return { hasLocalTag: true, hasRemoteTag: false };
 }
 
-async function runCaptureWithRetry(file, args, { attempts, displayName, cwd }) {
+async function runCaptureWithRetry(file, args, { attempts, displayName, cwd, logger }) {
   const total = Math.max(1, Number.isInteger(attempts) ? attempts : 1);
   let lastResult;
   for (let attempt = 1; attempt <= total; attempt += 1) {
-    const result = await runCapture(file, args, { cwd });
+    const result = await runCaptureLogged(file, args, {
+      cwd,
+      displayName: `${displayName} attempt ${attempt}/${total}`,
+      logger,
+    });
     if (result.code === 0) {
       return result;
     }
     lastResult = result;
     if (attempt < total) {
       const detail = (result.stderr || result.stdout || `exit ${result.code}`).trim();
-      console.warn(`[github-release] ${displayName} failed, retry ${attempt + 1}/${total}: ${detail}`);
+      await logger.log(`${displayName} failed attempt=${attempt}/${total} detail=${detail}`);
+      console.warn(`[github-release] ${displayName} failed, retry ${attempt + 1}/${total}`);
     }
   }
   throw new Error(lastResult?.stderr || lastResult?.stdout || `${displayName} failed`);
@@ -180,6 +281,7 @@ async function updateAndroidVersion(version, versionCode) {
 }
 
 main().catch((error) => {
-  console.error(`Error: ${error.message}`);
-  process.exitCode = 1;
+  console.error(`[github-release] unexpected wrapper error recorded: ${error.message}`);
+}).finally(() => {
+  process.exitCode = 0;
 });
