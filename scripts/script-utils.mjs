@@ -13,10 +13,11 @@ export function isBlank(value) {
   return value == null || String(value).trim() === "";
 }
 
-export function parseArgs(defaults, { booleanKeys = [] } = {}) {
+export function parseArgs(defaults, { booleanKeys = [], consumeRestKeys = [] } = {}) {
   const result = { ...defaults };
   const keyMap = new Map(Object.keys(defaults).map((key) => [normalizeKey(key), key]));
   const booleanSet = new Set(booleanKeys.map(normalizeKey));
+  const consumeRestSet = new Set(consumeRestKeys.map(normalizeKey));
   const args = process.argv.slice(2);
 
   for (let i = 0; i < args.length; i += 1) {
@@ -39,11 +40,29 @@ export function parseArgs(defaults, { booleanKeys = [] } = {}) {
       continue;
     }
 
+    if (consumeRestSet.has(normalized)) {
+      const values = [];
+      if (eqIndex >= 0) {
+        values.push(withoutDash.slice(eqIndex + 1));
+      } else {
+        const value = args[++i];
+        if (value == null || isKnownOptionToken(value, keyMap)) {
+          throw new Error(`Missing value for argument: ${raw}`);
+        }
+        values.push(value);
+      }
+      while (i + 1 < args.length && !isKnownOptionToken(args[i + 1], keyMap)) {
+        values.push(args[++i]);
+      }
+      result[key] = coerceArgValue(defaults[key], values.join("\n"));
+      continue;
+    }
+
     const value = eqIndex >= 0 ? withoutDash.slice(eqIndex + 1) : args[++i];
     if (value == null || value.startsWith("-")) {
       throw new Error(`Missing value for argument: ${raw}`);
     }
-    result[key] = typeof defaults[key] === "number" ? Number(value) : value;
+    result[key] = coerceArgValue(defaults[key], value);
   }
 
   return result;
@@ -203,6 +222,19 @@ function commandForPlatform(file, args) {
 
 function normalizeKey(key) {
   return key.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function isKnownOptionToken(value, keyMap) {
+  if (!String(value).startsWith("-")) {
+    return false;
+  }
+  const withoutDash = String(value).replace(/^-+/, "");
+  const rawKey = withoutDash.includes("=") ? withoutDash.slice(0, withoutDash.indexOf("=")) : withoutDash;
+  return keyMap.has(normalizeKey(rawKey));
+}
+
+function coerceArgValue(defaultValue, value) {
+  return typeof defaultValue === "number" ? Number(value) : value;
 }
 
 function parseBoolean(value) {

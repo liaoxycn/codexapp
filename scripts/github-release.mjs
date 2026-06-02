@@ -166,11 +166,14 @@ function validateOptions(options) {
 }
 
 function parseReleaseArgs() {
-  return parseArgs({
-    Version: "",
-    VersionCode: 0,
-    Notes: "",
-  });
+  return parseArgs(
+    {
+      Version: "",
+      VersionCode: 0,
+      Notes: "",
+    },
+    { consumeRestKeys: ["Notes"] }
+  );
 }
 
 function normalizeVersion(version) {
