@@ -1,1 +1,1 @@
-重写移动端 assistant 过程流，按 Codex Desktop 区分 commentary 过程文本和 final 回复；补齐 gateway ThreadItem 过程类型映射；修复运行中 delta 提前进入最终回复导致闪动和重复的问题。
+补充修复移动端 assistant 过程流：turn 完成后的 snapshot rebase 保留 live 收到的命令、工具、思考等过程消息，并保持历史顺序，避免完成刷新后只剩 final 回复。

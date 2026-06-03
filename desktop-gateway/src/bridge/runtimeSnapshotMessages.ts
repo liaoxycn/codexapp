@@ -125,8 +125,9 @@ export function rebaseSnapshotMessagesFromThread(state: ThreadRuntimeState): voi
   }
 
   const allMessages = collectThreadMessages(state.thread);
-  state.snapshot.messages = trimMessagesToWindow(allMessages, state.historyWindow);
-  state.snapshot.hasMoreHistory = allMessages.length > state.historyWindow;
+  const mergedMessages = mergeSnapshotMessages(allMessages, state.snapshot.messages);
+  state.snapshot.messages = trimMessagesToWindow(mergedMessages, state.historyWindow);
+  state.snapshot.hasMoreHistory = mergedMessages.length > state.historyWindow;
   normalizeAllCompactMessages(state);
 }
 
@@ -224,19 +225,40 @@ export function mergeSnapshotMessages(
   baseMessages: GatewayMessagePayload[],
   liveMessages: GatewayMessagePayload[]
 ): GatewayMessagePayload[] {
-  const merged = [...baseMessages];
+  const merged: GatewayMessagePayload[] = [];
+  const consumedBaseIndexes = new Set<number>();
+  let baseCursor = 0;
   const baseHasAnyRealAssistant = baseMessages.some(
     (entry) => entry.role === "assistant" && entry.blocks.some((block) => block.kind === "text" && block.value.trim().length > 0)
   );
+  const appendBaseUntil = (targetIndex: number) => {
+    while (baseCursor < targetIndex) {
+      if (!consumedBaseIndexes.has(baseCursor)) {
+        merged.push(baseMessages[baseCursor]!);
+        consumedBaseIndexes.add(baseCursor);
+      }
+      baseCursor += 1;
+    }
+  };
 
   for (const message of liveMessages) {
-    const existingIndex = merged.findIndex((entry) => entry.id === message.id);
-    if (existingIndex >= 0) {
-      merged[existingIndex] = mergeMessageBlocks(merged[existingIndex], message);
+    const baseIndex = baseMessages.findIndex((entry) => entry.id === message.id);
+    if (baseIndex >= 0) {
+      appendBaseUntil(baseIndex);
+      merged.push(mergeMessageBlocks(baseMessages[baseIndex]!, message));
+      consumedBaseIndexes.add(baseIndex);
+      baseCursor = Math.max(baseCursor, baseIndex + 1);
       continue;
     }
 
-    if (isOptimisticUserMessage(message) && merged.some((entry) => isSameUserMessage(entry, message))) {
+    const matchingBaseUserIndex = isOptimisticUserMessage(message)
+      ? baseMessages.findIndex((entry, index) => !consumedBaseIndexes.has(index) && isSameUserMessage(entry, message))
+      : -1;
+    if (matchingBaseUserIndex >= 0) {
+      appendBaseUntil(matchingBaseUserIndex);
+      merged.push(baseMessages[matchingBaseUserIndex]!);
+      consumedBaseIndexes.add(matchingBaseUserIndex);
+      baseCursor = Math.max(baseCursor, matchingBaseUserIndex + 1);
       continue;
     }
 
@@ -254,6 +276,12 @@ export function mergeSnapshotMessages(
     }
 
     merged.push(message);
+  }
+
+  for (const [index, message] of baseMessages.entries()) {
+    if (!consumedBaseIndexes.has(index)) {
+      merged.push(message);
+    }
   }
 
   return merged;

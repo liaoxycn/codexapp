@@ -1,0 +1,19 @@
+{
+  "startedAt": "2026-06-03T15:44:26.061Z",
+  "finishedAt": "2026-06-03T15:44:34.760Z",
+  "status": "triggered",
+  "logPath": "scripts\\release\\github-release-2026-06-03T15-44-26-060Z.log",
+  "externalExitCode": 0,
+  "version": "0.2.41",
+  "versionCode": 61,
+  "tag": "v0.2.41",
+  "branch": "master",
+  "notesLength": 126,
+  "releaseState": {
+    "hasLocalTag": false,
+    "hasRemoteTag": false
+  },
+  "branchPushed": true,
+  "tagPushed": true,
+  "githubActionsTrigger": "attempted"
+}

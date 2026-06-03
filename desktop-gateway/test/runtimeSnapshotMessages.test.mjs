@@ -80,6 +80,71 @@ test("mergeSnapshotMessages drops live assistant placeholder after real assistan
   assert.deepEqual(merged, baseMessages);
 });
 
+test("mergeSnapshotMessages preserves live process items before final history text", () => {
+  const baseMessages = [
+    {
+      id: "user-1",
+      role: "user",
+      blocks: [{ kind: "text", value: "run random" }],
+    },
+    {
+      id: "assistant-final",
+      role: "assistant",
+      isFinal: true,
+      blocks: [{ kind: "text", value: "861945488" }],
+    },
+  ];
+  const liveMessages = [
+    {
+      id: "user-live-1",
+      role: "user",
+      blocks: [{ kind: "text", value: "run random" }],
+    },
+    {
+      id: "reasoning-1",
+      role: "assistant",
+      blocks: [{ kind: "reasoning", value: "正在思考" }],
+    },
+    {
+      id: "cmd-1",
+      role: "assistant",
+      blocks: [{ kind: "commandSummary", value: "已运行命令" }],
+    },
+  ];
+
+  const merged = mergeSnapshotMessages(baseMessages, liveMessages);
+
+  assert.deepEqual(
+    merged.map((message) => [message.id, message.blocks[0].kind, message.blocks[0].value]),
+    [
+      ["user-1", "text", "run random"],
+      ["reasoning-1", "reasoning", "正在思考"],
+      ["cmd-1", "commandSummary", "已运行命令"],
+      ["assistant-final", "text", "861945488"],
+    ]
+  );
+});
+
+test("mergeSnapshotMessages keeps older base history before live-only process items", () => {
+  const baseMessages = [
+    { id: "old-user", role: "user", blocks: [{ kind: "text", value: "old" }] },
+    { id: "old-assistant", role: "assistant", isFinal: true, blocks: [{ kind: "text", value: "old answer" }] },
+    { id: "user-1", role: "user", blocks: [{ kind: "text", value: "run random" }] },
+    { id: "assistant-final", role: "assistant", isFinal: true, blocks: [{ kind: "text", value: "861945488" }] },
+  ];
+  const liveMessages = [
+    { id: "user-live-1", role: "user", blocks: [{ kind: "text", value: "run random" }] },
+    { id: "cmd-1", role: "assistant", blocks: [{ kind: "commandSummary", value: "已运行命令" }] },
+  ];
+
+  const merged = mergeSnapshotMessages(baseMessages, liveMessages);
+
+  assert.deepEqual(
+    merged.map((message) => message.id),
+    ["old-user", "old-assistant", "user-1", "cmd-1", "assistant-final"]
+  );
+});
+
 test("collectThreadMessages marks only completed assistant text as final", () => {
   const messages = collectThreadMessages({
     id: "thread-1",

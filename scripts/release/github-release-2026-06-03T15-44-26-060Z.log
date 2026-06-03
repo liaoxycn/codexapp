@@ -10,3 +10,57 @@ master
 [2026-06-03T15:44:27.597Z] EXIT git query local tag: code=1 signal=
 [2026-06-03T15:44:27.612Z] update Android version and release notes
 [2026-06-03T15:44:27.615Z] RUN git add: git add -A
+[2026-06-03T15:44:27.765Z] EXIT git add: code=0 signal=
+[2026-06-03T15:44:27.766Z] STDERR git add:
+warning: in the working copy of 'AGENTS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/build.gradle.kts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/androidTest/java/com/codexapp/ui/ThreadScreenVisibilityTest.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/main/java/com/codexapp/data/gateway/GatewaySnapshotMapper.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/main/java/com/codexapp/model/MessageModels.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/main/java/com/codexapp/ui/message/AssistantMessages.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/main/java/com/codexapp/ui/message/AssistantProcessStream.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/main/java/com/codexapp/ui/message/AssistantTurnUiModel.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/main/java/com/codexapp/ui/message/MessageRevision.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/main/java/com/codexapp/ui/message/MessageTurnActions.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/main/java/com/codexapp/ui/message/SystemStatusMessages.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/test/java/com/codexapp/ui/GatewaySnapshotMapperTest.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/test/java/com/codexapp/ui/MessageTurnActionsTest.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/appServerConfigRpc.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/bridge/itemNotifications.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/bridge/messageMapping.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/bridge/runtimeAssistantMessages.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/bridge/runtimeMessages.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/bridge/runtimeSnapshotMessages.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/protocol.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/test/appServerClient.test.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/test/bridgeBackend.test.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/test/messageMapping.test.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/test/runtimeAssistantMessages.test.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/test/runtimeMessages.test.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/test/runtimeSnapshotMessages.test.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/MOBILE_GATEWAY_PROTOCOL.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/RELEASE_NOTES.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/github-release.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/release/github-release-2026-06-03T15-44-26-060Z.log', LF will be replaced by CRLF the next time Git touches it
+[2026-06-03T15:44:27.766Z] RUN git commit: git commit -m "Release v0.2.41"
+[2026-06-03T15:44:27.945Z] EXIT git commit: code=0 signal=
+[2026-06-03T15:44:27.945Z] STDOUT git commit:
+[master dc397a0] Release v0.2.41
+ 30 files changed, 707 insertions(+), 125 deletions(-)
+ create mode 100644 scripts/release/github-release-2026-06-03T15-44-26-060Z.log
+[2026-06-03T15:44:27.946Z] RUN git push branch attempt 1/3: git push origin master
+[2026-06-03T15:44:31.329Z] EXIT git push branch attempt 1/3: code=0 signal=
+[2026-06-03T15:44:31.329Z] STDERR git push branch attempt 1/3:
+To https://github.com/liaoxycn/codexapp.git
+   402a1ef..dc397a0  master -> master
+[2026-06-03T15:44:31.330Z] RUN git tag: git tag -a v0.2.41 -m "Release v0.2.41"
+[2026-06-03T15:44:31.452Z] EXIT git tag: code=0 signal=
+[2026-06-03T15:44:31.453Z] RUN git push tag attempt 1/3: git push origin v0.2.41
+[2026-06-03T15:44:34.757Z] EXIT git push tag attempt 1/3: code=0 signal=
+[2026-06-03T15:44:34.758Z] STDERR git push tag attempt 1/3:
+To https://github.com/liaoxycn/codexapp.git
+ * [new tag]         v0.2.41 -> v0.2.41
+[2026-06-03T15:44:34.758Z] push result branch=ok tag=ok
+[2026-06-03T15:44:34.759Z] githubActionsTrigger=attempted
+[2026-06-03T15:44:34.761Z] externalExitCode=0
+[2026-06-03T15:44:34.762Z] END
