@@ -1,5 +1,8 @@
 package com.codexapp.model
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class HomeUiState(
     val threads: List<ThreadSummary>,
     val selectedThreadId: String,
@@ -38,6 +41,7 @@ data class HomeUiState(
     val diagnostics: StateDiagnostics = StateDiagnostics()
 )
 
+@Immutable
 data class NewThreadDraft(
     val cwd: String = "",
     val model: String = "",
@@ -60,6 +64,7 @@ data class NewThreadDraft(
         get() = permissionPreset.sandboxMode
 }
 
+@Immutable
 data class SessionConfig(
     val permissionMode: String = "",
     val provider: String = "",
@@ -67,6 +72,7 @@ data class SessionConfig(
     val reasoningEffort: String = ""
 )
 
+@Immutable
 data class GatewayConfigOptions(
     val models: List<GatewayConfigOption> = emptyList(),
     val reasoningEfforts: List<GatewayConfigOption> = emptyList(),
@@ -74,18 +80,21 @@ data class GatewayConfigOptions(
     val defaults: GatewayConfigDefaults = GatewayConfigDefaults()
 )
 
+@Immutable
 data class GatewayConfigOption(
     val label: String,
     val value: String,
     val description: String = ""
 )
 
+@Immutable
 data class GatewayConfigDefaults(
     val model: String = "",
     val reasoningEffort: String = "",
     val sandboxMode: String = ""
 )
 
+@Immutable
 data class PendingEditResendState(
     val threadId: String,
     val rollbackNumTurns: Int

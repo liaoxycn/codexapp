@@ -39,6 +39,8 @@ fun CodexApp(
         threads = state.threads,
         selectedThreadId = state.selectedThreadId,
         isNewThreadDraft = state.isNewThreadDraft,
+        isGenerating = state.isGenerating,
+        pendingApproval = state.pendingApproval,
     )
     var pendingForkNumTurns by remember { mutableStateOf<Int?>(null) }
     BackHandler(enabled = true, onBack = controller.handleBackPress)

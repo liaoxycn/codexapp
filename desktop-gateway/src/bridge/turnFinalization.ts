@@ -9,6 +9,7 @@ import {
 } from "./runtimeSnapshotMessages.js";
 import { clearRunningLease, hasRunningActivityLease } from "./runningLease.js";
 import {
+  hasActiveRuntimeWork,
   markRuntimeIdle,
   resolveRuntimeStatus,
 } from "./runtimeStatusRegistry.js";
@@ -56,8 +57,15 @@ export async function finalizeTurnRuntimeState({
     rebaseSnapshotMessagesFromThread(state);
     const nextTurnStarted =
       completedTurnId != null && state.currentTurnId != null && state.currentTurnId !== completedTurnId;
+    const hasOtherActiveWork = Boolean(
+      state.transientOperation ||
+        state.activeHookIds.length > 0 ||
+        state.activeTurnIds.some((id) => id !== completedTurnId) ||
+        (completedTurnId == null && state.currentTurnId)
+    );
     const keepRunning =
       nextTurnStarted ||
+      (!shouldShowStopped && turnStatus !== "failed" && hasOtherActiveWork) ||
       (!shouldShowStopped &&
         turnStatus !== "failed" &&
         resolveRuntimeStatus(state) === "running" &&

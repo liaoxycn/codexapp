@@ -19,6 +19,7 @@ import {
   markRuntimeIdle,
   markRuntimeTurnFinished,
   markRuntimeTurnStarted,
+  hasActiveRuntimeWork,
   resolveRuntimeStatus,
 } from "./runtimeStatusRegistry.js";
 import { clearCurrentTurnStarted, markCurrentTurnStarted } from "./runtimeTurnTiming.js";
@@ -45,7 +46,7 @@ export async function handleThreadStatusChanged(
     return;
   }
 
-  if (state.currentTurnId || state.stopRequested || hasRunningLease(state)) {
+  if (hasActiveRuntimeWork(state) || state.stopRequested || hasRunningLease(state)) {
     await deps.finalizeTurnState(threadId);
     return;
   }

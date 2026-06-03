@@ -4,6 +4,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +18,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.clickable
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.Text
@@ -34,66 +36,60 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.codexapp.model.MessageBlock
-import com.codexapp.model.MessageRole
 import com.codexapp.model.ThreadMessage
 import com.codexapp.ui.theme.CodexTheme
+import kotlinx.coroutines.delay
 
 @Composable
 internal fun AssistantMessage(
     message: ThreadMessage,
     processMessages: List<ThreadMessage>,
+    isRunning: Boolean,
     compactMode: Boolean,
     messageIndex: Int,
     showActions: Boolean,
     enableFinalActions: Boolean,
+    preferPlainText: Boolean,
     onForkFromMessage: (Int) -> Unit
 ) {
     var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
     var reasoningExpanded by rememberSaveable(message.id + ":reasoning") { mutableStateOf(false) }
-    val forkNumTurns = message.forkNumTurns
-    val finalText = remember(message.blocks) { message.assistantFinalText() }
     val context = LocalContext.current
-    val canCopy = showActions && enableFinalActions && message.isFinal && finalText.isNotBlank()
-    val canFork = showActions && enableFinalActions && message.isFinal && forkNumTurns != null
-    val showFooterActions = showActions && (canCopy || canFork)
-    val inlineProcessBlocks = remember(message.blocks) {
-        message.blocks.filter { it.isAssistantProcessBlock() }
+    val turn = remember(
+        message,
+        processMessages,
+        isRunning,
+        showActions,
+        enableFinalActions,
+        preferPlainText
+    ) {
+        buildAssistantTurnUiModel(
+            message = message,
+            processMessages = processMessages,
+            isRunning = isRunning,
+            showActions = showActions,
+            enableFinalActions = enableFinalActions,
+            preferPlainText = preferPlainText
+        )
     }
-    val bodyBlocks = remember(message.blocks) {
-        message.blocks.filterNot { it.isAssistantProcessBlock() }
+    val autoExpandProcess = turn.isRunning || (!message.isFinal && turn.hasProcess && turn.bodyBlocks.isEmpty())
+    var processExpanded by rememberSaveable(message.id + ":process") { mutableStateOf(autoExpandProcess) }
+    LaunchedEffect(turn.isRunning, turn.hasProcess, message.isFinal, turn.bodyBlocks.isEmpty()) {
+        processExpanded = autoExpandProcess
     }
-    val stableProcessMessages = remember(processMessages, inlineProcessBlocks, message.id) {
-        if (inlineProcessBlocks.isEmpty()) {
-            processMessages
-        } else {
-            processMessages + ThreadMessage(
-                id = "${message.id}:inline-process",
-                role = MessageRole.ASSISTANT,
-                blocks = inlineProcessBlocks
-            )
-        }
-    }
-    val processStartsExpanded = remember(stableProcessMessages) {
-        stableProcessMessages.any { processMessage ->
-            processMessage.blocks.any { it.isAssistantArtifactProcessBlock() }
-        }
-    }
-    var processExpanded by rememberSaveable(message.id + ":process") { mutableStateOf(processStartsExpanded) }
-    LaunchedEffect(processStartsExpanded) {
-        if (processStartsExpanded) {
-            processExpanded = true
-        }
-    }
-    val processedHeader = buildProcessedHeader(message.durationMs)
+    val processedHeader = rememberAssistantProcessedHeader(
+        durationMs = turn.durationMs,
+        isRunning = turn.isRunning
+    )
 
     Box(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -102,36 +98,47 @@ internal fun AssistantMessage(
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(if (compactMode) 3.dp else 5.dp)
         ) {
-            AssistantProcessedHeader(processedHeader, compactMode)
-
-            StableProcessSlot(
-                messages = stableProcessMessages,
+            AssistantProcessedHeader(
+                text = processedHeader,
                 expanded = processExpanded,
-                onToggle = { processExpanded = !processExpanded },
+                hasProcess = turn.hasProcess,
+                compactMode = compactMode,
+                onToggle = {
+                    if (turn.hasProcess) {
+                        processExpanded = !processExpanded
+                    }
+                }
+            )
+
+            AssistantProcessSlot(
+                messages = turn.processMessages,
+                visible = processExpanded && turn.hasProcess,
+                reserveRunningSpace = turn.isRunning,
                 compactMode = compactMode
             )
 
             StableAssistantBodySlot(
-                blocks = bodyBlocks,
+                blocks = turn.bodyBlocks,
                 expanded = expanded,
                 reasoningExpanded = reasoningExpanded,
                 onToggleExpanded = { expanded = !expanded },
                 onToggleReasoning = { reasoningExpanded = !reasoningExpanded },
+                renderMarkdown = !turn.preferPlainText,
                 compactMode = compactMode,
-                messageId = message.id,
+                messageId = turn.id,
                 messageIndex = messageIndex
             )
 
             AssistantTurnFooterActions(
-                messageId = message.id,
-                canShowActions = showFooterActions,
-                canCopy = canCopy,
-                canFork = canFork,
+                messageId = turn.id,
+                canShowActions = turn.showFooterActions,
+                canCopy = turn.canCopy,
+                canFork = turn.canFork,
                 compactMode = compactMode,
-                onCopyFinalText = { context.copyTextToClipboard("Codex 回复", finalText) },
+                onCopyFinalText = { context.copyTextToClipboard("Codex 回复", turn.finalText) },
                 onForkFromMessage = {
-                    if (forkNumTurns != null) {
-                        onForkFromMessage(forkNumTurns)
+                    if (turn.forkNumTurns != null) {
+                        onForkFromMessage(turn.forkNumTurns)
                     }
                 }
             )
@@ -140,91 +147,40 @@ internal fun AssistantMessage(
 }
 
 @Composable
-private fun AssistantProcessedHeader(text: String?, compactMode: Boolean) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(if (compactMode) 22.dp else 26.dp)
-            .testTag("assistant_processed_header")
+private fun AssistantProcessedHeader(
+    text: String,
+    expanded: Boolean,
+    hasProcess: Boolean,
+    compactMode: Boolean,
+    onToggle: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
     ) {
-        if (text != null) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(if (compactMode) 22.dp else 26.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(999.dp))
+                .clickable(enabled = hasProcess, onClick = onToggle)
+                .semantics {
+                    contentDescription = when {
+                        !hasProcess -> text
+                        expanded -> "$text，收起处理过程"
+                        else -> "$text，展开处理过程"
+                    }
+                }
+                .testTag("assistant_processed_header"),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
                 text = text,
                 color = CodexTheme.colors.textSecondary,
                 fontSize = if (compactMode) 11.sp else 12.sp,
                 fontWeight = FontWeight.Medium,
-                modifier = Modifier.align(Alignment.TopStart)
             )
-        }
-        Spacer(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(CodexTheme.colors.border)
-        )
-    }
-}
-
-@Composable
-private fun StableProcessSlot(
-    messages: List<ThreadMessage>,
-    expanded: Boolean,
-    onToggle: () -> Unit,
-    compactMode: Boolean
-) {
-    if (messages.isEmpty()) {
-        Spacer(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(processSlotMinHeight(compactMode))
-                .testTag("turn_process_reserved_slot")
-        )
-        return
-    }
-    TurnProcessBlock(
-        messages = messages,
-        expanded = expanded,
-        onToggle = onToggle,
-        compactMode = compactMode
-    )
-}
-
-@Composable
-private fun TurnProcessBlock(
-    messages: List<ThreadMessage>,
-    expanded: Boolean,
-    onToggle: () -> Unit,
-    compactMode: Boolean
-) {
-    val count = messages.sumOf { it.blocks.size }.coerceAtLeast(messages.size)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = processSlotMinHeight(compactMode)),
-        verticalArrangement = Arrangement.spacedBy(if (compactMode) 3.dp else 5.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(999.dp))
-                    .clickable(onClick = onToggle)
-                    .clearAndSetSemantics { contentDescription = if (expanded) "收起处理过程" else "展开处理过程" }
-                    .padding(horizontal = 2.dp, vertical = 3.dp)
-                    .testTag("turn_process_toggle")
-            ) {
-                Text(
-                    text = buildProcessHeaderTitle(count),
-                    color = CodexTheme.colors.textSecondary,
-                    fontSize = if (compactMode) 10.sp else 11.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(Modifier.width(6.dp))
+            if (hasProcess) {
+                Spacer(Modifier.width(4.dp))
                 Icon(
                     imageVector = if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
@@ -233,19 +189,45 @@ private fun TurnProcessBlock(
                 )
             }
         }
-        if (expanded) {
-            messages.forEachIndexed { index, processMessage ->
-                AssistantProcessMessage(
-                    message = processMessage,
-                    compactMode = compactMode,
-                    messageIndex = index
-                )
-            }
+        Spacer(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(CodexTheme.colors.border)
+        )
+    }
+}
+
+@Composable
+private fun AssistantProcessSlot(
+    messages: List<ThreadMessage>,
+    visible: Boolean,
+    reserveRunningSpace: Boolean,
+    compactMode: Boolean
+) {
+    if (!visible && !reserveRunningSpace) {
+        return
+    }
+    val modifier = if (reserveRunningSpace) {
+        Modifier
+            .fillMaxWidth()
+            .height(processSlotStableHeight(compactMode))
+            .clipToBounds()
+            .verticalScroll(rememberScrollState())
+    } else {
+        Modifier.fillMaxWidth()
+    }
+    Column(modifier = modifier) {
+        if (visible) {
+            AssistantProcessStream(
+                messages = messages,
+                compactMode = compactMode
+            )
         }
     }
 }
 
-private fun processSlotMinHeight(compactMode: Boolean) = if (compactMode) 26.dp else 30.dp
+private fun processSlotStableHeight(compactMode: Boolean) = if (compactMode) 40.dp else 46.dp
 
 @Composable
 private fun StableAssistantBodySlot(
@@ -254,6 +236,7 @@ private fun StableAssistantBodySlot(
     reasoningExpanded: Boolean,
     onToggleExpanded: () -> Unit,
     onToggleReasoning: () -> Unit,
+    renderMarkdown: Boolean,
     compactMode: Boolean,
     messageId: String,
     messageIndex: Int
@@ -275,7 +258,8 @@ private fun StableAssistantBodySlot(
                     fontSize = if (compactMode) 12.sp else 13.sp,
                     lineHeight = if (compactMode) 17.sp else 19.sp,
                     maxCollapsedLines = if (compactMode) 6 else 8,
-                    collapseEnabled = false
+                    collapseEnabled = false,
+                    parseMarkdown = renderMarkdown
                 )
 
                 is MessageBlock.Code -> if (!block.language.equals("shell", ignoreCase = true)) {
@@ -362,17 +346,42 @@ private fun AssistantTurnFooterActions(
     }
 }
 
-internal fun buildProcessHeaderTitle(count: Int): String {
-    return "已处理 $count 项"
-}
-
 internal fun buildProcessedHeader(durationMs: Long?): String? {
     val duration = durationMs?.takeIf { it > 0L }?.let { formatDuration(it) }
     return duration?.let { "已处理 $it" }
 }
 
+internal fun buildProcessHeaderTitle(count: Int): String {
+    return "已处理 $count 项"
+}
+
+@Composable
+private fun rememberAssistantProcessedHeader(durationMs: Long?, isRunning: Boolean): String {
+    var localElapsedSeconds by remember { mutableStateOf(0L) }
+    LaunchedEffect(isRunning, durationMs) {
+        if (!isRunning || durationMs != null) {
+            return@LaunchedEffect
+        }
+        localElapsedSeconds = 0L
+        while (true) {
+            delay(1000L)
+            localElapsedSeconds += 1L
+        }
+    }
+    val effectiveMs = durationMs ?: localElapsedSeconds * 1000L
+    return "已处理 ${formatDurationAllowZero(effectiveMs)}"
+}
+
 private fun formatDuration(durationMs: Long): String {
     val totalSeconds = (durationMs / 1000L).coerceAtLeast(1L)
+    return formatDurationSeconds(totalSeconds)
+}
+
+private fun formatDurationAllowZero(durationMs: Long): String {
+    return formatDurationSeconds((durationMs / 1000L).coerceAtLeast(0L))
+}
+
+private fun formatDurationSeconds(totalSeconds: Long): String {
     val minutes = totalSeconds / 60L
     val seconds = totalSeconds % 60L
     return if (minutes > 0L) {
@@ -382,100 +391,7 @@ private fun formatDuration(durationMs: Long): String {
     }
 }
 
-private fun ThreadMessage.assistantFinalText(): String {
-    return blocks.filterIsInstance<MessageBlock.Text>().joinToString("\n") { it.value }.trim()
-}
-
-private fun MessageBlock.isAssistantProcessBlock(): Boolean {
-    return when (this) {
-        is MessageBlock.Reasoning,
-        is MessageBlock.Status,
-        is MessageBlock.CommandSummary,
-        is MessageBlock.CommandMeta,
-        is MessageBlock.FileChangeSummary,
-        is MessageBlock.FileChangeMeta,
-        is MessageBlock.FileChangeDiff -> true
-        is MessageBlock.Code -> language.equals("shell", ignoreCase = true)
-        is MessageBlock.Text -> false
-    }
-}
-
-private fun MessageBlock.isAssistantArtifactProcessBlock(): Boolean {
-    return when (this) {
-        is MessageBlock.CommandSummary,
-        is MessageBlock.CommandMeta,
-        is MessageBlock.FileChangeSummary,
-        is MessageBlock.FileChangeMeta,
-        is MessageBlock.FileChangeDiff -> true
-        is MessageBlock.Code -> language.equals("shell", ignoreCase = true)
-        is MessageBlock.Reasoning,
-        is MessageBlock.Status,
-        is MessageBlock.Text -> false
-    }
-}
-
 private fun Context.copyTextToClipboard(label: String, text: String) {
     val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
     clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
-}
-
-@Composable
-private fun AssistantProcessMessage(
-    message: ThreadMessage,
-    compactMode: Boolean,
-    messageIndex: Int
-) {
-    val cards = remember(message.blocks) { deriveAssistantMessageCards(message.blocks) }
-    var reasoningExpanded by rememberSaveable(message.id + ":process-reasoning") { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(if (compactMode) 3.dp else 5.dp)) {
-        if (message.role == com.codexapp.model.MessageRole.SYSTEM) {
-            SystemMessage(message, compactMode)
-            return@Column
-        }
-        if (cards.hasFileChangeCard) {
-            FileChangeCard(
-                messageId = message.id,
-                summary = cards.fileChangeSummary ?: "文件改动",
-                entries = cards.fileChangeEntries,
-                compactMode = compactMode
-            )
-        }
-        if (cards.hasCommandCard) {
-            CommandExecutionCard(
-                messageId = message.id,
-                blockIndex = messageIndex,
-                summary = cards.commandSummary ?: if (cards.commandOutput != null) "命令执行中" else "命令状态",
-                metaLines = cards.commandMetaLines,
-                outputLanguage = cards.commandOutput?.language ?: "shell",
-                outputValue = cards.commandOutput?.value.orEmpty(),
-                compactMode = compactMode
-            )
-        }
-        message.blocks.forEach { block ->
-            when (block) {
-                is MessageBlock.Status -> InlineStatus(block.value, compactMode)
-                is MessageBlock.Reasoning -> ReasoningBlock(
-                    text = block.value,
-                    expanded = reasoningExpanded,
-                    onToggle = { reasoningExpanded = !reasoningExpanded },
-                    compactMode = compactMode
-                )
-                is MessageBlock.Code -> if (!block.language.equals("shell", ignoreCase = true)) {
-                    CodeBlock(
-                        messageId = message.id,
-                        blockIndex = messageIndex,
-                        language = block.language,
-                        value = block.value,
-                        compactMode = compactMode
-                    )
-                }
-                is MessageBlock.Text -> InlineStatus(block.value, compactMode)
-                is MessageBlock.CommandSummary,
-                is MessageBlock.CommandMeta,
-                is MessageBlock.FileChangeSummary,
-                is MessageBlock.FileChangeMeta,
-                is MessageBlock.FileChangeDiff -> Unit
-            }
-        }
-    }
 }

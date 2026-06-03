@@ -1,15 +1,28 @@
 package com.codexapp.ui.message
 
+import androidx.compose.runtime.Immutable
 import com.codexapp.model.MessageBlock
 import com.codexapp.model.MessageRole
 import com.codexapp.model.ThreadMessage
 
+@Immutable
 internal data class TurnMessageItem(
     val message: ThreadMessage,
     val processMessages: List<ThreadMessage> = emptyList(),
+    val assistantTurnRunning: Boolean = false,
     val assistantActionsEnabled: Boolean = true,
+    val showUserActions: Boolean = false,
+    val showAssistantActions: Boolean = false,
+    val preferPlainText: Boolean = false,
     val stableKey: String = message.id
-)
+) {
+    val contentType: String
+        get() = when {
+            message.role == MessageRole.USER -> "user"
+            processMessages.isNotEmpty() -> "assistant-turn"
+            else -> message.role.name.lowercase()
+        }
+}
 
 internal fun List<ThreadMessage>.toTurnMessageItems(currentTurnRunning: Boolean = false): List<TurnMessageItem> {
     val items = mutableListOf<TurnMessageItem>()
@@ -17,13 +30,27 @@ internal fun List<ThreadMessage>.toTurnMessageItems(currentTurnRunning: Boolean 
     while (index < size) {
         val message = this[index]
         if (message.role != MessageRole.USER) {
-            items += TurnMessageItem(message)
+            if (message.role == MessageRole.ASSISTANT && message.blocks.any { it.isAssistantProcessBlock() }) {
+                items += TurnMessageItem(
+                    message = message,
+                    showAssistantActions = isFinalAssistantTurnMessage(index)
+                )
+                index += 1
+                continue
+            }
+            items += TurnMessageItem(
+                message = message,
+                showAssistantActions = message.role == MessageRole.ASSISTANT && isFinalAssistantTurnMessage(index)
+            )
             index += 1
             continue
         }
 
         val userMessage = message
-        items += TurnMessageItem(userMessage)
+        items += TurnMessageItem(
+            message = userMessage,
+            showUserActions = isUserTurnActionMessage(index)
+        )
         index += 1
 
         val turnMessages = mutableListOf<ThreadMessage>()
@@ -43,7 +70,10 @@ internal fun List<ThreadMessage>.toTurnMessageItems(currentTurnRunning: Boolean 
                             blocks = emptyList()
                         ),
                         processMessages = turnMessages,
+                        assistantTurnRunning = true,
                         assistantActionsEnabled = false,
+                        showAssistantActions = true,
+                        preferPlainText = true,
                         stableKey = runningAssistantKey
                     )
                 }
@@ -53,22 +83,47 @@ internal fun List<ThreadMessage>.toTurnMessageItems(currentTurnRunning: Boolean 
                 items += TurnMessageItem(
                     message = streamingMessage,
                     processMessages = processMessages,
+                    assistantTurnRunning = true,
                     assistantActionsEnabled = false,
+                    showAssistantActions = true,
+                    preferPlainText = true,
                     stableKey = runningAssistantKey
                 )
                 items += turnMessages.drop(streamingAssistantIndex + 1)
-                    .map { TurnMessageItem(it, assistantActionsEnabled = false) }
+                    .map {
+                        TurnMessageItem(
+                            message = it,
+                            assistantActionsEnabled = false,
+                            showAssistantActions = it.role == MessageRole.ASSISTANT
+                        )
+                    }
             }
             continue
         }
         val finalAssistantIndex = turnMessages.indexOfLast { it.isFinalAssistantReply() }
         if (finalAssistantIndex < 0) {
-            items += turnMessages.map { TurnMessageItem(it) }
+            items += turnMessages.mapIndexed { turnIndex, turnMessage ->
+                val absoluteIndex = index - turnMessages.size + turnIndex
+                TurnMessageItem(
+                    message = turnMessage,
+                    showAssistantActions = turnMessage.role == MessageRole.ASSISTANT && isFinalAssistantTurnMessage(absoluteIndex)
+                )
+            }
         } else {
             val processMessages = turnMessages.take(finalAssistantIndex)
             val finalMessage = turnMessages[finalAssistantIndex]
-            items += TurnMessageItem(finalMessage, processMessages)
-            items += turnMessages.drop(finalAssistantIndex + 1).map { TurnMessageItem(it) }
+            items += TurnMessageItem(
+                message = finalMessage,
+                processMessages = processMessages,
+                showAssistantActions = true
+            )
+            items += turnMessages.drop(finalAssistantIndex + 1).mapIndexed { trailingIndex, turnMessage ->
+                val absoluteIndex = index - turnMessages.size + finalAssistantIndex + 1 + trailingIndex
+                TurnMessageItem(
+                    message = turnMessage,
+                    showAssistantActions = turnMessage.role == MessageRole.ASSISTANT && isFinalAssistantTurnMessage(absoluteIndex)
+                )
+            }
         }
     }
     return items

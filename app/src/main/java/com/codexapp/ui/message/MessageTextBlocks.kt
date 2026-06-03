@@ -1,7 +1,5 @@
 package com.codexapp.ui.message
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -45,10 +43,7 @@ internal fun ReasoningBlock(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(if (compactMode) 10.dp else 12.dp))
-            .background(CodexTheme.colors.surfaceSubtle)
-            .border(1.dp, CodexTheme.colors.border, RoundedCornerShape(if (compactMode) 10.dp else 12.dp))
-            .padding(horizontal = if (compactMode) 9.dp else 10.dp, vertical = if (compactMode) 7.dp else 8.dp),
+            .padding(vertical = if (compactMode) 1.dp else 2.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Row(
@@ -103,10 +98,21 @@ internal fun ExpandableText(
     fontSize: TextUnit,
     lineHeight: TextUnit,
     maxCollapsedLines: Int,
-    collapseEnabled: Boolean = true
+    collapseEnabled: Boolean = true,
+    parseMarkdown: Boolean = true
 ) {
     val displayText = text.trimEnd()
-    val isThinking = displayText.isBlank() || displayText == "正在思考" || displayText == "思考中"
+    if (!parseMarkdown) {
+        SelectionContainer {
+            Text(
+                text = displayText,
+                color = textColor,
+                fontSize = fontSize,
+                lineHeight = lineHeight
+            )
+        }
+        return
+    }
     val lines = remember(displayText) { parseMarkdownLines(displayText) }
     val shouldCollapse = collapseEnabled && (lines.size > maxCollapsedLines || displayText.length > 140)
     val visibleLines = if (shouldCollapse && !expanded) lines.take(maxCollapsedLines) else lines

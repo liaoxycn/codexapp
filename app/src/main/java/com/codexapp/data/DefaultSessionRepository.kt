@@ -9,10 +9,16 @@ import com.codexapp.data.gateway.normalizeGatewayUrl
 import com.codexapp.model.GatewayConfig
 import com.codexapp.model.NewThreadDraft
 import com.codexapp.model.SessionRemoteState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -20,7 +26,13 @@ import kotlinx.serialization.json.Json
 class DefaultSessionRepository(
     context: Context
 ) : SessionRepository {
+    private data class QueuedInboundMessage(
+        val epoch: Long,
+        val raw: String
+    )
+
     private val tag = "CodexGateway"
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val settingsStore = GatewaySettingsStore(context.applicationContext)
     private val gatewayClient = GatewayWebSocketClient()
     private val json = Json {
@@ -33,6 +45,9 @@ class DefaultSessionRepository(
     private val _state = MutableStateFlow(
         emptyRemoteState(settingsStore.load())
     )
+    private val inboundQueue = Channel<QueuedInboundMessage>(capacity = Channel.UNLIMITED)
+    @Volatile
+    private var inboundEpoch: Long = 0L
     private val commandActions = GatewayRepositoryCommandActions(
         commandSender = commandSender,
         readState = { _state.value },
@@ -50,7 +65,23 @@ class DefaultSessionRepository(
 
     override val state: StateFlow<SessionRemoteState> = _state.asStateFlow()
 
+    init {
+        repositoryScope.launch {
+            while (true) {
+                val first = inboundQueue.receive()
+                delay(16L)
+                val batch = mutableListOf(first)
+                while (true) {
+                    val next = inboundQueue.tryReceive().getOrNull() ?: break
+                    batch += next
+                }
+                applyInboundBatch(batch)
+            }
+        }
+    }
+
     override suspend fun connect(config: GatewayConfig) {
+        inboundEpoch += 1L
         val normalized = config.copy(url = normalizeGatewayUrl(config.url))
         if (normalized.url.isBlank()) {
             _state.update { it.withBlankGatewayUrl(normalized) }
@@ -62,6 +93,7 @@ class DefaultSessionRepository(
     }
 
     override suspend fun disconnect() {
+        inboundEpoch += 1L
         connection.disconnect()
     }
 
@@ -126,12 +158,28 @@ class DefaultSessionRepository(
     }
 
     private fun handleInboundMessage(raw: String) {
+        inboundQueue.trySend(
+            QueuedInboundMessage(
+                epoch = inboundEpoch,
+                raw = raw
+            )
+        )
+    }
+
+    private fun applyInboundBatch(batch: List<QueuedInboundMessage>) {
+        val currentEpoch = inboundEpoch
+        val rawBatch = batch
+            .filter { it.epoch == currentEpoch }
+            .map(QueuedInboundMessage::raw)
+        if (rawBatch.isEmpty()) {
+            return
+        }
         var shouldRequestFullSnapshot = false
         _state.update { previous ->
-            reduceGatewayInboundState(
+            reduceGatewayInboundStateBatch(
                 json = json,
                 previous = previous,
-                raw = raw,
+                raws = rawBatch,
                 onSnapshotPatchMismatch = { shouldRequestFullSnapshot = true }
             )
         }

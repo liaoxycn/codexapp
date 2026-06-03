@@ -7,6 +7,22 @@ import com.codexapp.data.gateway.isStaleFor
 import com.codexapp.model.SessionRemoteState
 import kotlinx.serialization.json.Json
 
+internal fun reduceGatewayInboundStateBatch(
+    json: Json,
+    previous: SessionRemoteState,
+    raws: List<String>,
+    onSnapshotPatchMismatch: () -> Unit = {}
+): SessionRemoteState {
+    return raws.fold(previous) { state, raw ->
+        reduceGatewayInboundState(
+            json = json,
+            previous = state,
+            raw = raw,
+            onSnapshotPatchMismatch = onSnapshotPatchMismatch
+        )
+    }
+}
+
 internal fun reduceGatewayInboundState(
     json: Json,
     previous: SessionRemoteState,

@@ -25,6 +25,8 @@ function createState(overrides = {}) {
     isFinalizing: false,
     runningSignalUntilMs: 0,
     turnCompletionGraceUntilMs: 0,
+    activeTurnIds: [],
+    activeHookIds: [],
     model: null,
     instructionSources: [],
     approvalPolicy: null,
@@ -73,6 +75,7 @@ test("finalizeTurnRuntimeState appends stopped status once and clears running st
     threads,
     threadId: "thread-1",
     turnStatus: "completed",
+    completedTurnId: "turn-1",
     emitChanged: () => {
       emitCount += 1;
     },

@@ -40,4 +40,24 @@ class CodexAppLogicTest {
         assertEquals("项目重构", chrome.title)
         assertEquals(ThreadStatus.RUNNING, chrome.status)
     }
+
+    @Test
+    fun generatingStateOverridesIdleSummary() {
+        val chrome = resolveSelectedThreadChrome(
+            threads = listOf(
+                ThreadSummary(
+                    id = "thread-1",
+                    title = "持续优化",
+                    preview = "",
+                    updatedAt = 1L,
+                    status = ThreadStatus.IDLE
+                )
+            ),
+            selectedThreadId = "thread-1",
+            isGenerating = true
+        )
+
+        assertEquals("持续优化", chrome.title)
+        assertEquals(ThreadStatus.RUNNING, chrome.status)
+    }
 }

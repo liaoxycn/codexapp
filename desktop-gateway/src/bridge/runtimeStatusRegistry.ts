@@ -56,7 +56,7 @@ export function markRuntimeApprovalPending(state: ThreadRuntimeState): void {
 
 export function markRuntimeApprovalResolved(state: ThreadRuntimeState): void {
   ensureRuntimeStatusShape(state);
-  applyRuntimeStatus(state, state.activeTurnIds.length > 0 || state.activeHookIds.length > 0 ? "running" : "idle");
+  applyRuntimeStatus(state, hasActiveRuntimeWork(state) ? "running" : "idle");
 }
 
 export function markRuntimeFailed(state: ThreadRuntimeState): void {
@@ -80,13 +80,22 @@ export function resolveRuntimeStatus(state: ThreadRuntimeState): ThreadLifecycle
   if (state.pendingApproval) {
     return "needs_approval";
   }
-  if (state.activeTurnIds.length > 0 || state.activeHookIds.length > 0) {
+  if (hasActiveRuntimeWork(state)) {
     return "running";
   }
   if (hasRunningActivityLease(state)) {
     return "running";
   }
   return state.runtimeStatus;
+}
+
+export function hasActiveRuntimeWork(state: ThreadRuntimeState): boolean {
+  ensureRuntimeStatusShape(state);
+  return Boolean(
+    state.transientOperation ||
+      state.activeTurnIds.length > 0 ||
+      state.activeHookIds.length > 0
+  );
 }
 
 export function applyRuntimeStatusToSnapshot(state: ThreadRuntimeState): void {
@@ -130,7 +139,7 @@ function normalizeTerminalStatus(status: string | undefined, state: ThreadRuntim
   if (state.pendingApproval) {
     return "needs_approval";
   }
-  if (state.activeTurnIds.length > 0 || state.activeHookIds.length > 0) {
+  if (hasActiveRuntimeWork(state)) {
     return "running";
   }
   return "idle";

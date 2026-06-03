@@ -421,7 +421,7 @@ test("stale idle refresh drops an existing live runtime overlay", () => {
   );
 });
 
-test("older idle refresh keeps a newer live runtime overlay", () => {
+test("incoming completed current turn clears stale live runtime overlay", () => {
   assert.equal(
     shouldRetainThreadRuntimeOverlay(
       thread({
@@ -446,11 +446,11 @@ test("older idle refresh keeps a newer live runtime overlay", () => {
         lastActivityAtMs: 200_000,
       }
     ),
-    true
+    false
   );
 });
 
-test("older idle refresh keeps newer live runtime overlay stored on snapshot", () => {
+test("incoming completed current turn clears stale snapshot overlay", () => {
   assert.equal(
     shouldRetainThreadRuntimeOverlay(
       thread({
@@ -475,7 +475,7 @@ test("older idle refresh keeps newer live runtime overlay stored on snapshot", (
         lastActivityAtMs: 200_000,
       }
     ),
-    true
+    false
   );
 });
 
@@ -512,7 +512,7 @@ test("active running lease keeps live overlay across same-timestamp idle refresh
   );
 });
 
-test("active runtime ids keep live overlay across stale idle refresh", () => {
+test("unresolved active runtime ids keep live overlay across stale idle refresh", () => {
   const idleThread = thread({
     status: "idle",
     turns: [
@@ -528,7 +528,7 @@ test("active runtime ids keep live overlay across stale idle refresh", () => {
 
   assert.equal(
     shouldRetainThreadRuntimeOverlay(idleThread, {
-      activeTurnIds: ["turn-live"],
+      activeTurnIds: ["turn-next"],
       runtimeStatus: "running",
       transientOperation: null,
       pendingApproval: null,

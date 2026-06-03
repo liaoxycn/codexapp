@@ -77,6 +77,7 @@ internal fun GatewaySnapshotMessage.applyTo(
 ): SessionRemoteState {
     val threads = threads.toThreadSummaries()
     val incomingSelectedThreadId = selectedThreadId ?: threads.firstOrNull()?.id.orEmpty()
+    val nextMessages = previous.messages.mergeSnapshotMessages(messages.toThreadMessages(previous.messages))
     if (!previous.shouldAcceptSelectedThreadSnapshot(incomingSelectedThreadId, threads)) {
         return previous.withDeferredSelectionSnapshot(
             threads = threads,
@@ -91,7 +92,7 @@ internal fun GatewaySnapshotMessage.applyTo(
         pendingSelectionThreadId = null,
         pendingThreadTitle = null,
         isThreadSwitching = false,
-        messages = previous.messages.mergeSnapshotMessages(messages.toThreadMessages()),
+        messages = nextMessages,
         hasMoreHistory = hasMoreHistory,
         isLoadingOlder = false,
         pendingApproval = pendingApproval,
@@ -105,7 +106,13 @@ internal fun GatewaySnapshotMessage.applyTo(
         configOptions = configOptions.toConfigOptions(),
         desktopRestartRequired = desktopRestartRequired,
         operationalNotices = operationalNotices.toOperationalNotices(),
-        isGenerating = isGenerating,
+        isGenerating = resolveSelectedThreadGenerating(
+            selectedThreadId = incomingSelectedThreadId,
+            threads = threads,
+            messages = nextMessages,
+            snapshotIsGenerating = isGenerating,
+            pendingApproval = pendingApproval
+        ),
         diagnostics = diagnostics.toStateDiagnostics(revision ?: previous.snapshotRevision),
         isManualRefreshing = false,
         connectionStatus = ConnectionStatus.CONNECTED,
@@ -138,6 +145,21 @@ internal fun GatewaySnapshotPatchMessage.applyTo(
         previous.selectedThreadId
     }
     val acceptSelectedSnapshot = previous.shouldAcceptSelectedThreadSnapshot(nextSelectedThreadId, nextThreads)
+    val nextMessages = if (acceptSelectedSnapshot && "messages" in changedFields) {
+        previous.messages.mergeSnapshotMessages(messages.orEmpty().toThreadMessages(previous.messages))
+    } else {
+        previous.messages
+    }
+    val patchIsGenerating = if (acceptSelectedSnapshot && "isGenerating" in changedFields) {
+        isGenerating == true
+    } else {
+        previous.isGenerating
+    }
+    val nextPendingApproval = if (acceptSelectedSnapshot && "pendingApproval" in changedFields) {
+        pendingApproval
+    } else {
+        previous.pendingApproval
+    }
 
     return previous.copy(
         threads = nextThreads,
@@ -145,14 +167,10 @@ internal fun GatewaySnapshotPatchMessage.applyTo(
         pendingSelectionThreadId = if (acceptSelectedSnapshot) null else previous.pendingSelectionThreadId,
         pendingThreadTitle = if (acceptSelectedSnapshot) null else previous.pendingThreadTitle,
         isThreadSwitching = if (acceptSelectedSnapshot) false else previous.isThreadSwitching,
-        messages = if (acceptSelectedSnapshot && "messages" in changedFields) {
-            previous.messages.mergeSnapshotMessages(messages.orEmpty().toThreadMessages())
-        } else {
-            previous.messages
-        },
+        messages = nextMessages,
         hasMoreHistory = if (acceptSelectedSnapshot && "hasMoreHistory" in changedFields) hasMoreHistory == true else previous.hasMoreHistory,
         isLoadingOlder = if (acceptSelectedSnapshot) false else previous.isLoadingOlder,
-        pendingApproval = if (acceptSelectedSnapshot && "pendingApproval" in changedFields) pendingApproval else previous.pendingApproval,
+        pendingApproval = nextPendingApproval,
         chips = if (acceptSelectedSnapshot && "chips" in changedFields) chips.orEmpty().toComposerChips() else previous.chips,
         files = if (acceptSelectedSnapshot && "files" in changedFields) files.orEmpty().toComposerFiles() else previous.files,
         slashCommands = if ("slashCommands" in changedFields) slashCommands.orEmpty() else previous.slashCommands,
@@ -183,7 +201,13 @@ internal fun GatewaySnapshotPatchMessage.applyTo(
         } else {
             emptyList()
         },
-        isGenerating = if (acceptSelectedSnapshot && "isGenerating" in changedFields) isGenerating == true else previous.isGenerating,
+        isGenerating = resolveSelectedThreadGenerating(
+            selectedThreadId = nextSelectedThreadId,
+            threads = nextThreads,
+            messages = nextMessages,
+            snapshotIsGenerating = patchIsGenerating,
+            pendingApproval = nextPendingApproval
+        ),
         diagnostics = if ("diagnostics" in changedFields) {
             diagnostics?.toStateDiagnostics(revision) ?: previous.diagnostics.copy(snapshotRevision = revision)
         } else {
@@ -222,6 +246,41 @@ private fun SessionRemoteState.withDeferredSelectionSnapshot(
     )
 }
 
+private fun resolveSelectedThreadGenerating(
+    selectedThreadId: String,
+    threads: List<ThreadSummary>,
+    messages: List<ThreadMessage>,
+    snapshotIsGenerating: Boolean,
+    pendingApproval: String?
+): Boolean {
+    if (pendingApproval != null) {
+        return false
+    }
+    if (snapshotIsGenerating) {
+        return true
+    }
+    if (threads.any { it.id == selectedThreadId && it.status == ThreadStatus.RUNNING }) {
+        return true
+    }
+    return messages.hasOpenAssistantTurn()
+}
+
+private fun List<ThreadMessage>.hasOpenAssistantTurn(): Boolean {
+    val lastUserIndex = indexOfLast { it.role == MessageRole.USER }
+    if (lastUserIndex < 0 || lastUserIndex == lastIndex) {
+        return false
+    }
+    val turnMessages = drop(lastUserIndex + 1)
+    if (turnMessages.none { it.role == MessageRole.ASSISTANT }) {
+        return false
+    }
+    return turnMessages.none { it.role == MessageRole.ASSISTANT && it.isFinal && it.hasAssistantReplyText() }
+}
+
+private fun ThreadMessage.hasAssistantReplyText(): Boolean {
+    return blocks.any { it is MessageBlock.Text && it.value.isNotBlank() }
+}
+
 internal fun GatewaySnapshotPatchMessage.isStaleFor(previous: SessionRemoteState): Boolean {
     return previous.snapshotRevision != 0L && baseRevision != previous.snapshotRevision
 }
@@ -258,39 +317,36 @@ internal fun List<GatewayThreadPayload>.toThreadSummaries(): List<ThreadSummary>
     }
 }
 
-internal fun List<GatewayMessagePayload>.toThreadMessages(): List<ThreadMessage> {
-    return map { message ->
-        ThreadMessage(
-            id = message.id,
-            role = message.role.toMessageRole(),
-            blocks = message.blocks.map { it.toMessageBlock() },
-            forkNumTurns = message.forkNumTurns?.takeIf { it > 0 },
-            rollbackNumTurns = message.rollbackNumTurns?.takeIf { it > 0 },
-            durationMs = message.durationMs?.takeIf { it > 0L },
-            isFinal = message.isFinal
-        )
+internal fun List<GatewayMessagePayload>.toThreadMessages(
+    previousMessages: List<ThreadMessage> = emptyList()
+): List<ThreadMessage> {
+    val previousById = previousMessages.associateBy(ThreadMessage::id)
+    val mapped = map { message ->
+        message.toThreadMessage(previousById[message.id])
     }
+    return previousMessages.reuseIfSameMessages(mapped)
 }
 
 private fun List<ThreadMessage>.mergeSnapshotMessages(
     snapshotMessages: List<ThreadMessage>
 ): List<ThreadMessage> {
-    if (isEmpty() || snapshotMessages.isEmpty()) {
-        return snapshotMessages.dedupeAdjacentDuplicateUserMessages()
+    val merged = when {
+        isEmpty() || snapshotMessages.isEmpty() -> snapshotMessages.dedupeAdjacentDuplicateUserMessages()
+        none { it.isOptimisticUserMessage() } -> snapshotMessages.dedupeAdjacentDuplicateUserMessages()
+        else -> {
+            val snapshotUserTexts = snapshotMessages
+                .asSequence()
+                .filter { it.role == MessageRole.USER }
+                .map { it.normalizedText() }
+                .filter { it.isNotBlank() }
+                .toSet()
+            val carriedOptimisticMessages = filter { message ->
+                message.isOptimisticUserMessage() && message.normalizedText() !in snapshotUserTexts
+            }
+            (carriedOptimisticMessages + snapshotMessages).dedupeAdjacentDuplicateUserMessages()
+        }
     }
-    if (none { it.isOptimisticUserMessage() }) {
-        return snapshotMessages.dedupeAdjacentDuplicateUserMessages()
-    }
-    val snapshotUserTexts = snapshotMessages
-        .asSequence()
-        .filter { it.role == MessageRole.USER }
-        .map { it.normalizedText() }
-        .filter { it.isNotBlank() }
-        .toSet()
-    val carriedOptimisticMessages = filter { message ->
-        message.isOptimisticUserMessage() && message.normalizedText() !in snapshotUserTexts
-    }
-    return (carriedOptimisticMessages + snapshotMessages).dedupeAdjacentDuplicateUserMessages()
+    return reuseIfSameMessages(merged)
 }
 
 private fun ThreadMessage.isOptimisticUserMessage(): Boolean {
@@ -313,6 +369,81 @@ private fun List<ThreadMessage>.dedupeAdjacentDuplicateUserMessages(): List<Thre
         }
     }
     return deduped
+}
+
+private fun GatewayMessagePayload.toThreadMessage(previous: ThreadMessage?): ThreadMessage {
+    val role = role.toMessageRole()
+    val blocks = blocks.toMessageBlocks(previous?.blocks)
+    val next = ThreadMessage(
+        id = id,
+        role = role,
+        blocks = blocks,
+        forkNumTurns = forkNumTurns?.takeIf { it > 0 },
+        rollbackNumTurns = rollbackNumTurns?.takeIf { it > 0 },
+        durationMs = durationMs?.takeIf { it > 0L },
+        isFinal = isFinal
+    )
+    return if (
+        previous != null &&
+        previous.role == next.role &&
+        previous.blocks === next.blocks &&
+        previous.forkNumTurns == next.forkNumTurns &&
+        previous.rollbackNumTurns == next.rollbackNumTurns &&
+        previous.durationMs == next.durationMs &&
+        previous.isFinal == next.isFinal
+    ) {
+        previous
+    } else {
+        next
+    }
+}
+
+private fun List<GatewayBlockPayload>.toMessageBlocks(
+    previousBlocks: List<MessageBlock>?
+): List<MessageBlock> {
+    val mapped = mapIndexed { index, block ->
+        block.toMessageBlock(previousBlocks?.getOrNull(index))
+    }
+    return previousBlocks.reuseIfSameBlocks(mapped)
+}
+
+internal fun GatewayBlockPayload.toMessageBlock(previous: MessageBlock? = null): MessageBlock {
+    return when (kind) {
+        "code" -> previous.takeIf {
+            it is MessageBlock.Code &&
+                it.language == (language ?: "text") &&
+                it.value == value
+        } ?: MessageBlock.Code(
+            language = language ?: "text",
+            value = value
+        )
+
+        "status" -> previous.takeIf { it is MessageBlock.Status && it.value == value } ?: MessageBlock.Status(value)
+        "reasoning" -> previous.takeIf { it is MessageBlock.Reasoning && it.value == value } ?: MessageBlock.Reasoning(value)
+        "commandSummary" -> previous.takeIf { it is MessageBlock.CommandSummary && it.value == value } ?: MessageBlock.CommandSummary(value)
+        "commandMeta" -> previous.takeIf { it is MessageBlock.CommandMeta && it.value == value } ?: MessageBlock.CommandMeta(value)
+        "fileChangeSummary" -> previous.takeIf { it is MessageBlock.FileChangeSummary && it.value == value } ?: MessageBlock.FileChangeSummary(value)
+        "fileChangeMeta" -> previous.takeIf {
+            it is MessageBlock.FileChangeMeta && it.value == value && it.path == path.orEmpty()
+        } ?: MessageBlock.FileChangeMeta(value, path.orEmpty())
+        "fileChangeDiff" -> previous.takeIf { it is MessageBlock.FileChangeDiff && it.value == value } ?: MessageBlock.FileChangeDiff(value)
+        else -> previous.takeIf { it is MessageBlock.Text && it.value == value } ?: MessageBlock.Text(value)
+    }
+}
+
+private fun List<MessageBlock>?.reuseIfSameBlocks(next: List<MessageBlock>): List<MessageBlock> {
+    val previous = this ?: return next
+    if (previous.size != next.size) {
+        return next
+    }
+    return if (previous.indices.all { previous[it] === next[it] }) previous else next
+}
+
+private fun List<ThreadMessage>.reuseIfSameMessages(next: List<ThreadMessage>): List<ThreadMessage> {
+    if (size != next.size) {
+        return next
+    }
+    return if (indices.all { this[it] === next[it] }) this else next
 }
 
 private fun ThreadMessage.normalizedText(): String {
@@ -409,22 +540,4 @@ private fun GatewayConfigOptionPayload.toConfigOption(): GatewayConfigOption {
         value = value,
         description = description.orEmpty()
     )
-}
-
-internal fun GatewayBlockPayload.toMessageBlock(): MessageBlock {
-    return when (kind) {
-        "code" -> MessageBlock.Code(
-            language = language ?: "text",
-            value = value
-        )
-
-        "status" -> MessageBlock.Status(value)
-        "reasoning" -> MessageBlock.Reasoning(value)
-        "commandSummary" -> MessageBlock.CommandSummary(value)
-        "commandMeta" -> MessageBlock.CommandMeta(value)
-        "fileChangeSummary" -> MessageBlock.FileChangeSummary(value)
-        "fileChangeMeta" -> MessageBlock.FileChangeMeta(value, path.orEmpty())
-        "fileChangeDiff" -> MessageBlock.FileChangeDiff(value)
-        else -> MessageBlock.Text(value)
-    }
 }

@@ -1,5 +1,8 @@
 package com.codexapp.model
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class SessionRemoteState(
     val threads: List<ThreadSummary> = emptyList(),
     val selectedThreadId: String = "",
@@ -30,6 +33,7 @@ data class SessionRemoteState(
     val diagnostics: StateDiagnostics = StateDiagnostics()
 )
 
+@Immutable
 data class TokenUsageState(
     val totalTokens: Long,
     val inputTokens: Long,
@@ -38,12 +42,14 @@ data class TokenUsageState(
     val contextPercent: Int? = null
 )
 
+@Immutable
 data class OperationalNotice(
     val id: String,
     val text: String,
     val createdAt: Long = 0L
 )
 
+@Immutable
 data class StateDiagnostics(
     val selectedThreadId: String = "",
     val pendingSelectionThreadId: String = "",

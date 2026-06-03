@@ -598,10 +598,13 @@ class ThreadScreenVisibilityTest {
             updateProcessMessages = { processMessages = it }
             MaterialTheme {
                 MessageCard(
-                    messages = listOf(assistant),
                     message = assistant,
                     processMessages = processMessages,
+                    assistantTurnRunning = true,
                     assistantActionsEnabled = false,
+                    showUserActions = false,
+                    showAssistantActions = true,
+                    preferPlainText = true,
                     compactMode = false,
                     messageIndex = 0,
                     onEditUserMessage = { _, _ -> },

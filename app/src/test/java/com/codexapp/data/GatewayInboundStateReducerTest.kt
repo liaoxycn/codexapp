@@ -106,6 +106,63 @@ class GatewayInboundStateReducerTest {
     }
 
     @Test
+    fun reduceGatewayInboundStateBatchAppliesSequentialPatchesInSinglePass() {
+        val previous = emptyRemoteState(GatewayConfig(url = "ws://10.0.2.2:8765/mobile"))
+        val next = reduceGatewayInboundStateBatch(
+            json = json,
+            previous = previous,
+            raws = listOf(
+                """
+                    {
+                      "type": "snapshot",
+                      "revision": 1,
+                      "threads": [],
+                      "messages": [],
+                      "chips": [],
+                      "slashCommands": [],
+                      "isGenerating": true
+                    }
+                """.trimIndent(),
+                """
+                    {
+                      "type": "snapshot_patch",
+                      "baseRevision": 1,
+                      "revision": 2,
+                      "changed": ["messages"],
+                      "messages": [
+                        {
+                          "id": "msg-1",
+                          "role": "assistant",
+                          "blocks": [{ "kind": "text", "value": "hel" }]
+                        }
+                      ]
+                    }
+                """.trimIndent(),
+                """
+                    {
+                      "type": "snapshot_patch",
+                      "baseRevision": 2,
+                      "revision": 3,
+                      "changed": ["messages", "isGenerating"],
+                      "messages": [
+                        {
+                          "id": "msg-1",
+                          "role": "assistant",
+                          "blocks": [{ "kind": "text", "value": "hello" }]
+                        }
+                      ],
+                      "isGenerating": false
+                    }
+                """.trimIndent()
+            )
+        )
+
+        assertEquals(3L, next.snapshotRevision)
+        assertEquals("hello", (next.messages.single().blocks.single() as MessageBlock.Text).value)
+        assertFalse(next.isGenerating)
+    }
+
+    @Test
     fun pendingThreadSelectionIgnoresOldThreadSnapshotUntilTargetArrives() {
         val previous = SessionRemoteState(
             selectedThreadId = "thread-old",

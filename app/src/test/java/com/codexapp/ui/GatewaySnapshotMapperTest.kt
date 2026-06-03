@@ -20,8 +20,10 @@ import com.codexapp.model.MessageBlock
 import com.codexapp.model.MessageRole
 import com.codexapp.model.SessionRemoteState
 import com.codexapp.model.ThreadMessage
+import com.codexapp.model.ThreadStatus
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -248,6 +250,97 @@ class GatewaySnapshotMapperTest {
     }
 
     @Test
+    fun snapshotPatchKeepsGeneratingWhenSelectedAssistantTurnIsNotFinal() {
+        val previous = SessionRemoteState(
+            snapshotRevision = 10L,
+            selectedThreadId = "thread-1",
+            threads = listOf(
+                com.codexapp.model.ThreadSummary(
+                    id = "thread-1",
+                    title = "持续优化",
+                    preview = "",
+                    status = ThreadStatus.IDLE
+                )
+            ),
+            isGenerating = true,
+            messages = listOf(
+                ThreadMessage(
+                    id = "user-1",
+                    role = MessageRole.USER,
+                    blocks = listOf(MessageBlock.Text("prompt"))
+                ),
+                ThreadMessage(
+                    id = "assistant-live",
+                    role = MessageRole.ASSISTANT,
+                    blocks = listOf(MessageBlock.Text("partial"))
+                )
+            )
+        )
+        val patch = GatewaySnapshotPatchMessage(
+            baseRevision = 10L,
+            revision = 11L,
+            changed = listOf("threads", "isGenerating"),
+            threads = listOf(
+                com.codexapp.data.gateway.GatewayThreadPayload(
+                    id = "thread-1",
+                    title = "持续优化",
+                    preview = "",
+                    status = "idle"
+                )
+            ),
+            isGenerating = false
+        )
+
+        val next = patch.applyTo(previous)
+
+        assertTrue(next.isGenerating)
+    }
+
+    @Test
+    fun snapshotPatchAllowsIdleAfterFinalAssistantReplyArrives() {
+        val previous = SessionRemoteState(
+            snapshotRevision = 11L,
+            selectedThreadId = "thread-1",
+            isGenerating = true,
+            messages = listOf(
+                ThreadMessage(
+                    id = "user-1",
+                    role = MessageRole.USER,
+                    blocks = listOf(MessageBlock.Text("prompt"))
+                ),
+                ThreadMessage(
+                    id = "assistant-live",
+                    role = MessageRole.ASSISTANT,
+                    blocks = listOf(MessageBlock.Text("partial"))
+                )
+            )
+        )
+        val patch = GatewaySnapshotPatchMessage(
+            baseRevision = 11L,
+            revision = 12L,
+            changed = listOf("messages", "isGenerating"),
+            messages = listOf(
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "user-1",
+                    role = "user",
+                    blocks = listOf(GatewayBlockPayload(kind = "text", value = "prompt"))
+                ),
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "assistant-final",
+                    role = "assistant",
+                    blocks = listOf(GatewayBlockPayload(kind = "text", value = "done")),
+                    isFinal = true
+                )
+            ),
+            isGenerating = false
+        )
+
+        val next = patch.applyTo(previous)
+
+        assertEquals(false, next.isGenerating)
+    }
+
+    @Test
     fun snapshotPatchCollapsesAdjacentDuplicateUserMessages() {
         val previous = SessionRemoteState(snapshotRevision = 1L)
         val patch = GatewaySnapshotPatchMessage(
@@ -276,6 +369,48 @@ class GatewaySnapshotMapperTest {
         val next = patch.applyTo(previous)
 
         assertEquals(listOf("user-real", "assistant-live"), next.messages.map { it.id })
+    }
+
+    @Test
+    fun snapshotPatchReusesUnchangedMessageInstances() {
+        val unchanged = ThreadMessage(
+            id = "assistant-stable",
+            role = MessageRole.ASSISTANT,
+            blocks = listOf(MessageBlock.Text("stable"))
+        )
+        val previous = SessionRemoteState(
+            snapshotRevision = 5L,
+            messages = listOf(
+                unchanged,
+                ThreadMessage(
+                    id = "assistant-live",
+                    role = MessageRole.ASSISTANT,
+                    blocks = listOf(MessageBlock.Text("old"))
+                )
+            )
+        )
+        val patch = GatewaySnapshotPatchMessage(
+            baseRevision = 5L,
+            revision = 6L,
+            changed = listOf("messages"),
+            messages = listOf(
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "assistant-stable",
+                    role = "assistant",
+                    blocks = listOf(GatewayBlockPayload(kind = "text", value = "stable"))
+                ),
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "assistant-live",
+                    role = "assistant",
+                    blocks = listOf(GatewayBlockPayload(kind = "text", value = "new"))
+                )
+            )
+        )
+
+        val next = patch.applyTo(previous)
+
+        assertSame(unchanged, next.messages.first())
+        assertEquals("new", (next.messages.last().blocks.single() as MessageBlock.Text).value)
     }
 
     @Test

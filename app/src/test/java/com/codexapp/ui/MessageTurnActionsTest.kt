@@ -3,8 +3,11 @@ package com.codexapp.ui
 import com.codexapp.model.MessageBlock
 import com.codexapp.model.MessageRole
 import com.codexapp.model.ThreadMessage
+import com.codexapp.ui.message.buildAssistantTurnUiModel
 import com.codexapp.ui.message.toTurnMessageItems
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MessageTurnActionsTest {
@@ -21,6 +24,7 @@ class MessageTurnActionsTest {
         assertEquals(listOf("u1", "u1:assistant-running"), items.map { it.message.id })
         assertEquals(listOf("status", "reasoning"), items.last().processMessages.map { it.id })
         assertEquals("u1:assistant-running", items.last().stableKey)
+        assertEquals(true, items.last().preferPlainText)
     }
 
     @Test
@@ -55,6 +59,7 @@ class MessageTurnActionsTest {
         assertEquals("u1:assistant-running", thinkingOnly.last().stableKey)
         assertEquals("u1:assistant-running", streamingText.last().stableKey)
         assertEquals(listOf("reasoning"), streamingText.last().processMessages.map { it.id })
+        assertEquals(true, streamingText.last().preferPlainText)
     }
 
     @Test
@@ -90,6 +95,7 @@ class MessageTurnActionsTest {
 
         assertEquals(listOf("u1", "final"), items.map { it.message.id })
         assertEquals(listOf("status", "reasoning"), items.last().processMessages.map { it.id })
+        assertEquals(false, items.last().preferPlainText)
     }
 
     @Test
@@ -105,6 +111,67 @@ class MessageTurnActionsTest {
 
         assertEquals(listOf("u1", "status", "reasoning", "streaming-text"), items.map { it.message.id })
         assertEquals(emptyList<ThreadMessage>(), items.last().processMessages)
+    }
+
+    @Test
+    fun assistantTurnUiModelSeparatesProcessBlocksFromFinalBody() {
+        val model = buildAssistantTurnUiModel(
+            message = ThreadMessage(
+                id = "assistant-final",
+                role = MessageRole.ASSISTANT,
+                blocks = listOf(
+                    MessageBlock.Status("运行中"),
+                    MessageBlock.Reasoning("正在分析"),
+                    MessageBlock.Text("最终回复")
+                ),
+                forkNumTurns = 2,
+                durationMs = 8_000L,
+                isFinal = true
+            ),
+            processMessages = listOf(
+                ThreadMessage(
+                    id = "assistant-process",
+                    role = MessageRole.ASSISTANT,
+                    blocks = listOf(MessageBlock.Status("运行中"))
+                )
+            ),
+            isRunning = false,
+            showActions = true,
+            enableFinalActions = true,
+            preferPlainText = false
+        )
+
+        assertEquals(listOf(MessageBlock.Text("最终回复")), model.bodyBlocks)
+        assertEquals(2, model.processMessages.size)
+        assertEquals("最终回复", model.finalText)
+        assertTrue(model.canCopy)
+        assertTrue(model.canFork)
+        assertTrue(model.showFooterActions)
+        assertFalse(model.isRunning)
+    }
+
+    @Test
+    fun assistantTurnUiModelKeepsFinalActionsDisabledWhileRunning() {
+        val model = buildAssistantTurnUiModel(
+            message = ThreadMessage(
+                id = "assistant-running",
+                role = MessageRole.ASSISTANT,
+                blocks = listOf(MessageBlock.Text("partial answer")),
+                forkNumTurns = 2,
+                durationMs = 5_000L,
+                isFinal = true
+            ),
+            processMessages = emptyList(),
+            isRunning = true,
+            showActions = true,
+            enableFinalActions = true,
+            preferPlainText = true
+        )
+
+        assertFalse(model.canCopy)
+        assertFalse(model.canFork)
+        assertFalse(model.showFooterActions)
+        assertTrue(model.preferPlainText)
     }
 
     @Test

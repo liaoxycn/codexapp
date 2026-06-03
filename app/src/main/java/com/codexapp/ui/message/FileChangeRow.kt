@@ -30,17 +30,19 @@ internal fun FileChangeRow(
     messageId: String,
     index: Int,
     entry: FileChangeEntry,
-    compactMode: Boolean
+    compactMode: Boolean,
+    forceExpanded: Boolean = false
 ) {
     val hasDiff = !entry.diff.isNullOrBlank()
     var expanded by rememberSaveable(fileChangeExpansionKey(messageId, index)) { mutableStateOf(false) }
+    val detailsExpanded = forceExpanded || expanded
     Column(verticalArrangement = Arrangement.spacedBy(if (compactMode) 2.dp else 3.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(FileChangeTokens.rowShape)
                 .then(
-                    if (hasDiff) {
+                    if (hasDiff && !forceExpanded) {
                         Modifier.clickable(onClick = { expanded = !expanded })
                     } else {
                         Modifier
@@ -60,14 +62,14 @@ internal fun FileChangeRow(
             )
             if (hasDiff) {
                 Icon(
-                    imageVector = if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = fileChangeDiffContentDescription(expanded, entry.label),
+                    imageVector = if (detailsExpanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = fileChangeDiffContentDescription(detailsExpanded, entry.label),
                     tint = CodexTheme.colors.textTertiary,
                     modifier = Modifier.size(14.dp)
                 )
             }
         }
-        if (expanded && hasDiff) {
+        if (detailsExpanded && hasDiff) {
             if (entry.path.isNotBlank()) {
                 Text(
                     text = entry.path,

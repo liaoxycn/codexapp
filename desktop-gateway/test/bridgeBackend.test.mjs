@@ -379,7 +379,7 @@ test("bridge backend starts compact request from prompt command", async () => {
   const snapshot = await backend.sendPrompt("compact-thread", "/compact");
 
   assert.deepEqual(compactCalls, ["compact-thread"]);
-  assert.equal(snapshot.isGenerating, false);
+  assert.equal(snapshot.isGenerating, true);
   assert.equal(snapshot.messages.some((message) =>
     message.blocks.some((block) => block.kind === "status" && block.value === "已请求压缩上下文")
   ), true);
@@ -455,7 +455,7 @@ test("bridge backend keeps subscribed running status across stale refresh", asyn
     status: "idle",
     turns: [
       {
-        id: "turn-live",
+        id: "turn-old",
         status: "completed",
         completedAt: 100,
         items: [
@@ -485,6 +485,92 @@ test("bridge backend keeps subscribed running status across stale refresh", asyn
 
   assert.equal(snapshot.isGenerating, true);
   assert.equal(snapshot.threads.find((item) => item.id === "long-running-thread")?.status, "running");
+});
+
+test("bridge backend reconnect refresh clears stale running overlay after turn already completed", async () => {
+  const backend = new AppServerBridgeBackend();
+  const initialThread = thread("finished-thread", {
+    cwd: "D:/Projects/Finished",
+    status: "idle",
+    turns: [],
+  });
+  const completedThread = thread("finished-thread", {
+    cwd: "D:/Projects/Finished",
+    status: "idle",
+    updatedAt: 210,
+    turns: [
+      {
+        id: "turn-live",
+        status: "completed",
+        startedAt: 200,
+        completedAt: 210,
+        items: [
+          { type: "agentMessage", id: "assistant-live", text: "done" },
+        ],
+      },
+    ],
+  });
+  backend.appServer = {
+    configOptions: async () => fakeConfigOptions(),
+    threadStart: async (cwd) => startedThreadResponse("finished-thread", cwd, initialThread),
+    threadList: async () => [completedThread],
+    threadRead: async () => completedThread,
+  };
+
+  await backend.createThread("D:/Projects/Finished");
+  await backend.handleNotification({
+    method: "turn/started",
+    params: { threadId: "finished-thread", turn: { id: "turn-live", startedAt: 200 } },
+  });
+  await backend.handleNotification({
+    method: "item/agentMessage/delta",
+    params: { threadId: "finished-thread", turnId: "turn-live", itemId: "assistant-live", delta: "working" },
+  });
+
+  const snapshot = await backend.refreshThreads("finished-thread");
+
+  assert.equal(snapshot.isGenerating, false);
+  assert.equal(snapshot.threads.find((item) => item.id === "finished-thread")?.status, "idle");
+});
+
+test("bridge backend keeps active hook running across idle status refresh", async () => {
+  const backend = new AppServerBridgeBackend();
+  const staleThread = thread("hook-running-thread", {
+    cwd: "D:/Projects/HookRun",
+    status: "idle",
+    turns: [
+      {
+        id: "turn-live",
+        status: "completed",
+        completedAt: 100,
+        items: [
+          { type: "agentMessage", id: "assistant-old", text: "old" },
+        ],
+      },
+    ],
+  });
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("hook-running-thread", cwd, staleThread),
+    threadRead: async () => staleThread,
+  };
+
+  await backend.createThread("D:/Projects/HookRun");
+  await backend.handleNotification({
+    method: "hook/started",
+    params: {
+      threadId: "hook-running-thread",
+      turnId: "turn-live",
+      run: { id: "hook-live", eventName: "preToolUse", handlerType: "command", status: "running" },
+    },
+  });
+  await backend.handleNotification({
+    method: "thread/status/changed",
+    params: { threadId: "hook-running-thread", status: "idle" },
+  });
+
+  const snapshot = backend.getSnapshot("hook-running-thread");
+  assert.equal(snapshot.isGenerating, true);
+  assert.equal(snapshot.threads.find((item) => item.id === "hook-running-thread")?.status, "running");
 });
 
 test("bridge backend does not let stale turn completion clear a newer loop turn", async () => {

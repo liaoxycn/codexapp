@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.testTag
@@ -33,7 +34,9 @@ internal fun ThreadMessageList(
     onApprovePending: () -> Unit,
     onRejectPending: () -> Unit,
 ) {
-    val turnItems = state.messages.toTurnMessageItems(currentTurnRunning = state.isGenerating)
+    val turnItems = remember(state.messages, state.isGenerating) {
+        state.messages.toTurnMessageItems(currentTurnRunning = state.isGenerating)
+    }
     val centerDraft = state.messages.isEmpty() && state.isNewThreadDraft
     LazyColumn(
         modifier = modifier
@@ -79,13 +82,17 @@ internal fun ThreadMessageList(
 
         itemsIndexed(
             items = turnItems,
-            key = { _, item -> item.stableKey }
+            key = { _, item -> item.stableKey },
+            contentType = { _, item -> item.contentType }
         ) { index, item ->
             MessageCard(
-                messages = turnItems.map { it.message },
                 message = item.message,
                 processMessages = item.processMessages,
+                assistantTurnRunning = item.assistantTurnRunning,
+                showUserActions = item.showUserActions,
+                showAssistantActions = item.showAssistantActions,
                 assistantActionsEnabled = item.assistantActionsEnabled,
+                preferPlainText = item.preferPlainText,
                 compactMode = compactMode,
                 messageIndex = index,
                 onEditUserMessage = onEditUserMessage,

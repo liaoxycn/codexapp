@@ -185,17 +185,39 @@ export function shouldRetainThreadRuntimeOverlay(
   if (shouldRetainLiveThreadRuntime(thread)) {
     return true;
   }
+  const terminalTurnIds = new Set(
+    thread.turns
+      .filter((turn) => turn.completedAt != null || isTerminalTurnStatus(turn.status))
+      .map((turn) => turn.id)
+  );
+  const trackedTurnIds = new Set(
+    [
+      existingRuntime?.currentTurnId,
+      ...(existingRuntime?.activeTurnIds ?? []),
+    ].filter((value): value is string => typeof value === "string" && value.length > 0)
+  );
+  const trackedTurnsResolved =
+    trackedTurnIds.size > 0 &&
+    [...trackedTurnIds].every((turnId) => terminalTurnIds.has(turnId));
   const nowMs = Date.now();
   const runningLeaseActive = Boolean(
     (existingRuntime?.runningSignalUntilMs ?? 0) > nowMs ||
       (existingRuntime?.turnCompletionGraceUntilMs ?? 0) > nowMs
   );
   const hasActiveRuntimeSignal = Boolean(
-    (existingRuntime?.activeTurnIds?.length ?? 0) > 0 ||
+    (existingRuntime?.activeTurnIds ?? []).some((turnId) => !terminalTurnIds.has(turnId)) ||
       (existingRuntime?.activeHookIds?.length ?? 0) > 0
   );
   if (hasActiveRuntimeSignal) {
     return true;
+  }
+  if (
+    trackedTurnsResolved &&
+    !existingRuntime?.transientOperation &&
+    !existingRuntime?.pendingApproval?.text &&
+    (existingRuntime?.activeHookIds?.length ?? 0) === 0
+  ) {
+    return false;
   }
   const hasLiveOverlay = Boolean(
     existingRuntime?.isGenerating ||
