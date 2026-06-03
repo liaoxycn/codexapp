@@ -24,7 +24,28 @@ import com.codexapp.ui.theme.CodexTheme
 
 @Composable
 internal fun SystemMessage(message: ThreadMessage, compactMode: Boolean) {
-    val text = message.blocks.filterIsInstance<MessageBlock.Status>().firstOrNull()?.value ?: return
+    val text = message.blocks.firstNotNullOfOrNull { block ->
+        when (block) {
+            is MessageBlock.Status -> block.value
+            is MessageBlock.Review -> block.value
+            is MessageBlock.Hook -> block.value
+            is MessageBlock.Context -> block.value
+            is MessageBlock.ToolCall -> block.value
+            is MessageBlock.WebSearch -> block.value
+            is MessageBlock.Image -> block.value
+            is MessageBlock.Collab -> block.value
+            is MessageBlock.Plan -> block.value
+            is MessageBlock.Commentary,
+            is MessageBlock.Reasoning,
+            is MessageBlock.Text,
+            is MessageBlock.Code,
+            is MessageBlock.CommandSummary,
+            is MessageBlock.CommandMeta,
+            is MessageBlock.FileChangeSummary,
+            is MessageBlock.FileChangeMeta,
+            is MessageBlock.FileChangeDiff -> null
+        }
+    } ?: return
     Row(verticalAlignment = Alignment.CenterVertically) {
         InlineStatus(text, compactMode)
     }

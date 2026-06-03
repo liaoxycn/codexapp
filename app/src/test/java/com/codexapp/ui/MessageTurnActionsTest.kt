@@ -4,6 +4,7 @@ import com.codexapp.model.MessageBlock
 import com.codexapp.model.MessageRole
 import com.codexapp.model.ThreadMessage
 import com.codexapp.ui.message.buildAssistantTurnUiModel
+import com.codexapp.ui.message.hasMeaningfulReasoningText
 import com.codexapp.ui.message.toTurnMessageItems
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -24,7 +25,18 @@ class MessageTurnActionsTest {
         assertEquals(listOf("u1", "u1:assistant-running"), items.map { it.message.id })
         assertEquals(listOf("status", "reasoning"), items.last().processMessages.map { it.id })
         assertEquals("u1:assistant-running", items.last().stableKey)
-        assertEquals(true, items.last().preferPlainText)
+        assertEquals(false, items.last().preferPlainText)
+    }
+
+    @Test
+    fun runningTurnShowsThinkingPlaceholderBeforeGatewayProcessArrives() {
+        val messages = listOf(user("u1"))
+
+        val items = messages.toTurnMessageItems(currentTurnRunning = true)
+
+        assertEquals(listOf("u1", "u1:assistant-running"), items.map { it.message.id })
+        assertEquals(listOf("u1:assistant-running:thinking"), items.last().processMessages.map { it.id })
+        assertEquals(true, items.last().assistantTurnRunning)
     }
 
     @Test
@@ -45,6 +57,23 @@ class MessageTurnActionsTest {
     }
 
     @Test
+    fun runningTurnAbsorbsProcessMessagesThatArriveAfterStreamingText() {
+        val messages = listOf(
+            user("u1"),
+            assistant("streaming-text", MessageBlock.Text("正在输出，还没有结束"), durationMs = 16_000L),
+            assistant("search-1", MessageBlock.Status("网页搜索 search: weather Shenzhen")),
+            assistant("search-2", MessageBlock.Status("网页搜索 openPage: https://weather.example"))
+        )
+
+        val items = messages.toTurnMessageItems(currentTurnRunning = true)
+
+        assertEquals(listOf("u1", "streaming-text"), items.map { it.message.id })
+        assertEquals(listOf("search-1", "search-2"), items.last().processMessages.map { it.id })
+        assertEquals("u1:assistant-running", items.last().stableKey)
+        assertEquals(true, items.last().assistantTurnRunning)
+    }
+
+    @Test
     fun runningTurnKeepsSameAssistantKeyWhenTextArrivesAfterThinking() {
         val thinkingOnly = listOf(
             user("u1"),
@@ -59,7 +88,7 @@ class MessageTurnActionsTest {
         assertEquals("u1:assistant-running", thinkingOnly.last().stableKey)
         assertEquals("u1:assistant-running", streamingText.last().stableKey)
         assertEquals(listOf("reasoning"), streamingText.last().processMessages.map { it.id })
-        assertEquals(true, streamingText.last().preferPlainText)
+        assertEquals(false, streamingText.last().preferPlainText)
     }
 
     @Test
@@ -96,6 +125,53 @@ class MessageTurnActionsTest {
         assertEquals(listOf("u1", "final"), items.map { it.message.id })
         assertEquals(listOf("status", "reasoning"), items.last().processMessages.map { it.id })
         assertEquals(false, items.last().preferPlainText)
+    }
+
+    @Test
+    fun semanticProcessBlocksDoNotBecomeFinalReplyText() {
+        val messages = listOf(
+            user("u1"),
+            assistant("commentary", MessageBlock.Commentary("我先检查 gateway mapper。")),
+            assistant("plan", MessageBlock.Plan("检查实现并修改")),
+            assistant("tool", MessageBlock.ToolCall("正在调用工具 codegraph/explore")),
+            ThreadMessage(
+                id = "tool-detail",
+                role = MessageRole.ASSISTANT,
+                blocks = listOf(
+                    MessageBlock.ToolCall("已调用工具 codegraph/explore"),
+                    MessageBlock.Code(language = "json", value = """{"ok":true}""")
+                )
+            ),
+            assistant("search", MessageBlock.WebSearch("已搜索网页: Codex app-server")),
+            assistant("final", MessageBlock.Text("最终回复"), isFinal = true)
+        )
+
+        val items = messages.toTurnMessageItems()
+
+        assertEquals(listOf("u1", "final"), items.map { it.message.id })
+        assertEquals(listOf("commentary", "plan", "tool", "tool-detail", "search"), items.last().processMessages.map { it.id })
+    }
+
+    @Test
+    fun reasoningPlaceholderDoesNotCountAsMeaningfulContent() {
+        assertFalse(listOf(MessageBlock.Reasoning("正在思考")).hasMeaningfulReasoningText())
+        assertTrue(listOf(MessageBlock.Reasoning("先检查 snapshot，再处理 running 收口")).hasMeaningfulReasoningText())
+    }
+
+    @Test
+    fun completedTurnAbsorbsProcessMessagesThatArriveAfterFinalReply() {
+        val messages = listOf(
+            user("u1"),
+            assistant("final", MessageBlock.Text("最终回复"), isFinal = true, durationMs = 42_000L),
+            assistant("search-1", MessageBlock.Status("网页搜索 search: weather Shenzhen")),
+            assistant("search-2", MessageBlock.Status("网页搜索 openPage: https://weather.example"))
+        )
+
+        val items = messages.toTurnMessageItems()
+
+        assertEquals(listOf("u1", "final"), items.map { it.message.id })
+        assertEquals(listOf("search-1", "search-2"), items.last().processMessages.map { it.id })
+        assertEquals(false, items.last().assistantTurnRunning)
     }
 
     @Test

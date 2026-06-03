@@ -420,8 +420,17 @@ internal fun GatewayBlockPayload.toMessageBlock(previous: MessageBlock? = null):
 
         "status" -> previous.takeIf { it is MessageBlock.Status && it.value == value } ?: MessageBlock.Status(value)
         "reasoning" -> previous.takeIf { it is MessageBlock.Reasoning && it.value == value } ?: MessageBlock.Reasoning(value)
+        "commentary" -> previous.takeIf { it is MessageBlock.Commentary && it.value == value } ?: MessageBlock.Commentary(value)
+        "plan" -> previous.takeIf { it is MessageBlock.Plan && it.value == value } ?: MessageBlock.Plan(value)
         "commandSummary" -> previous.takeIf { it is MessageBlock.CommandSummary && it.value == value } ?: MessageBlock.CommandSummary(value)
         "commandMeta" -> previous.takeIf { it is MessageBlock.CommandMeta && it.value == value } ?: MessageBlock.CommandMeta(value)
+        "toolCall" -> previous.takeIf { it is MessageBlock.ToolCall && it.value == value } ?: MessageBlock.ToolCall(value)
+        "webSearch" -> previous.takeIf { it is MessageBlock.WebSearch && it.value == value } ?: MessageBlock.WebSearch(value)
+        "image" -> previous.takeIf { it is MessageBlock.Image && it.value == value } ?: MessageBlock.Image(value)
+        "collab" -> previous.takeIf { it is MessageBlock.Collab && it.value == value } ?: MessageBlock.Collab(value)
+        "review" -> previous.takeIf { it is MessageBlock.Review && it.value == value } ?: MessageBlock.Review(value)
+        "hook" -> previous.takeIf { it is MessageBlock.Hook && it.value == value } ?: MessageBlock.Hook(value)
+        "context" -> previous.takeIf { it is MessageBlock.Context && it.value == value } ?: MessageBlock.Context(value)
         "fileChangeSummary" -> previous.takeIf { it is MessageBlock.FileChangeSummary && it.value == value } ?: MessageBlock.FileChangeSummary(value)
         "fileChangeMeta" -> previous.takeIf {
             it is MessageBlock.FileChangeMeta && it.value == value && it.path == path.orEmpty()

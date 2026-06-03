@@ -84,5 +84,10 @@ test("configOptions keeps app server request context", async () => {
 
   assert.equal(options.defaults.model, "gpt-5");
   assert.equal(options.models[0].label, "GPT-5");
+  assert.equal(options.defaults.sandboxMode, "workspace-write");
+  assert.deepEqual(
+    options.sandboxModes.map((option) => option.value),
+    ["read-only", "workspace-write", "danger-full-access"]
+  );
   assert.deepEqual(calls.map((call) => call.method), ["config/read", "model/list"]);
 });

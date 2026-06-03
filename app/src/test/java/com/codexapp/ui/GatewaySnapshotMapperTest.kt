@@ -414,6 +414,45 @@ class GatewaySnapshotMapperTest {
     }
 
     @Test
+    fun semanticGatewayBlocksMapToProcessMessageBlocks() {
+        val previous = SessionRemoteState(snapshotRevision = 1L)
+        val patch = GatewaySnapshotPatchMessage(
+            baseRevision = 1L,
+            revision = 2L,
+            changed = listOf("messages"),
+            messages = listOf(
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "assistant-process",
+                    role = "assistant",
+                    blocks = listOf(
+                        GatewayBlockPayload(kind = "plan", value = "计划"),
+                        GatewayBlockPayload(kind = "commentary", value = "过程自然语言"),
+                        GatewayBlockPayload(kind = "toolCall", value = "工具"),
+                        GatewayBlockPayload(kind = "webSearch", value = "搜索"),
+                        GatewayBlockPayload(kind = "image", value = "图片"),
+                        GatewayBlockPayload(kind = "collab", value = "协作"),
+                        GatewayBlockPayload(kind = "review", value = "审查"),
+                        GatewayBlockPayload(kind = "hook", value = "Hook"),
+                        GatewayBlockPayload(kind = "context", value = "上下文")
+                    )
+                )
+            )
+        )
+
+        val blocks = patch.applyTo(previous).messages.single().blocks
+
+        assertTrue(blocks[0] is MessageBlock.Plan)
+        assertTrue(blocks[1] is MessageBlock.Commentary)
+        assertTrue(blocks[2] is MessageBlock.ToolCall)
+        assertTrue(blocks[3] is MessageBlock.WebSearch)
+        assertTrue(blocks[4] is MessageBlock.Image)
+        assertTrue(blocks[5] is MessageBlock.Collab)
+        assertTrue(blocks[6] is MessageBlock.Review)
+        assertTrue(blocks[7] is MessageBlock.Hook)
+        assertTrue(blocks[8] is MessageBlock.Context)
+    }
+
+    @Test
     fun statusApplyToPreservesDetailFallback() {
         val previous = emptyRemoteState(GatewayConfig()).copy(connectionDetail = "old detail")
         val next = GatewayStatusMessage(status = "error").applyTo(previous)

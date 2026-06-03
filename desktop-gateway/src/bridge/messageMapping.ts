@@ -16,7 +16,14 @@ export function mapItemToMessages(item: AppServerThreadItem, cwd = ""): GatewayM
         },
       ];
     case "agentMessage":
-      return [{ id: item.id, role: "assistant", blocks: [{ kind: "text", value: asString(item.text) }] }];
+      return [{
+        id: item.id,
+        role: "assistant",
+        blocks: [{
+          kind: item.phase === "commentary" ? "commentary" : "text",
+          value: asString(item.text),
+        }],
+      }];
     case "reasoning": {
       const reasoningText = [...asStringArray(item.summary), ...asStringArray(item.content)].join("\n");
       return [
@@ -51,22 +58,38 @@ export function mapItemToMessages(item: AppServerThreadItem, cwd = ""): GatewayM
       ];
     }
     case "plan":
-      return [{ id: item.id, role: "assistant", blocks: [{ kind: "text", value: asString(item.text) }] }];
+      return [{ id: item.id, role: "assistant", blocks: [{ kind: "plan", value: asString(item.text, "更新计划") }] }];
     case "mcpToolCall": {
       const status = asString(item.status);
+      const detail = formatJsonDetail({
+        arguments: "arguments" in item ? item.arguments : undefined,
+        result: item.result,
+        error: item.error,
+      });
       return [{
         id: item.id,
         role: "assistant",
-        blocks: [{ kind: "status", value: formatToolStatus("MCP", `${asString(item.server)}/${asString(item.tool)}`, status) }],
+        blocks: [
+          { kind: "toolCall", value: formatToolStatus("MCP", `${asString(item.server)}/${asString(item.tool)}`, status) },
+          ...(detail ? [{ kind: "code" as const, language: "json", value: detail }] : []),
+        ],
       }];
     }
     case "dynamicToolCall": {
       const status = asString(item.status);
       const name = `${item.namespace ? `${asString(item.namespace)}/` : ""}${asString(item.tool)}`;
+      const detail = formatJsonDetail({
+        arguments: item.arguments,
+        contentItems: item.contentItems,
+        success: item.success,
+      });
       return [{
         id: item.id,
         role: "assistant",
-        blocks: [{ kind: "status", value: formatToolStatus("工具", name, status) }],
+        blocks: [
+          { kind: "toolCall", value: formatToolStatus("工具", name, status) },
+          ...(detail ? [{ kind: "code" as const, language: "json", value: detail }] : []),
+        ],
       }];
     }
     case "webSearch": {
@@ -75,41 +98,41 @@ export function mapItemToMessages(item: AppServerThreadItem, cwd = ""): GatewayM
       return [{
         id: item.id,
         role: "assistant",
-        blocks: [{ kind: "status", value: formatSearchStatus(asString(item.query), status) }],
+        blocks: [{ kind: "webSearch", value: formatSearchStatus(asString(item.query), status) }],
       }];
     }
     case "imageView":
       return [{
         id: item.id,
         role: "assistant",
-        blocks: [{ kind: "text", value: `查看图片: ${item.path}` }],
+        blocks: [{ kind: "image", value: `查看图片: ${item.path}` }],
       }];
     case "imageGeneration":
       return [{
         id: item.id,
         role: "assistant",
-        blocks: [{ kind: "text", value: `生成图片 ${item.status}: ${item.savedPath ?? item.result}` }],
+        blocks: [{ kind: "image", value: `生成图片 ${item.status}: ${item.savedPath ?? item.result}` }],
       }];
     case "collabAgentToolCall":
       return [{
         id: item.id,
         role: "assistant",
-        blocks: [{ kind: "text", value: `协作代理: ${item.tool} · ${item.status}` }],
+        blocks: [{ kind: "collab", value: `协作代理: ${item.tool} · ${item.status}` }],
       }];
     case "hookPrompt":
       return [{
         id: item.id,
         role: "system",
-        blocks: [{ kind: "status", value: flattenHookPrompt(asHookPromptFragments(item.fragments)) || "Hook 提示" }],
+        blocks: [{ kind: "hook", value: flattenHookPrompt(asHookPromptFragments(item.fragments)) || "Hook 提示" }],
       }];
     case "enteredReviewMode":
-      return [{ id: item.id, role: "system", blocks: [{ kind: "status", value: `进入 review: ${asString(item.review)}` }] }];
+      return [{ id: item.id, role: "system", blocks: [{ kind: "review", value: `进入 review: ${asString(item.review)}` }] }];
     case "exitedReviewMode":
-      return [{ id: item.id, role: "system", blocks: [{ kind: "status", value: `退出 review: ${asString(item.review)}` }] }];
+      return [{ id: item.id, role: "system", blocks: [{ kind: "review", value: `退出 review: ${asString(item.review)}` }] }];
     case "contextCompaction":
-      return [];
+      return [{ id: item.id, role: "assistant", blocks: [{ kind: "context", value: "上下文压缩" }] }];
     default:
-      return [];
+      return [{ id: item.id, role: "assistant", blocks: [{ kind: "status", value: `事件: ${asString(item.type, "unknown")}` }] }];
   }
 }
 
@@ -223,5 +246,19 @@ function normalizeStatus(status: string): "running" | "completed" | "failed" | "
       return "failed";
     default:
       return "other";
+  }
+}
+
+function formatJsonDetail(value: Record<string, unknown>): string {
+  const filtered = Object.fromEntries(
+    Object.entries(value).filter(([, entry]) => entry !== undefined && entry !== null)
+  );
+  if (Object.keys(filtered).length === 0) {
+    return "";
+  }
+  try {
+    return JSON.stringify(filtered, null, 2);
+  } catch {
+    return "";
   }
 }

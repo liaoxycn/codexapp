@@ -19,13 +19,13 @@ export function ensureActiveAssistantMessage(state: ThreadRuntimeState, turnId: 
 export function appendAssistantDelta(state: ThreadRuntimeState, itemId: string, delta: string): void {
   const messageId = normalizeLiveAssistantMessageId(state, itemId);
   const current = state.snapshot.messages.find((message) => message.id === messageId);
-  const currentText = current?.blocks.find((block) => block.kind === "text")?.value ?? "";
+  const currentText = current?.blocks.find((block) => block.kind === "commentary")?.value ?? "";
   replaceOrAppendMessage(state, {
     id: messageId,
     role: "assistant",
     blocks: [
-      ...(current?.blocks.filter((block) => block.kind !== "text") ?? []),
-      { kind: "text", value: currentText + delta },
+      ...(current?.blocks.filter((block) => block.kind !== "commentary") ?? []),
+      { kind: "commentary", value: currentText + delta },
     ],
   });
 }

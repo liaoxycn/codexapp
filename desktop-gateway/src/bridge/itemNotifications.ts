@@ -136,7 +136,7 @@ export function handlePlanDelta(
     state,
     itemId,
     "assistant",
-    { kind: "text", value: delta },
+    { kind: "plan", value: delta },
     true
   );
   deps.emitChanged();
@@ -246,7 +246,7 @@ export function handleMcpToolCallProgress(
   replaceOrAppendMessage(state, {
     id: itemId,
     role: "assistant",
-    blocks: [{ kind: "text", value: `MCP 进度: ${message}` }],
+    blocks: [{ kind: "toolCall", value: `MCP 进度: ${message}` }],
   });
   deps.emitChanged();
 }
@@ -314,7 +314,7 @@ export function handleGuardianApprovalReview(
   replaceOrAppendMessage(state, {
     id: `auto-approval-review-${reviewId}`,
     role: "system",
-    blocks: [{ kind: "status", value: lines.join("\n") }],
+    blocks: [{ kind: "review", value: lines.join("\n") }],
   });
   deps.emitChanged();
 }
@@ -463,7 +463,7 @@ function mapRawResponseItem(turnId: string, value: unknown) {
     return {
       id: itemId,
       role: "assistant" as const,
-      blocks: [{ kind: "status" as const, value: formatRawCommandStatus(command, asString(item.status, "updated")) }],
+      blocks: [{ kind: "commandSummary" as const, value: formatRawCommandStatus(command, asString(item.status, "updated")) }],
     };
   }
 
@@ -473,7 +473,7 @@ function mapRawResponseItem(turnId: string, value: unknown) {
     return {
       id: itemId,
       role: "assistant" as const,
-      blocks: [{ kind: "status" as const, value: formatRawToolStatus(name, status) }],
+      blocks: [{ kind: "toolCall" as const, value: formatRawToolStatus(name, status) }],
     };
   }
 
@@ -481,7 +481,7 @@ function mapRawResponseItem(turnId: string, value: unknown) {
     return {
       id: itemId,
       role: "assistant" as const,
-      blocks: [{ kind: "status" as const, value: formatRawSearchStatus(asString(item.status, "completed")) }],
+      blocks: [{ kind: "webSearch" as const, value: formatRawSearchStatus(asString(item.status, "completed")) }],
     };
   }
 
@@ -489,7 +489,7 @@ function mapRawResponseItem(turnId: string, value: unknown) {
     return {
       id: itemId,
       role: "assistant" as const,
-      blocks: [{ kind: "text" as const, value: `生成图片 ${asString(item.status, "completed")}: ${asString(item.result)}` }],
+      blocks: [{ kind: "image" as const, value: `生成图片 ${asString(item.status, "completed")}: ${asString(item.result)}` }],
     };
   }
 

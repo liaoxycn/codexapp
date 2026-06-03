@@ -132,24 +132,54 @@ export function rebaseSnapshotMessagesFromThread(state: ThreadRuntimeState): voi
 
 export function collectThreadMessages(thread: AppServerThread): GatewayMessagePayload[] {
   const nowMs = Date.now();
-  return thread.turns.flatMap((turn, turnIndex) =>
-    turn.items.flatMap((item) => {
-      const turnCompleted = turn.completedAt != null || isTerminalTurnStatus(turn.status);
-      const durationMs = getTurnDurationMs(turn, nowMs);
-      return mapItemToMessages(item, thread.cwd).map((message) => {
-        const isAssistantText =
-          message.role === "assistant" &&
-          message.blocks.some((block) => block.kind === "text" && block.value.trim().length > 0);
-        return {
-          ...message,
-          ...(message.role === "assistant" ? { forkNumTurns: turnIndex + 1 } : {}),
-          ...(message.role === "assistant" && durationMs != null ? { durationMs } : {}),
-          ...(isAssistantText && turnCompleted ? { isFinal: true } : {}),
-          ...(message.role === "user" ? { rollbackNumTurns: thread.turns.length - turnIndex } : {}),
-        };
-      });
-    })
-  );
+  return thread.turns.flatMap((turn, turnIndex) => {
+    const turnCompleted = turn.completedAt != null || isTerminalTurnStatus(turn.status);
+    const durationMs = getTurnDurationMs(turn, nowMs);
+    const messages = turn.items.flatMap((item) => mapItemToMessages(item, thread.cwd));
+    const finalAssistantTextId = turnCompleted ? resolveFinalAssistantTextId(messages) : null;
+    return messages.map((message) => {
+      const normalizedMessage =
+        turnCompleted && message.role === "assistant" && message.id !== finalAssistantTextId
+          ? convertAssistantTextToCommentary(message)
+          : message;
+      const isFinalAssistantText =
+        normalizedMessage.role === "assistant" &&
+        normalizedMessage.id === finalAssistantTextId &&
+        normalizedMessage.blocks.some((block) => block.kind === "text" && block.value.trim().length > 0);
+      return {
+        ...normalizedMessage,
+        ...(normalizedMessage.role === "assistant" ? { forkNumTurns: turnIndex + 1 } : {}),
+        ...(normalizedMessage.role === "assistant" && durationMs != null ? { durationMs } : {}),
+        ...(isFinalAssistantText ? { isFinal: true } : {}),
+        ...(normalizedMessage.role === "user" ? { rollbackNumTurns: thread.turns.length - turnIndex } : {}),
+      };
+    });
+  });
+}
+
+function resolveFinalAssistantTextId(messages: GatewayMessagePayload[]): string | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]!;
+    if (
+      message.role === "assistant" &&
+      message.blocks.some((block) => block.kind === "text" && block.value.trim().length > 0)
+    ) {
+      return message.id;
+    }
+  }
+  return null;
+}
+
+function convertAssistantTextToCommentary(message: GatewayMessagePayload): GatewayMessagePayload {
+  if (!message.blocks.some((block) => block.kind === "text")) {
+    return message;
+  }
+  return {
+    ...message,
+    blocks: message.blocks.map((block) =>
+      block.kind === "text" ? { ...block, kind: "commentary" as const } : block
+    ),
+  };
 }
 
 function getTurnDurationMs(

@@ -67,13 +67,24 @@ internal fun buildAssistantTurnUiModel(
 internal fun MessageBlock.isAssistantProcessBlock(): Boolean {
     return when (this) {
         is MessageBlock.Reasoning,
+        is MessageBlock.Commentary,
+        is MessageBlock.Plan,
         is MessageBlock.Status,
         is MessageBlock.CommandSummary,
         is MessageBlock.CommandMeta,
+        is MessageBlock.ToolCall,
+        is MessageBlock.WebSearch,
+        is MessageBlock.Image,
+        is MessageBlock.Collab,
+        is MessageBlock.Review,
+        is MessageBlock.Hook,
+        is MessageBlock.Context,
         is MessageBlock.FileChangeSummary,
         is MessageBlock.FileChangeMeta,
         is MessageBlock.FileChangeDiff -> true
-        is MessageBlock.Code -> language.equals("shell", ignoreCase = true)
+        is MessageBlock.Code -> language.equals("shell", ignoreCase = true) ||
+            language.equals("json", ignoreCase = true) ||
+            language.equals("diff", ignoreCase = true)
         is MessageBlock.Text -> false
     }
 }

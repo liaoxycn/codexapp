@@ -442,7 +442,7 @@ test("bridge backend merges assistant delta from notification stream", async () 
   assert.equal(snapshot.isGenerating, true);
   assert.equal(
     snapshot.messages.some((message) =>
-      message.blocks.some((block) => block.kind === "text" && block.value.includes("hello"))
+      message.blocks.some((block) => block.kind === "commentary" && block.value.includes("hello"))
     ),
     true
   );

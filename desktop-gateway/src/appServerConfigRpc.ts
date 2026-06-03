@@ -7,6 +7,11 @@ import type { GatewayConfigOptionsPayload } from "./protocol.js";
 
 const MODEL_LIST_PAGE_SIZE = 100;
 const MODEL_LIST_MAX_PAGES = 5;
+const SUPPORTED_SANDBOX_MODES = [
+  { label: "read-only", value: "read-only" },
+  { label: "workspace-write", value: "workspace-write" },
+  { label: "danger-full-access", value: "danger-full-access" },
+];
 
 type RequestFn = <TParams extends object, TResult = unknown>(
   method: string,
@@ -65,9 +70,7 @@ function buildGatewayConfigOptions(
       value: option.reasoningEffort,
       description: option.description,
     })),
-    sandboxModes: config.sandbox_mode
-      ? [{ label: config.sandbox_mode, value: config.sandbox_mode }]
-      : [],
+    sandboxModes: SUPPORTED_SANDBOX_MODES,
     defaults: {
       model: defaultModel,
       reasoningEffort:

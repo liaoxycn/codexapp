@@ -43,7 +43,7 @@ test("ensureActiveAssistantMessage attaches live turn duration", () => {
   assert.equal(state.snapshot.messages[0]?.durationMs >= 1000, true);
 });
 
-test("appendAssistantDelta reuses live placeholder and keeps reasoning block", () => {
+test("appendAssistantDelta streams live text as process commentary", () => {
   const state = createState();
 
   ensureActiveAssistantMessage(state, "turn-1");
@@ -57,7 +57,7 @@ test("appendAssistantDelta reuses live placeholder and keeps reasoning block", (
       role: "assistant",
       blocks: [
         { kind: "reasoning", value: "正在思考" },
-        { kind: "text", value: "hello" },
+        { kind: "commentary", value: "hello" },
       ],
     },
   ]);

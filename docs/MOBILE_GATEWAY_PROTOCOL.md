@@ -41,7 +41,7 @@
 
 分叉入口属于消息/turn，不属于会话列表。App Server 的 `thread/fork` 参数只有 `threadId`，没有 turn id；gateway 通过 `fork_thread.numTurns` 实现移动端 turn 级分叉：先调用 `thread/fork` 复制会话，再按源会话总 turn 数对新会话调用 `thread/rollback` 裁掉后续 turns。
 
-移动端默认启动到“新对话草稿态”。草稿态只保存在本地 UI；用户发送第一条消息时，App 发送 `send_prompt.newThread=true` 与草稿配置，gateway 先调用 app-server `thread/start`，再对新线程调用 `turn/start`。新会话权限模式当前提供三档预设：`默认权限 -> on-request + user + workspace-write`、`自动审查 -> on-failure + auto_review + workspace-write`、`完全访问权限 -> never + user + danger-full-access`，默认值为“完全访问权限”。归档当前会话后，gateway 返回 `selectedThreadId=""`、空消息和空 cwd，App 保持草稿态，不自动跳到其他会话。
+移动端默认启动到“新对话草稿态”。草稿态只保存在本地 UI；用户发送第一条消息时，App 发送 `send_prompt.newThread=true` 与草稿配置，gateway 先调用 app-server `thread/start`，再对新线程调用 `turn/start`。新会话权限模式当前提供三档预设：`默认权限 -> on-request + user + workspace-write`、`自动审查 -> on-failure + auto_review + workspace-write`、`完全访问权限 -> never + user + danger-full-access`，默认值按 `configOptions.defaults.sandboxMode` 和 `configOptions.sandboxModes` 解析；当 app-server 不下发 `danger-full-access` 能力时，移动端必须回落到可用预设。Codex CLI 0.136.0 的 `sandbox` 主线枚举仍包含 `read-only | workspace-write | danger-full-access`，experimental `permissions` profile 不能和旧 `sandbox` 同时发送。归档当前会话后，gateway 返回 `selectedThreadId=""`、空消息和空 cwd，App 保持草稿态，不自动跳到其他会话。
 
 ## 服务端消息
 
@@ -74,7 +74,11 @@
   "configOptions": {
     "models": [{ "label": "GPT-5", "value": "gpt-5" }],
     "reasoningEfforts": [{ "label": "medium", "value": "medium" }],
-    "sandboxModes": [{ "label": "workspace-write", "value": "workspace-write" }],
+    "sandboxModes": [
+      { "label": "read-only", "value": "read-only" },
+      { "label": "workspace-write", "value": "workspace-write" },
+      { "label": "danger-full-access", "value": "danger-full-access" }
+    ],
     "defaults": {
       "model": "gpt-5",
       "reasoningEffort": "medium",
@@ -134,7 +138,11 @@
   blocks: Array<{
     kind:
       | "text" | "code" | "status" | "reasoning"
+      | "commentary"
+      | "plan"
       | "commandSummary" | "commandMeta"
+      | "toolCall" | "webSearch" | "image" | "collab"
+      | "review" | "hook" | "context"
       | "fileChangeSummary" | "fileChangeMeta" | "fileChangeDiff"
     value: string
     language?: string
@@ -147,7 +155,7 @@
 }
 ```
 
-客户端必须按 `blocks` 顺序渲染。未知 `kind` 应降级为文本，避免新协议导致空消息。`forkNumTurns` 表示从当前助手回复所在 turn 分叉需要保留的 turn 数；移动端只在助手回复消息菜单展示“从此处分叉”。`rollbackNumTurns` 表示从当前用户消息编辑/重发需要回滚的 turn 数。`durationMs` 是该 turn 的真实耗时。`isFinal=true` 只可由 gateway 在 app-server turn 已完成时下发；移动端只能用它判断最终回复并收起过程信息，不能用 assistant 文本是否存在来推断。
+客户端必须按 `blocks` 顺序渲染。未知 `kind` 应降级为文本，避免新协议导致空消息。`text` 只表示最终 assistant 正文或用户输入；`commentary` 表示 Desktop 同款过程自然语言；`plan/reasoning/command*/toolCall/webSearch/image/collab/review/hook/context/fileChange*` 也都属于 assistant 过程流，完成后默认折叠到“已处理”下。`forkNumTurns` 表示从当前助手回复所在 turn 分叉需要保留的 turn 数；移动端只在助手回复消息菜单展示“从此处分叉”。`rollbackNumTurns` 表示从当前用户消息编辑/重发需要回滚的 turn 数。`durationMs` 是该 turn 的真实耗时。`isFinal=true` 只可由 gateway 在 app-server turn 已完成时下发；移动端只能用它判断最终回复并收起过程信息，不能用 assistant 文本是否存在来推断。
 
 ## App Server 映射规则
 
@@ -158,7 +166,7 @@ gateway 负责把 Codex App Server JSON-RPC 压平成移动端 snapshot：
 - `file/search`/项目文件枚举 -> `projectFiles`；移动端文件面板只展示当前项目内文件，并过滤 app-server 已排除路径
 - `turn/start/steer/interrupt` -> `send_prompt`、`stop_turn`
 - `serverRequest/*` -> `pendingApproval`
-- `item/*`、`rawResponseItem/completed`、`thread/realtime/*` -> `messages`
+- `item/*`、`rawResponseItem/completed`、`thread/realtime/*` -> `messages`；`ThreadItem` 类型至少覆盖 `userMessage`、`agentMessage`、`plan`、`reasoning`、`commandExecution`、`fileChange`、`mcpToolCall`、`dynamicToolCall`、`collabAgentToolCall`、`webSearch`、`imageView`、`imageGeneration`、`hookPrompt`、`enteredReviewMode`、`exitedReviewMode`、`contextCompaction`
 - `thread/tokenUsage/updated`、`hook/*`、`model/*`、`warning/error` -> system/status message
 - `account/*`、`skills/changed`、`mcpServer/*`、`app/list/updated`、`fs/changed`、`fuzzyFileSearch/*` -> selected thread 的 operational status
 - `command/exec/outputDelta`、`process/outputDelta`、`process/exited` 是 connection-scoped 流；当前只 acknowledge，不写入会话

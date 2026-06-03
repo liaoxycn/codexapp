@@ -62,34 +62,34 @@ internal fun List<ThreadMessage>.toTurnMessageItems(currentTurnRunning: Boolean 
             val runningAssistantKey = "${userMessage.id}:assistant-running"
             val streamingAssistantIndex = turnMessages.indexOfLast { it.isAssistantReplyText() }
             if (streamingAssistantIndex < 0) {
-                if (turnMessages.isNotEmpty()) {
-                    items += TurnMessageItem(
-                        message = ThreadMessage(
-                            id = runningAssistantKey,
-                            role = MessageRole.ASSISTANT,
-                            blocks = emptyList()
-                        ),
-                        processMessages = turnMessages,
-                        assistantTurnRunning = true,
-                        assistantActionsEnabled = false,
-                        showAssistantActions = true,
-                        preferPlainText = true,
-                        stableKey = runningAssistantKey
-                    )
-                }
+                items += TurnMessageItem(
+                    message = ThreadMessage(
+                        id = runningAssistantKey,
+                        role = MessageRole.ASSISTANT,
+                        blocks = emptyList()
+                    ),
+                    processMessages = turnMessages.ifEmpty { listOf(runningThinkingMessage(runningAssistantKey)) },
+                    assistantTurnRunning = true,
+                    assistantActionsEnabled = false,
+                    showAssistantActions = true,
+                    stableKey = runningAssistantKey
+                )
             } else {
-                val processMessages = turnMessages.take(streamingAssistantIndex)
                 val streamingMessage = turnMessages[streamingAssistantIndex]
+                val processMessages = turnMessages.filterIndexed { turnIndex, turnMessage ->
+                    turnIndex != streamingAssistantIndex && turnMessage.isAssistantProcessMessage()
+                }
+                val trailingMessages = turnMessages.drop(streamingAssistantIndex + 1)
+                    .filterNot { it.isAssistantProcessMessage() }
                 items += TurnMessageItem(
                     message = streamingMessage,
                     processMessages = processMessages,
                     assistantTurnRunning = true,
                     assistantActionsEnabled = false,
                     showAssistantActions = true,
-                    preferPlainText = true,
                     stableKey = runningAssistantKey
                 )
-                items += turnMessages.drop(streamingAssistantIndex + 1)
+                items += trailingMessages
                     .map {
                         TurnMessageItem(
                             message = it,
@@ -110,14 +110,18 @@ internal fun List<ThreadMessage>.toTurnMessageItems(currentTurnRunning: Boolean 
                 )
             }
         } else {
-            val processMessages = turnMessages.take(finalAssistantIndex)
             val finalMessage = turnMessages[finalAssistantIndex]
+            val processMessages = turnMessages.filterIndexed { turnIndex, turnMessage ->
+                turnIndex != finalAssistantIndex && turnMessage.isAssistantProcessMessage()
+            }
+            val trailingMessages = turnMessages.drop(finalAssistantIndex + 1)
+                .filterNot { it.isAssistantProcessMessage() }
             items += TurnMessageItem(
                 message = finalMessage,
                 processMessages = processMessages,
                 showAssistantActions = true
             )
-            items += turnMessages.drop(finalAssistantIndex + 1).mapIndexed { trailingIndex, turnMessage ->
+            items += trailingMessages.mapIndexed { trailingIndex, turnMessage ->
                 val absoluteIndex = index - turnMessages.size + finalAssistantIndex + 1 + trailingIndex
                 TurnMessageItem(
                     message = turnMessage,
@@ -159,4 +163,18 @@ private fun ThreadMessage.isAssistantReplyText(): Boolean {
     return role == MessageRole.ASSISTANT && blocks.any { block ->
         block is MessageBlock.Text && block.value.isNotBlank()
     }
+}
+
+private fun ThreadMessage.isAssistantProcessMessage(): Boolean {
+    return role == MessageRole.ASSISTANT &&
+        blocks.isNotEmpty() &&
+        blocks.all { it.isAssistantProcessBlock() }
+}
+
+private fun runningThinkingMessage(runningAssistantKey: String): ThreadMessage {
+    return ThreadMessage(
+        id = "$runningAssistantKey:thinking",
+        role = MessageRole.ASSISTANT,
+        blocks = listOf(MessageBlock.Reasoning("正在思考"))
+    )
 }

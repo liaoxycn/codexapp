@@ -111,6 +111,42 @@ test("collectThreadMessages marks only completed assistant text as final", () =>
   assert.equal(messages.find((message) => message.id === "assistant-final")?.durationMs, 61000);
 });
 
+test("collectThreadMessages keeps completed commentary above the final answer", () => {
+  const messages = collectThreadMessages({
+    id: "thread-1",
+    preview: "",
+    status: "idle",
+    cwd: "D:/Projects/Test",
+    updatedAt: 1,
+    name: null,
+    modelProvider: "openai",
+    turns: [
+      {
+        id: "turn-done",
+        status: "completed",
+        completedAt: 2,
+        items: [
+          { type: "userMessage", id: "user-1", content: [{ type: "text", text: "fix it" }] },
+          { type: "agentMessage", id: "assistant-progress-1", text: "我先检查 gateway mapper。", phase: "commentary" },
+          { type: "commandExecution", id: "cmd-1", command: "npm test", status: "completed" },
+          { type: "agentMessage", id: "assistant-progress-2", text: "现在补 Android 渲染。", phase: null },
+          { type: "agentMessage", id: "assistant-final", text: "已修复。", phase: "final_answer" },
+        ],
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    messages.filter((message) => message.role === "assistant").map((message) => [message.id, message.blocks[0].kind, message.isFinal]),
+    [
+      ["assistant-progress-1", "commentary", undefined],
+      ["cmd-1", "commandSummary", undefined],
+      ["assistant-progress-2", "commentary", undefined],
+      ["assistant-final", "text", true],
+    ]
+  );
+});
+
 test("collectThreadMessages computes running turn duration from startedAt", () => {
   const realNow = Date.now;
   Date.now = () => 125000;

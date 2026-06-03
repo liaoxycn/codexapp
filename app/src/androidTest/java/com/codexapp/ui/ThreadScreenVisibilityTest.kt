@@ -585,7 +585,7 @@ class ThreadScreenVisibilityTest {
     }
 
     @Test
-    fun runningAssistantTemporaryProcessUpdatesKeepReplySlotsAnchored() {
+    fun runningAssistantProcessUpdatesGrowReplyFlow() {
         lateinit var updateProcessMessages: (List<ThreadMessage>) -> Unit
         val assistant = ThreadMessage(
             id = "assistant-slot",
@@ -604,7 +604,7 @@ class ThreadScreenVisibilityTest {
                     assistantActionsEnabled = false,
                     showUserActions = false,
                     showAssistantActions = true,
-                    preferPlainText = true,
+                    preferPlainText = false,
                     compactMode = false,
                     messageIndex = 0,
                     onEditUserMessage = { _, _ -> },
@@ -635,23 +635,44 @@ class ThreadScreenVisibilityTest {
             )
         }
         rule.waitForIdle()
-        assertEquals(emptyBodyTop, rule.onNodeWithTag(runningBodyTag, useUnmergedTree = true).getUnclippedBoundsInRoot().top)
-        assertEquals(emptyFooterTop, rule.onNodeWithTag(runningFooterTag, useUnmergedTree = true).getUnclippedBoundsInRoot().top)
+        val thinkingBodyTop = rule.onNodeWithTag(runningBodyTag, useUnmergedTree = true).getUnclippedBoundsInRoot().top
+        val thinkingFooterTop = rule.onNodeWithTag(runningFooterTag, useUnmergedTree = true).getUnclippedBoundsInRoot().top
+        assertTrue(thinkingBodyTop > emptyBodyTop)
+        assertTrue(thinkingFooterTop > emptyFooterTop)
 
+        val commentaryText = "我先对照当前分组逻辑和 process 渲染入口"
+        val reasoningText = "我会先检查 snapshot reducer，再处理 running 状态"
         rule.runOnIdle {
             updateProcessMessages(
                 listOf(
                     ThreadMessage(
+                        id = "assistant-commentary-text",
+                        role = MessageRole.ASSISTANT,
+                        blocks = listOf(MessageBlock.Commentary(commentaryText))
+                    ),
+                    ThreadMessage(
+                        id = "assistant-reasoning-text",
+                        role = MessageRole.ASSISTANT,
+                        blocks = listOf(MessageBlock.Reasoning(reasoningText))
+                    ),
+                    ThreadMessage(
                         id = "assistant-status",
                         role = MessageRole.ASSISTANT,
                         blocks = listOf(MessageBlock.Status("Token 总计 123"))
+                    ),
+                    ThreadMessage(
+                        id = "assistant-search",
+                        role = MessageRole.ASSISTANT,
+                        blocks = listOf(MessageBlock.Status("网页搜索 search: weather Shenzhen"))
                     )
                 )
             )
         }
         rule.waitForIdle()
-        assertEquals(emptyBodyTop, rule.onNodeWithTag(runningBodyTag, useUnmergedTree = true).getUnclippedBoundsInRoot().top)
-        assertEquals(emptyFooterTop, rule.onNodeWithTag(runningFooterTag, useUnmergedTree = true).getUnclippedBoundsInRoot().top)
+        rule.onNodeWithText(commentaryText).assertExists()
+        rule.onNodeWithText(reasoningText).assertExists()
+        assertTrue(rule.onNodeWithTag(runningBodyTag, useUnmergedTree = true).getUnclippedBoundsInRoot().top > thinkingBodyTop)
+        assertTrue(rule.onNodeWithTag(runningFooterTag, useUnmergedTree = true).getUnclippedBoundsInRoot().top > thinkingFooterTop)
     }
 
     @Test

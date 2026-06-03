@@ -24,9 +24,27 @@ sealed interface MessageBlock {
     @Immutable
     data class Reasoning(val value: String) : MessageBlock
     @Immutable
+    data class Commentary(val value: String) : MessageBlock
+    @Immutable
+    data class Plan(val value: String) : MessageBlock
+    @Immutable
     data class CommandSummary(val value: String) : MessageBlock
     @Immutable
     data class CommandMeta(val value: String) : MessageBlock
+    @Immutable
+    data class ToolCall(val value: String) : MessageBlock
+    @Immutable
+    data class WebSearch(val value: String) : MessageBlock
+    @Immutable
+    data class Image(val value: String) : MessageBlock
+    @Immutable
+    data class Collab(val value: String) : MessageBlock
+    @Immutable
+    data class Review(val value: String) : MessageBlock
+    @Immutable
+    data class Hook(val value: String) : MessageBlock
+    @Immutable
+    data class Context(val value: String) : MessageBlock
     @Immutable
     data class FileChangeSummary(val value: String) : MessageBlock
     @Immutable

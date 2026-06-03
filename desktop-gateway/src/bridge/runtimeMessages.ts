@@ -1,5 +1,5 @@
 import type { AppServerThreadItem } from "../appServerTypes.js";
-import type { GatewayMessagePayload } from "../protocol.js";
+import type { GatewayBlockPayload, GatewayMessagePayload } from "../protocol.js";
 import { asFileChanges, asString } from "./appServerValues.js";
 import { buildFileChangeBlocks } from "./fileChanges.js";
 import {
@@ -16,6 +16,24 @@ import type { ThreadRuntimeState } from "./types.js";
 export function mergeThreadItem(state: ThreadRuntimeState, item: AppServerThreadItem, preferLiveAssistantId = false): void {
   if (item.type === "agentMessage") {
     const messageId = item.id;
+    const textBlock: GatewayBlockPayload = {
+      kind: item.phase === "commentary" ? "commentary" : "text",
+      value: asString(item.text),
+    };
+    if (item.phase === "commentary") {
+      replaceOrAppendMessage(state, {
+        id: messageId,
+        role: "assistant",
+        blocks: [textBlock],
+      });
+      if (state.activeAssistantMessageId === messageId) {
+        state.activeAssistantMessageId = null;
+      }
+      if (state.liveAssistantItemId === messageId) {
+        state.liveAssistantItemId = null;
+      }
+      return;
+    }
     if (preferLiveAssistantId) {
       const liveId = resolveLiveAssistantMessageId(state, item.id);
       if (liveId !== item.id) {
@@ -24,7 +42,11 @@ export function mergeThreadItem(state: ThreadRuntimeState, item: AppServerThread
     }
     state.activeAssistantMessageId = item.id;
     state.liveAssistantItemId = item.id;
-    replaceOrAppendMessage(state, mergeWithExistingAssistantMessage(state, messageId, [{ kind: "text", value: asString(item.text) }]));
+    replaceOrAppendMessage(state, {
+      id: messageId,
+      role: "assistant",
+      blocks: [textBlock],
+    });
     return;
   }
 

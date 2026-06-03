@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,7 +64,15 @@ private fun AssistantProcessMessage(
     messageIndex: Int
 ) {
     val cards = remember(message.blocks) { deriveAssistantMessageCards(message.blocks) }
-    var reasoningExpanded by rememberSaveable(message.id + ":process-reasoning") { mutableStateOf(false) }
+    val hasReasoningText = remember(message.blocks) { message.blocks.hasMeaningfulReasoningText() }
+    var reasoningExpanded by rememberSaveable(message.id + ":process-reasoning") {
+        mutableStateOf(hasReasoningText)
+    }
+    LaunchedEffect(hasReasoningText) {
+        if (hasReasoningText) {
+            reasoningExpanded = true
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(if (compactMode) 3.dp else 5.dp)) {
         if (message.role == MessageRole.SYSTEM) {
             SystemMessage(message, compactMode)
@@ -97,6 +106,15 @@ private fun AssistantProcessMessage(
                     onToggle = { reasoningExpanded = !reasoningExpanded },
                     compactMode = compactMode
                 )
+                is MessageBlock.Commentary -> CommentaryProcessText(block.value, compactMode)
+                is MessageBlock.Plan -> InlineStatus(block.value, compactMode)
+                is MessageBlock.ToolCall -> InlineStatus(block.value, compactMode)
+                is MessageBlock.WebSearch -> InlineStatus(block.value, compactMode)
+                is MessageBlock.Image -> InlineStatus(block.value, compactMode)
+                is MessageBlock.Collab -> InlineStatus(block.value, compactMode)
+                is MessageBlock.Review -> InlineStatus(block.value, compactMode)
+                is MessageBlock.Hook -> InlineStatus(block.value, compactMode)
+                is MessageBlock.Context -> InlineStatus(block.value, compactMode)
                 is MessageBlock.Code -> if (!block.language.equals("shell", ignoreCase = true)) {
                     CodeBlock(
                         messageId = message.id,
@@ -114,6 +132,29 @@ private fun AssistantProcessMessage(
                 is MessageBlock.FileChangeDiff -> Unit
             }
         }
+    }
+}
+
+@Composable
+private fun CommentaryProcessText(text: String, compactMode: Boolean) {
+    MarkdownText(
+        text = text,
+        expanded = true,
+        onToggle = {},
+        textColor = CodexTheme.colors.textPrimary,
+        fontSize = if (compactMode) 11.sp else 12.sp,
+        lineHeight = if (compactMode) 16.sp else 18.sp,
+        maxCollapsedLines = Int.MAX_VALUE,
+        wrapContent = true
+    )
+}
+
+internal fun List<MessageBlock>.hasMeaningfulReasoningText(): Boolean {
+    return any { block ->
+        block is MessageBlock.Reasoning &&
+            block.value.trim().isNotBlank() &&
+            block.value.trim() != "正在思考" &&
+            block.value.trim() != "思考中"
     }
 }
 

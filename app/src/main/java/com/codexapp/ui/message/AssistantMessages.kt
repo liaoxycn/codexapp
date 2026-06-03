@@ -5,8 +5,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,7 +34,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -113,7 +110,6 @@ internal fun AssistantMessage(
             AssistantProcessSlot(
                 messages = turn.processMessages,
                 visible = processExpanded && turn.hasProcess,
-                reserveRunningSpace = turn.isRunning,
                 compactMode = compactMode
             )
 
@@ -202,32 +198,16 @@ private fun AssistantProcessedHeader(
 private fun AssistantProcessSlot(
     messages: List<ThreadMessage>,
     visible: Boolean,
-    reserveRunningSpace: Boolean,
     compactMode: Boolean
 ) {
-    if (!visible && !reserveRunningSpace) {
+    if (!visible) {
         return
     }
-    val modifier = if (reserveRunningSpace) {
-        Modifier
-            .fillMaxWidth()
-            .height(processSlotStableHeight(compactMode))
-            .clipToBounds()
-            .verticalScroll(rememberScrollState())
-    } else {
-        Modifier.fillMaxWidth()
-    }
-    Column(modifier = modifier) {
-        if (visible) {
-            AssistantProcessStream(
-                messages = messages,
-                compactMode = compactMode
-            )
-        }
-    }
+    AssistantProcessStream(
+        messages = messages,
+        compactMode = compactMode
+    )
 }
-
-private fun processSlotStableHeight(compactMode: Boolean) = if (compactMode) 40.dp else 46.dp
 
 @Composable
 private fun StableAssistantBodySlot(
@@ -280,6 +260,15 @@ private fun StableAssistantBodySlot(
                     compactMode = compactMode
                 )
 
+                is MessageBlock.Commentary,
+                is MessageBlock.Plan,
+                is MessageBlock.ToolCall,
+                is MessageBlock.WebSearch,
+                is MessageBlock.Image,
+                is MessageBlock.Collab,
+                is MessageBlock.Review,
+                is MessageBlock.Hook,
+                is MessageBlock.Context,
                 is MessageBlock.CommandSummary,
                 is MessageBlock.CommandMeta,
                 is MessageBlock.FileChangeSummary,
