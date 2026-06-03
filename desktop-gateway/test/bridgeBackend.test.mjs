@@ -407,12 +407,20 @@ test("bridge backend executes approved shell command through app-server", async 
     threadRead: async (threadId) => thread(threadId, { cwd: "D:/Projects/ApprovedShell" }),
     threadShellCommand: async (threadId, command) => {
       shellCalls.push([threadId, command]);
+      const state = backend.threads.get(threadId);
+      state.snapshot.messages = state.snapshot.messages.concat({
+        id: "cmd-shell-1",
+        role: "assistant",
+        blocks: [{ kind: "commandSummary", value: "已运行命令" }],
+      });
     },
   };
 
   await backend.createThread("D:/Projects/ApprovedShell");
   await backend.sendPrompt("approved-shell-thread", "!dir");
   const snapshot = await backend.approveCurrent("approved-shell-thread", true);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const settledSnapshot = backend.getSnapshot("approved-shell-thread");
 
   assert.deepEqual(shellCalls, [["approved-shell-thread", "dir"]]);
   assert.equal(snapshot.pendingApproval, null);
@@ -420,6 +428,56 @@ test("bridge backend executes approved shell command through app-server", async 
   assert.equal(snapshot.messages.some((message) =>
     message.blocks.some((block) => block.kind === "status" && block.value === "审批已允许")
   ), true);
+  assert.equal(settledSnapshot.isGenerating, false);
+  assert.equal(
+    settledSnapshot.messages.some((message) =>
+      message.blocks.some((block) => block.kind === "commandSummary" && block.value === "已运行命令")
+    ),
+    true
+  );
+});
+
+test("bridge backend ignores refresh failure after approved shell command", async () => {
+  const backend = new AppServerBridgeBackend();
+  let readCount = 0;
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("approved-shell-refresh-failure", cwd),
+    threadRead: async (threadId) => {
+      readCount += 1;
+      if (readCount === 1) {
+        return thread(threadId, { cwd: "D:/Projects/ApprovedShell" });
+      }
+      throw new Error("rollout is empty");
+    },
+    threadShellCommand: async (threadId) => {
+      const state = backend.threads.get(threadId);
+      state.snapshot.messages = state.snapshot.messages.concat({
+        id: "cmd-shell-refresh-failure",
+        role: "assistant",
+        blocks: [{ kind: "commandSummary", value: "已运行命令" }],
+      });
+    },
+  };
+
+  await backend.createThread("D:/Projects/ApprovedShell");
+  await backend.sendPrompt("approved-shell-refresh-failure", "!dir");
+  await backend.approveCurrent("approved-shell-refresh-failure", true);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const settledSnapshot = backend.getSnapshot("approved-shell-refresh-failure");
+
+  assert.equal(settledSnapshot.isGenerating, false);
+  assert.equal(
+    settledSnapshot.messages.some((message) =>
+      message.blocks.some((block) => block.kind === "commandSummary" && block.value === "已运行命令")
+    ),
+    true
+  );
+  assert.equal(
+    settledSnapshot.messages.some((message) =>
+      message.blocks.some((block) => block.kind === "status" && block.value.startsWith("shell 命令执行失败:"))
+    ),
+    false
+  );
 });
 
 test("bridge backend merges assistant delta from notification stream", async () => {

@@ -1,14 +1,14 @@
 {
-  "startedAt": "2026-06-03T15:44:26.061Z",
-  "finishedAt": "2026-06-03T15:44:34.760Z",
+  "startedAt": "2026-06-03T16:05:25.705Z",
+  "finishedAt": "2026-06-03T16:05:33.792Z",
   "status": "triggered",
-  "logPath": "scripts\\release\\github-release-2026-06-03T15-44-26-060Z.log",
+  "logPath": "scripts\\release\\github-release-2026-06-03T16-05-25-703Z.log",
   "externalExitCode": 0,
-  "version": "0.2.41",
-  "versionCode": 61,
-  "tag": "v0.2.41",
+  "version": "0.2.42",
+  "versionCode": 62,
+  "tag": "v0.2.42",
   "branch": "master",
-  "notesLength": 126,
+  "notesLength": 101,
   "releaseState": {
     "hasLocalTag": false,
     "hasRemoteTag": false

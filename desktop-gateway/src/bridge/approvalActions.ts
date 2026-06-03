@@ -1,12 +1,15 @@
 import { AppServerClient } from "../appServerClient.js";
 import type { ClientSnapshot } from "../protocol.js";
+import { clearCurrentTurnStarted } from "./runtimeTurnTiming.js";
 import { systemStatus } from "./runtimeMessageStore.js";
+import { pruneCompletedArtifacts } from "./runtimeSnapshotMessages.js";
 import { clearRunningLease, markRunningSignal } from "./runningLease.js";
 import {
   markRuntimeApprovalPending,
   markRuntimeApprovalResolved,
   markRuntimeFailed,
   markRuntimeIdle,
+  markRuntimeTurnFinished,
   markRuntimeTurnStarted,
   resolveRuntimeStatus,
 } from "./runtimeStatusRegistry.js";
@@ -27,6 +30,7 @@ interface SharedApprovalActionDeps {
   threads: Map<string, ThreadRuntimeState>;
   emitChanged(): void;
   getSnapshot(threadId?: string): ClientSnapshot;
+  refreshThread(threadId: string): Promise<void>;
   updateSummaryStatus(threadId: string, status: ThreadLifecycleStatus): void;
 }
 
@@ -40,6 +44,7 @@ export async function handleCurrentApproval({
   appServer,
   emitChanged,
   getSnapshot,
+  refreshThread,
   threadId,
   threads,
   updateSummaryStatus,
@@ -71,21 +76,50 @@ export async function handleCurrentApproval({
     updateSummaryStatus(threadId, resolveRuntimeStatus(state));
     emitChanged();
 
-    void appServer.threadShellCommand(threadId, pending.command ?? "").catch((error) => {
-      const latest = threads.get(threadId);
-      if (!latest) {
-        return;
-      }
+    void appServer.threadShellCommand(threadId, pending.command ?? "")
+      .then(async () => {
+        try {
+          await refreshThread(threadId);
+        } catch {
+          // Shell RPC can complete before the thread history is materialized.
+          // Keep the live process messages and still close the running state.
+        }
+        const latest = threads.get(threadId);
+        if (!latest) {
+          return;
+        }
 
-      latest.snapshot.isGenerating = false;
-      clearRunningLease(latest);
-      markRuntimeFailed(latest);
-      latest.snapshot.messages = latest.snapshot.messages.concat(
-        systemStatus(`shell 命令执行失败: ${error instanceof Error ? error.message : "unknown"}`)
-      );
-      updateSummaryStatus(threadId, resolveRuntimeStatus(latest));
-      emitChanged();
-    });
+        latest.transientOperation = null;
+        markRuntimeTurnFinished(latest, `shell-${threadId}`, "completed");
+        latest.snapshot.isGenerating = false;
+        latest.currentTurnId = null;
+        latest.activeAssistantMessageId = null;
+        latest.liveAssistantItemId = null;
+        clearCurrentTurnStarted(latest);
+        clearRunningLease(latest);
+        pruneCompletedArtifacts(latest);
+        markRuntimeIdle(latest);
+        updateSummaryStatus(threadId, resolveRuntimeStatus(latest));
+        emitChanged();
+      })
+      .catch((error) => {
+        const latest = threads.get(threadId);
+        if (!latest) {
+          return;
+        }
+
+        latest.transientOperation = null;
+        latest.snapshot.isGenerating = false;
+        latest.currentTurnId = null;
+        clearCurrentTurnStarted(latest);
+        clearRunningLease(latest);
+        markRuntimeFailed(latest);
+        latest.snapshot.messages = latest.snapshot.messages.concat(
+          systemStatus(`shell 命令执行失败: ${error instanceof Error ? error.message : "unknown"}`)
+        );
+        updateSummaryStatus(threadId, resolveRuntimeStatus(latest));
+        emitChanged();
+      });
     return getSnapshot(threadId);
   }
 
