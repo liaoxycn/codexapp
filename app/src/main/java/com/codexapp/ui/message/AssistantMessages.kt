@@ -78,7 +78,7 @@ internal fun AssistantMessage(
             preferPlainText = preferPlainText
         )
     }
-    val autoExpandProcess = turn.isRunning || (!message.isFinal && turn.hasProcess && turn.bodyBlocks.isEmpty())
+    val autoExpandProcess = turn.isRunning || (turn.hasProcess && turn.bodyBlocks.isEmpty())
     var processExpanded by rememberSaveable(message.id + ":process") { mutableStateOf(autoExpandProcess) }
     LaunchedEffect(turn.isRunning, turn.hasProcess, message.isFinal, turn.bodyBlocks.isEmpty()) {
         processExpanded = autoExpandProcess
@@ -113,17 +113,19 @@ internal fun AssistantMessage(
                 compactMode = compactMode
             )
 
-            StableAssistantBodySlot(
-                blocks = turn.bodyBlocks,
-                expanded = expanded,
-                reasoningExpanded = reasoningExpanded,
-                onToggleExpanded = { expanded = !expanded },
-                onToggleReasoning = { reasoningExpanded = !reasoningExpanded },
-                renderMarkdown = !turn.preferPlainText,
-                compactMode = compactMode,
-                messageId = turn.id,
-                messageIndex = messageIndex
-            )
+            if (turn.bodyBlocks.isNotEmpty()) {
+                StableAssistantBodySlot(
+                    blocks = turn.bodyBlocks,
+                    expanded = expanded,
+                    reasoningExpanded = reasoningExpanded,
+                    onToggleExpanded = { expanded = !expanded },
+                    onToggleReasoning = { reasoningExpanded = !reasoningExpanded },
+                    renderMarkdown = !turn.preferPlainText,
+                    compactMode = compactMode,
+                    messageId = turn.id,
+                    messageIndex = messageIndex
+                )
+            }
 
             AssistantTurnFooterActions(
                 messageId = turn.id,
@@ -291,6 +293,9 @@ private fun AssistantTurnFooterActions(
     onCopyFinalText: () -> Unit,
     onForkFromMessage: () -> Unit
 ) {
+    if (!canShowActions || (!canCopy && !canFork)) {
+        return
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()

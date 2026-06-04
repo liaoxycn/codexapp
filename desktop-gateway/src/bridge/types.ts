@@ -39,6 +39,14 @@ export interface ThreadTokenUsage {
   contextPercent?: number;
 }
 
+export interface GatewayShellSession {
+  processId: string;
+  messageId: string;
+  command: string;
+  turnId: string;
+  startedAtMs: number;
+}
+
 export interface ThreadRuntimeState {
   summary: GatewayThreadPayload;
   thread: AppServerThread | null;
@@ -48,10 +56,11 @@ export interface ThreadRuntimeState {
   historyWindow: number;
   currentTurnId: string | null;
   currentTurnStartedAtMs: number | null;
-  activeAssistantMessageId: string | null;
-  liveAssistantItemId: string | null;
+  activeAssistantMessageId: string | null;
+  liveAssistantItemId: string | null;
   transientOperation: "compact" | "rollback" | "shell" | null;
-  pendingApproval: PendingApproval | null;
+  gatewayShellSession: GatewayShellSession | null;
+  pendingApproval: PendingApproval | null;
   stopRequested: boolean;
   isFinalizing: boolean;
   runningSignalUntilMs: number;

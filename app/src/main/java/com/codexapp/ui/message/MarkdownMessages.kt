@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -18,7 +19,8 @@ internal fun MarkdownText(
     fontSize: TextUnit,
     lineHeight: TextUnit,
     maxCollapsedLines: Int,
-    wrapContent: Boolean = false
+    wrapContent: Boolean = false,
+    modifier: Modifier = Modifier
 ) {
     val displayText = text.trimEnd()
     val lines = remember(displayText) { parseMarkdownLines(displayText) }
@@ -26,7 +28,10 @@ internal fun MarkdownText(
         lines.count { it.kind != MarkdownLineKind.EMPTY } > maxCollapsedLines || displayText.length > 180
     val visibleLines = if (shouldCollapse && !expanded) lines.take(maxCollapsedLines) else lines
 
-    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(1.dp)
+    ) {
         SelectionContainer {
             Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 visibleLines.forEach { line ->

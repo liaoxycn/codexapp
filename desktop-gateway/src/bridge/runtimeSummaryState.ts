@@ -86,6 +86,7 @@ export function markAllThreadsFailedState(
     state.activeAssistantMessageId = null;
     state.liveAssistantItemId = null;
     state.transientOperation = null;
+    state.gatewayShellSession = null;
     state.pendingApproval = null;
     state.snapshot.pendingApproval = null;
     state.snapshot.isGenerating = false;
@@ -118,6 +119,7 @@ export function createPlaceholderThreadRuntimeState(
     activeAssistantMessageId: null,
     liveAssistantItemId: null,
     transientOperation: null,
+    gatewayShellSession: null,
     pendingApproval: null,
     stopRequested: false,
     isFinalizing: false,

@@ -268,3 +268,17 @@ export interface ThreadRollbackResponse {
 export interface TurnStartResult {
   turn: AppServerTurn;
 }
+
+export interface CommandExecParams {
+  command: string[];
+  processId?: string | null;
+  streamStdoutStderr?: boolean;
+  cwd?: string | null;
+  sandboxPolicy?: AppServerSandboxPolicy | null;
+}
+
+export interface CommandExecResponse {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}

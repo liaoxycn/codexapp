@@ -99,6 +99,7 @@ export function upsertThreadState({
     activeAssistantMessageId: retainRuntimeOverlay ? existing?.activeAssistantMessageId ?? null : null,
     liveAssistantItemId: retainRuntimeOverlay ? existing?.liveAssistantItemId ?? null : null,
     transientOperation: retainRuntimeOverlay ? existing?.transientOperation ?? null : null,
+    gatewayShellSession: retainRuntimeOverlay ? existing?.gatewayShellSession ?? null : null,
     pendingApproval: retainRuntimeOverlay ? existing?.pendingApproval ?? null : null,
     stopRequested: retainRuntimeOverlay ? existing?.stopRequested ?? false : false,
     isFinalizing: retainRuntimeOverlay ? existing?.isFinalizing ?? false : false,

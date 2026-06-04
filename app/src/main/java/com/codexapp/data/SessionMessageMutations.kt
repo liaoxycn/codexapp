@@ -15,18 +15,9 @@ internal fun SessionRemoteState.withOptimisticPrompt(
         role = MessageRole.USER,
         blocks = listOf(MessageBlock.Text(prompt))
     )
-    val nextMessages = if (isGenerating) {
-        messages + userMessage
-    } else {
-        messages + userMessage + ThreadMessage(
-            id = "assistant-pending",
-            role = MessageRole.ASSISTANT,
-            blocks = listOf(MessageBlock.Status("正在生成…"))
-        )
-    }
     return copy(
         isGenerating = true,
-        messages = nextMessages
+        messages = messages + userMessage
     )
 }
 

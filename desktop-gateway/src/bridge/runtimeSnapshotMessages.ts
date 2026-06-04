@@ -137,34 +137,40 @@ export function collectThreadMessages(thread: AppServerThread): GatewayMessagePa
     const turnCompleted = turn.completedAt != null || isTerminalTurnStatus(turn.status);
     const durationMs = getTurnDurationMs(turn, nowMs);
     const messages = turn.items.flatMap((item) => mapItemToMessages(item, thread.cwd));
-    const finalAssistantTextId = turnCompleted ? resolveFinalAssistantTextId(messages) : null;
+    const finalAssistantMessageId = turnCompleted ? resolveFinalAssistantMessageId(messages) : null;
     return messages.map((message) => {
       const normalizedMessage =
-        turnCompleted && message.role === "assistant" && message.id !== finalAssistantTextId
+        turnCompleted && message.role === "assistant" && message.id !== finalAssistantMessageId
           ? convertAssistantTextToCommentary(message)
           : message;
-      const isFinalAssistantText =
+      const isFinalAssistantMessage =
         normalizedMessage.role === "assistant" &&
-        normalizedMessage.id === finalAssistantTextId &&
-        normalizedMessage.blocks.some((block) => block.kind === "text" && block.value.trim().length > 0);
+        normalizedMessage.id === finalAssistantMessageId &&
+        normalizedMessage.blocks.some((block) => hasRenderableAssistantBlock(block));
       return {
         ...normalizedMessage,
         ...(normalizedMessage.role === "assistant" ? { forkNumTurns: turnIndex + 1 } : {}),
         ...(normalizedMessage.role === "assistant" && durationMs != null ? { durationMs } : {}),
-        ...(isFinalAssistantText ? { isFinal: true } : {}),
+        ...(isFinalAssistantMessage ? { isFinal: true } : {}),
         ...(normalizedMessage.role === "user" ? { rollbackNumTurns: thread.turns.length - turnIndex } : {}),
       };
     });
   });
 }
 
-function resolveFinalAssistantTextId(messages: GatewayMessagePayload[]): string | null {
+function resolveFinalAssistantMessageId(messages: GatewayMessagePayload[]): string | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]!;
     if (
       message.role === "assistant" &&
       message.blocks.some((block) => block.kind === "text" && block.value.trim().length > 0)
     ) {
+      return message.id;
+    }
+  }
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]!;
+    if (message.role === "assistant" && message.blocks.some((block) => hasRenderableAssistantBlock(block))) {
       return message.id;
     }
   }
@@ -181,6 +187,37 @@ function convertAssistantTextToCommentary(message: GatewayMessagePayload): Gatew
       block.kind === "text" ? { ...block, kind: "commentary" as const } : block
     ),
   };
+}
+
+function hasRenderableAssistantBlock(block: GatewayMessagePayload["blocks"][number]): boolean {
+  switch (block.kind) {
+    case "text":
+    case "code":
+    case "status":
+    case "reasoning":
+    case "commentary":
+    case "plan":
+    case "commandSummary":
+    case "commandMeta":
+    case "toolCall":
+    case "webSearch":
+    case "image":
+    case "collab":
+    case "review":
+    case "hook":
+    case "context":
+    case "fileChangeSummary":
+    case "fileChangeDiff":
+      return block.value.trim().length > 0;
+    case "fileChangeMeta":
+      return block.value.trim().length > 0 || (block.path?.trim().length ?? 0) > 0;
+    default:
+      return false;
+  }
+}
+
+function isAssistantProcessBlock(block: GatewayMessagePayload["blocks"][number]): boolean {
+  return block.kind !== "text" && hasRenderableAssistantBlock(block);
 }
 
 function getTurnDurationMs(
@@ -263,6 +300,20 @@ export function mergeSnapshotMessages(
     }
 
     if (message.id.startsWith("assistant-live-") && baseHasAnyRealAssistant) {
+      const liveProcessBlocks = message.blocks.filter(isAssistantProcessBlock);
+      if (liveProcessBlocks.length > 0) {
+        const targetBaseIndex = findFinalAssistantBaseIndex(baseMessages, consumedBaseIndexes);
+        if (targetBaseIndex >= 0) {
+          appendBaseUntil(targetBaseIndex);
+          merged.push(mergeMessageBlocks(baseMessages[targetBaseIndex]!, {
+            ...message,
+            id: baseMessages[targetBaseIndex]!.id,
+            blocks: liveProcessBlocks,
+          }));
+          consumedBaseIndexes.add(targetBaseIndex);
+          baseCursor = Math.max(baseCursor, targetBaseIndex + 1);
+        }
+      }
       continue;
     }
 
@@ -285,4 +336,21 @@ export function mergeSnapshotMessages(
   }
 
   return merged;
+}
+
+function findFinalAssistantBaseIndex(
+  baseMessages: GatewayMessagePayload[],
+  consumedBaseIndexes: Set<number>
+): number {
+  for (let index = baseMessages.length - 1; index >= 0; index -= 1) {
+    const message = baseMessages[index]!;
+    if (
+      !consumedBaseIndexes.has(index) &&
+      message.role === "assistant" &&
+      message.blocks.some((block) => block.kind === "text" && block.value.trim().length > 0)
+    ) {
+      return index;
+    }
+  }
+  return -1;
 }

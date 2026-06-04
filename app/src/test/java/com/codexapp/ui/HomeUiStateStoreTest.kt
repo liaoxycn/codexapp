@@ -182,14 +182,14 @@ class HomeUiStateStoreTest {
                 selectedThreadId = "",
                 pendingThreadTitle = "新会话",
                 isThreadSwitching = true,
-                messages = listOf(message("user-new"), message("assistant-pending")),
+                messages = listOf(message("user-new")),
                 isGenerating = true
             )
             yield()
 
             assertTrue(store.state.value.isNewThreadDraft)
             assertEquals("", store.state.value.selectedThreadId)
-            assertEquals(listOf("user-new", "assistant-pending"), store.state.value.messages.map { it.id })
+            assertEquals(listOf("user-new"), store.state.value.messages.map { it.id })
             assertTrue(store.state.value.isGenerating)
 
             remoteState.value = remoteState.value.copy(

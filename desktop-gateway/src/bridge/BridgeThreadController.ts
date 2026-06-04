@@ -134,7 +134,6 @@ export class BridgeThreadController {
       appServer: this.getAppServer(),
       emitChanged: () => this.runtime.emitChanged(),
       getSnapshot: (selectedThreadId) => this.runtime.getSnapshot(selectedThreadId),
-      refreshThread: async (targetThreadId) => this.catalog.refreshThread(targetThreadId),
       threadId: resolved,
       threads: this.threads,
       updateSummaryStatus: (targetThreadId, status) => this.runtime.updateSummaryStatus(targetThreadId, status),

@@ -27,7 +27,6 @@ internal fun parseMarkdownLines(text: String): List<MarkdownLine> {
         val line = rawLine.trimEnd()
         if (line.startsWith("```")) {
             inCodeBlock = !inCodeBlock
-            result += MarkdownLine(MarkdownLineKind.CODE, line)
             return@forEach
         }
         if (inCodeBlock) {
@@ -46,6 +45,11 @@ internal fun parseMarkdownLines(text: String): List<MarkdownLine> {
             line.startsWith("- ") || line.startsWith("* ") -> result += MarkdownLine(
                 kind = MarkdownLineKind.LIST_ITEM,
                 text = line.drop(2).trim()
+            )
+
+            line.matches(Regex("""\d+\.\s+.+""")) -> result += MarkdownLine(
+                kind = MarkdownLineKind.LIST_ITEM,
+                text = line.substringAfter('.').trim()
             )
 
             line.startsWith("> ") -> result += MarkdownLine(

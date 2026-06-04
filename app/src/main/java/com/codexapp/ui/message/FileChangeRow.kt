@@ -70,22 +70,35 @@ internal fun FileChangeRow(
             }
         }
         if (detailsExpanded && hasDiff) {
-            if (entry.path.isNotBlank()) {
-                Text(
-                    text = entry.path,
-                    color = CodexTheme.colors.textTertiary,
-                    fontSize = if (compactMode) 9.sp else 10.sp,
-                    lineHeight = if (compactMode) 12.sp else 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = 2.dp, end = 2.dp)
-                )
-            }
-            FileDiffBlock(
-                value = entry.diff.orEmpty(),
+            FileChangeEntryDetails(
+                entry = entry,
                 compactMode = compactMode
             )
         }
+    }
+}
+
+@Composable
+internal fun FileChangeEntryDetails(
+    entry: FileChangeEntry,
+    compactMode: Boolean
+) {
+    if (entry.path.isNotBlank()) {
+        Text(
+            text = entry.path,
+            color = CodexTheme.colors.textTertiary,
+            fontSize = if (compactMode) 9.sp else 10.sp,
+            lineHeight = if (compactMode) 12.sp else 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 2.dp, end = 2.dp)
+        )
+    }
+    if (!entry.diff.isNullOrBlank()) {
+        FileDiffBlock(
+            value = entry.diff.orEmpty(),
+            compactMode = compactMode
+        )
     }
 }
 

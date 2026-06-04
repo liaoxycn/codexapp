@@ -1,1 +1,1 @@
-- 修复 shell 审批通过后 gateway 刷新失败导致的假失败提示\n- 修复审批执行完成后 isGenerating 未收口、Android 端持续 running 的问题\n- 补充审批成功与刷新降级测试覆盖
+优化移动端 assistant 消息流：补齐已运行命令过程类型，命令-only turn 不再丢失；完善过程图标、文件改动展开去重、MCP 工具默认折叠；修复完成态过程保留与展示。

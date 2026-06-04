@@ -43,6 +43,7 @@ class MessageTurnActionsTest {
     fun runningTurnKeepsStreamingAssistantTextVisibleUntilTurnStops() {
         val messages = listOf(
             user("u1"),
+            system("approval", MessageBlock.Status("审批已允许")),
             assistant("status", MessageBlock.Status("运行中")),
             assistant("reasoning", MessageBlock.Reasoning("思考")),
             assistant("streaming-text", MessageBlock.Text("正在输出，还没有结束"), durationMs = 5_000L)
@@ -51,7 +52,7 @@ class MessageTurnActionsTest {
         val items = messages.toTurnMessageItems(currentTurnRunning = true)
 
         assertEquals(listOf("u1", "streaming-text"), items.map { it.message.id })
-        assertEquals(listOf("status", "reasoning"), items.last().processMessages.map { it.id })
+        assertEquals(listOf("approval", "status", "reasoning"), items.last().processMessages.map { it.id })
         assertEquals("u1:assistant-running", items.last().stableKey)
         assertEquals(5_000L, items.last().message.durationMs)
     }
@@ -115,6 +116,7 @@ class MessageTurnActionsTest {
     fun completedTurnMovesProcessMessagesAboveFinalReply() {
         val messages = listOf(
             user("u1"),
+            system("approval", MessageBlock.Status("审批已允许")),
             assistant("status", MessageBlock.Status("运行中")),
             assistant("reasoning", MessageBlock.Reasoning("思考")),
             assistant("final", MessageBlock.Text("最终回复"), isFinal = true)
@@ -123,7 +125,7 @@ class MessageTurnActionsTest {
         val items = messages.toTurnMessageItems()
 
         assertEquals(listOf("u1", "final"), items.map { it.message.id })
-        assertEquals(listOf("status", "reasoning"), items.last().processMessages.map { it.id })
+        assertEquals(listOf("approval", "status", "reasoning"), items.last().processMessages.map { it.id })
         assertEquals(false, items.last().preferPlainText)
     }
 
@@ -163,6 +165,7 @@ class MessageTurnActionsTest {
         val messages = listOf(
             user("u1"),
             assistant("final", MessageBlock.Text("最终回复"), isFinal = true, durationMs = 42_000L),
+            system("approval", MessageBlock.Status("审批已允许")),
             assistant("search-1", MessageBlock.Status("网页搜索 search: weather Shenzhen")),
             assistant("search-2", MessageBlock.Status("网页搜索 openPage: https://weather.example"))
         )
@@ -170,7 +173,32 @@ class MessageTurnActionsTest {
         val items = messages.toTurnMessageItems()
 
         assertEquals(listOf("u1", "final"), items.map { it.message.id })
-        assertEquals(listOf("search-1", "search-2"), items.last().processMessages.map { it.id })
+        assertEquals(listOf("approval", "search-1", "search-2"), items.last().processMessages.map { it.id })
+        assertEquals(false, items.last().assistantTurnRunning)
+    }
+
+    @Test
+    fun shellOnlyFinalAssistantStillAnchorsCompletedTurn() {
+        val messages = listOf(
+            user("u1"),
+            system("approval", MessageBlock.Status("审批已允许")),
+            ThreadMessage(
+                id = "command-final",
+                role = MessageRole.ASSISTANT,
+                blocks = listOf(
+                    MessageBlock.CommandSummary("已运行 1 条命令"),
+                    MessageBlock.CommandMeta("结果: 退出码 0"),
+                    MessageBlock.Code(language = "shell", value = "12345")
+                ),
+                isFinal = true,
+                durationMs = 2_000L
+            )
+        )
+
+        val items = messages.toTurnMessageItems()
+
+        assertEquals(listOf("u1", "command-final"), items.map { it.message.id })
+        assertEquals(listOf("approval"), items.last().processMessages.map { it.id })
         assertEquals(false, items.last().assistantTurnRunning)
     }
 
@@ -185,8 +213,9 @@ class MessageTurnActionsTest {
 
         val items = messages.toTurnMessageItems(currentTurnRunning = false)
 
-        assertEquals(listOf("u1", "status", "reasoning", "streaming-text"), items.map { it.message.id })
-        assertEquals(emptyList<ThreadMessage>(), items.last().processMessages)
+        assertEquals(listOf("u1", "streaming-text"), items.map { it.message.id })
+        assertEquals(listOf("status", "reasoning"), items.last().processMessages.map { it.id })
+        assertEquals(false, items.last().showAssistantActions)
     }
 
     @Test
@@ -261,7 +290,85 @@ class MessageTurnActionsTest {
 
         val items = messages.toTurnMessageItems()
 
-        assertEquals(listOf("u1", "final-1", "u2", "status-2"), items.map { it.message.id })
+        assertEquals(listOf("u1", "final-1", "u2"), items.map { it.message.id })
+    }
+
+    @Test
+    fun completedProcessOnlyTurnDoesNotRenderStandaloneAssistantRows() {
+        val messages = listOf(
+            user("u1"),
+            assistant("status", MessageBlock.Status("运行中")),
+            assistant("tool", MessageBlock.ToolCall("已调用工具 node_repl/js")),
+            assistant("file", MessageBlock.FileChangeSummary("已编辑 bridgeBackend.test.mjs"))
+        )
+
+        val items = messages.toTurnMessageItems()
+
+        assertEquals(listOf("u1"), items.map { it.message.id })
+    }
+
+    @Test
+    fun completedFinalCommandOnlyTurnRendersCommandAssistant() {
+        val messages = listOf(
+            user("u1"),
+            ThreadMessage(
+                id = "cmd",
+                role = MessageRole.ASSISTANT,
+                blocks = listOf(
+                    MessageBlock.CommandSummary("已运行命令"),
+                    MessageBlock.CommandMeta("命令: pwd"),
+                    MessageBlock.Code("shell", "D:\\Projects\\home\\codexapp")
+                ),
+                durationMs = 3_000L,
+                isFinal = true
+            )
+        )
+
+        val items = messages.toTurnMessageItems()
+
+        assertEquals(listOf("u1", "cmd"), items.map { it.message.id })
+        assertEquals(emptyList<ThreadMessage>(), items.last().processMessages)
+        assertEquals(3_000L, items.last().message.durationMs)
+        assertTrue(items.last().showAssistantActions)
+    }
+
+    @Test
+    fun completedNonFinalCommandOnlyTurnRendersCommandProcessAnchor() {
+        val messages = listOf(
+            user("u1"),
+            ThreadMessage(
+                id = "cmd",
+                role = MessageRole.ASSISTANT,
+                blocks = listOf(
+                    MessageBlock.CommandSummary("已运行命令"),
+                    MessageBlock.CommandMeta("命令: pwd"),
+                    MessageBlock.Code("shell", "D:\\Projects\\home\\codexapp")
+                ),
+                durationMs = 3_000L
+            )
+        )
+
+        val items = messages.toTurnMessageItems()
+
+        assertEquals(listOf("u1", "u1:assistant-command-process"), items.map { it.message.id })
+        assertEquals(listOf("cmd"), items.last().processMessages.map { it.id })
+        assertEquals(3_000L, items.last().message.durationMs)
+        assertFalse(items.last().showAssistantActions)
+    }
+
+    @Test
+    fun leadingProcessMessagesAreNotRenderedAsStandaloneTurns() {
+        val messages = listOf(
+            assistant("status", MessageBlock.Status("运行中")),
+            assistant("tool", MessageBlock.ToolCall("已调用工具 node_repl/js")),
+            user("u1"),
+            assistant("final", MessageBlock.Text("最终回复"), isFinal = true)
+        )
+
+        val items = messages.toTurnMessageItems()
+
+        assertEquals(listOf("u1", "final"), items.map { it.message.id })
+        assertEquals(emptyList<ThreadMessage>(), items.last().processMessages)
     }
 
     private fun user(id: String) = ThreadMessage(
@@ -283,5 +390,14 @@ class MessageTurnActionsTest {
         forkNumTurns = forkNumTurns,
         durationMs = durationMs,
         isFinal = isFinal
+    )
+
+    private fun system(
+        id: String,
+        block: MessageBlock
+    ) = ThreadMessage(
+        id = id,
+        role = MessageRole.SYSTEM,
+        blocks = listOf(block)
     )
 }

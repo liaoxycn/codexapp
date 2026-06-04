@@ -23,6 +23,7 @@ import com.codexapp.model.ThreadMessage
 import com.codexapp.model.ThreadStatus
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -338,6 +339,68 @@ class GatewaySnapshotMapperTest {
         val next = patch.applyTo(previous)
 
         assertEquals(false, next.isGenerating)
+    }
+
+    @Test
+    fun snapshotPatchAllowsIdleAfterShellOnlyFinalAssistantArrives() {
+        val previous = SessionRemoteState(
+            snapshotRevision = 12L,
+            selectedThreadId = "thread-1",
+            threads = listOf(
+                com.codexapp.model.ThreadSummary(
+                    id = "thread-1",
+                    title = "Codex 会话",
+                    preview = "",
+                    status = ThreadStatus.IDLE
+                )
+            ),
+            isGenerating = true,
+            messages = listOf(
+                ThreadMessage(
+                    id = "user-1",
+                    role = MessageRole.USER,
+                    blocks = listOf(MessageBlock.Text("!powershell -NoProfile -Command Get-Random"))
+                ),
+                ThreadMessage(
+                    id = "assistant-live",
+                    role = MessageRole.ASSISTANT,
+                    blocks = listOf(MessageBlock.Reasoning("正在思考"))
+                )
+            )
+        )
+        val patch = GatewaySnapshotPatchMessage(
+            baseRevision = 12L,
+            revision = 13L,
+            changed = listOf("messages", "isGenerating"),
+            messages = listOf(
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "user-1",
+                    role = "user",
+                    blocks = listOf(GatewayBlockPayload(kind = "text", value = "!powershell -NoProfile -Command Get-Random"))
+                ),
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "approval-1",
+                    role = "system",
+                    blocks = listOf(GatewayBlockPayload(kind = "status", value = "审批已允许"))
+                ),
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "assistant-final",
+                    role = "assistant",
+                    isFinal = true,
+                    blocks = listOf(
+                        GatewayBlockPayload(kind = "commandSummary", value = "已运行 1 条命令"),
+                        GatewayBlockPayload(kind = "commandMeta", value = "结果: 退出码 0"),
+                        GatewayBlockPayload(kind = "code", language = "shell", value = "34590525")
+                    )
+                )
+            ),
+            isGenerating = false
+        )
+
+        val next = patch.applyTo(previous)
+
+        assertFalse(next.isGenerating)
+        assertEquals(listOf("user-1", "approval-1", "assistant-final"), next.messages.map { it.id })
     }
 
     @Test

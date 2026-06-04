@@ -1,6 +1,8 @@
 import process from "node:process";
 import type {
   AppServerThread,
+  CommandExecParams,
+  CommandExecResponse,
   JsonRpcNotification,
   JsonRpcServerRequest,
   ThreadForkResponse,
@@ -25,6 +27,7 @@ import {
   unsubscribeThread,
 } from "./appServerThreadRpc.js";
 import {
+  execCommand,
   interruptTurn,
   sendThreadShellCommand,
   startThreadCompaction,
@@ -128,6 +131,10 @@ export class AppServerClient {
 
   async threadShellCommand(threadId: string, command: string): Promise<void> {
     await sendThreadShellCommand(this.request.bind(this), threadId, command);
+  }
+
+  async commandExec(params: CommandExecParams): Promise<CommandExecResponse> {
+    return await execCommand(this.request.bind(this), params);
   }
 
   respond(id: string | number, result: unknown): void {

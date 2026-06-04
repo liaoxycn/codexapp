@@ -145,6 +145,10 @@ test("handleBridgeNotification surfaces streaming item notifications", async () 
     state.snapshot.messages.map((message) => message.blocks.at(-1).value),
     ["思考摘要 1", "思考", "步骤", "+line", "MCP 进度: 连接中", "\nstdin> y\n"]
   );
+  assert.deepEqual(
+    state.snapshot.messages.map((message) => message.blocks[0].kind),
+    ["reasoning", "reasoning", "plan", "fileChangeSummary", "toolCall", "commandSummary"]
+  );
 });
 
 test("handleBridgeNotification surfaces errors and thread warnings", async () => {

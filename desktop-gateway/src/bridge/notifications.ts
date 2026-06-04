@@ -3,6 +3,7 @@ import type { GatewayOperationalNoticePayload } from "../protocol.js";
 import type { ThreadLifecycleStatus, ThreadRuntimeState } from "./types.js";
 import {
   handleAgentMessageDelta,
+  handleCommandExecOutputDelta,
   handleCommandExecutionOutputDelta,
   handleFileChangeOutputDelta,
   handleFileChangePatchUpdated,
@@ -187,6 +188,8 @@ export async function handleBridgeNotification(
       handleOperationalNotice(notification, deps);
       return;
     case "command/exec/outputDelta":
+      handleCommandExecOutputDelta(notification, deps);
+      return;
     case "process/outputDelta":
     case "process/exited":
       return;

@@ -274,11 +274,32 @@ private fun List<ThreadMessage>.hasOpenAssistantTurn(): Boolean {
     if (turnMessages.none { it.role == MessageRole.ASSISTANT }) {
         return false
     }
-    return turnMessages.none { it.role == MessageRole.ASSISTANT && it.isFinal && it.hasAssistantReplyText() }
+    return turnMessages.none { it.role == MessageRole.ASSISTANT && it.isFinal && it.hasAssistantTerminalContent() }
 }
 
-private fun ThreadMessage.hasAssistantReplyText(): Boolean {
-    return blocks.any { it is MessageBlock.Text && it.value.isNotBlank() }
+private fun ThreadMessage.hasAssistantTerminalContent(): Boolean {
+    return blocks.any { block ->
+        when (block) {
+            is MessageBlock.Text -> block.value.isNotBlank()
+            is MessageBlock.Code -> block.value.isNotBlank()
+            is MessageBlock.Status -> block.value.isNotBlank()
+            is MessageBlock.Reasoning -> block.value.isNotBlank()
+            is MessageBlock.Commentary -> block.value.isNotBlank()
+            is MessageBlock.Plan -> block.value.isNotBlank()
+            is MessageBlock.CommandSummary -> block.value.isNotBlank()
+            is MessageBlock.CommandMeta -> block.value.isNotBlank()
+            is MessageBlock.ToolCall -> block.value.isNotBlank()
+            is MessageBlock.WebSearch -> block.value.isNotBlank()
+            is MessageBlock.Image -> block.value.isNotBlank()
+            is MessageBlock.Collab -> block.value.isNotBlank()
+            is MessageBlock.Review -> block.value.isNotBlank()
+            is MessageBlock.Hook -> block.value.isNotBlank()
+            is MessageBlock.Context -> block.value.isNotBlank()
+            is MessageBlock.FileChangeSummary -> block.value.isNotBlank()
+            is MessageBlock.FileChangeMeta -> block.value.isNotBlank() || block.path.isNotBlank()
+            is MessageBlock.FileChangeDiff -> block.value.isNotBlank()
+        }
+    }
 }
 
 internal fun GatewaySnapshotPatchMessage.isStaleFor(previous: SessionRemoteState): Boolean {

@@ -30,11 +30,7 @@ internal fun List<ThreadMessage>.toTurnMessageItems(currentTurnRunning: Boolean 
     while (index < size) {
         val message = this[index]
         if (message.role != MessageRole.USER) {
-            if (message.role == MessageRole.ASSISTANT && message.blocks.any { it.isAssistantProcessBlock() }) {
-                items += TurnMessageItem(
-                    message = message,
-                    showAssistantActions = isFinalAssistantTurnMessage(index)
-                )
+            if (message.shouldAttachToAssistantProcessStream()) {
                 index += 1
                 continue
             }
@@ -77,10 +73,10 @@ internal fun List<ThreadMessage>.toTurnMessageItems(currentTurnRunning: Boolean 
             } else {
                 val streamingMessage = turnMessages[streamingAssistantIndex]
                 val processMessages = turnMessages.filterIndexed { turnIndex, turnMessage ->
-                    turnIndex != streamingAssistantIndex && turnMessage.isAssistantProcessMessage()
+                    turnIndex != streamingAssistantIndex && turnMessage.shouldAttachToAssistantProcessStream()
                 }
                 val trailingMessages = turnMessages.drop(streamingAssistantIndex + 1)
-                    .filterNot { it.isAssistantProcessMessage() }
+                    .filterNot { it.shouldAttachToAssistantProcessStream() }
                 items += TurnMessageItem(
                     message = streamingMessage,
                     processMessages = processMessages,
@@ -102,20 +98,60 @@ internal fun List<ThreadMessage>.toTurnMessageItems(currentTurnRunning: Boolean 
         }
         val finalAssistantIndex = turnMessages.indexOfLast { it.isFinalAssistantReply() }
         if (finalAssistantIndex < 0) {
-            items += turnMessages.mapIndexed { turnIndex, turnMessage ->
-                val absoluteIndex = index - turnMessages.size + turnIndex
-                TurnMessageItem(
-                    message = turnMessage,
-                    showAssistantActions = turnMessage.role == MessageRole.ASSISTANT && isFinalAssistantTurnMessage(absoluteIndex)
+            val fallbackAssistantIndex = turnMessages.indexOfLast { it.isAssistantReplyText() }
+            if (fallbackAssistantIndex < 0) {
+                val processMessages = turnMessages.filter { it.shouldAttachToAssistantProcessStream() }
+                if (processMessages.hasCommandProcessMessage()) {
+                    items += TurnMessageItem(
+                        message = ThreadMessage(
+                            id = "${userMessage.id}:assistant-command-process",
+                            role = MessageRole.ASSISTANT,
+                            blocks = emptyList(),
+                            durationMs = processMessages.lastKnownDurationMs()
+                        ),
+                        processMessages = processMessages,
+                        assistantActionsEnabled = false,
+                        showAssistantActions = false
+                    )
+                } else {
+                    items += turnMessages
+                        .filterNot { it.shouldAttachToAssistantProcessStream() }
+                        .mapIndexed { turnIndex, turnMessage ->
+                            val absoluteIndex = index - turnMessages.size + turnIndex
+                            TurnMessageItem(
+                                message = turnMessage,
+                                showAssistantActions = turnMessage.role == MessageRole.ASSISTANT && isFinalAssistantTurnMessage(absoluteIndex)
+                            )
+                        }
+                }
+            } else {
+                val fallbackMessage = turnMessages[fallbackAssistantIndex]
+                val processMessages = turnMessages.filterIndexed { turnIndex, turnMessage ->
+                    turnIndex != fallbackAssistantIndex && turnMessage.shouldAttachToAssistantProcessStream()
+                }
+                val trailingMessages = turnMessages.drop(fallbackAssistantIndex + 1)
+                    .filterNot { it.shouldAttachToAssistantProcessStream() }
+                items += TurnMessageItem(
+                    message = fallbackMessage,
+                    processMessages = processMessages,
+                    assistantActionsEnabled = false,
+                    showAssistantActions = false
                 )
+                items += trailingMessages.mapIndexed { trailingIndex, turnMessage ->
+                    val absoluteIndex = index - turnMessages.size + fallbackAssistantIndex + 1 + trailingIndex
+                    TurnMessageItem(
+                        message = turnMessage,
+                        showAssistantActions = turnMessage.role == MessageRole.ASSISTANT && isFinalAssistantTurnMessage(absoluteIndex)
+                    )
+                }
             }
         } else {
             val finalMessage = turnMessages[finalAssistantIndex]
             val processMessages = turnMessages.filterIndexed { turnIndex, turnMessage ->
-                turnIndex != finalAssistantIndex && turnMessage.isAssistantProcessMessage()
+                turnIndex != finalAssistantIndex && turnMessage.shouldAttachToAssistantProcessStream()
             }
             val trailingMessages = turnMessages.drop(finalAssistantIndex + 1)
-                .filterNot { it.isAssistantProcessMessage() }
+                .filterNot { it.shouldAttachToAssistantProcessStream() }
             items += TurnMessageItem(
                 message = finalMessage,
                 processMessages = processMessages,
@@ -156,7 +192,7 @@ private fun List<ThreadMessage>.nextVisibleRole(index: Int): MessageRole? {
 }
 
 internal fun ThreadMessage.isFinalAssistantReply(): Boolean {
-    return role == MessageRole.ASSISTANT && isFinal && isAssistantReplyText()
+    return role == MessageRole.ASSISTANT && isFinal && hasAssistantTerminalContent()
 }
 
 private fun ThreadMessage.isAssistantReplyText(): Boolean {
@@ -165,10 +201,58 @@ private fun ThreadMessage.isAssistantReplyText(): Boolean {
     }
 }
 
+private fun ThreadMessage.hasAssistantTerminalContent(): Boolean {
+    return role == MessageRole.ASSISTANT && blocks.any { block ->
+        when (block) {
+            is MessageBlock.Text -> block.value.isNotBlank()
+            is MessageBlock.Code -> block.value.isNotBlank()
+            is MessageBlock.Status -> block.value.isNotBlank()
+            is MessageBlock.Reasoning -> block.value.isNotBlank()
+            is MessageBlock.Commentary -> block.value.isNotBlank()
+            is MessageBlock.Plan -> block.value.isNotBlank()
+            is MessageBlock.CommandSummary -> block.value.isNotBlank()
+            is MessageBlock.CommandMeta -> block.value.isNotBlank()
+            is MessageBlock.ToolCall -> block.value.isNotBlank()
+            is MessageBlock.WebSearch -> block.value.isNotBlank()
+            is MessageBlock.Image -> block.value.isNotBlank()
+            is MessageBlock.Collab -> block.value.isNotBlank()
+            is MessageBlock.Review -> block.value.isNotBlank()
+            is MessageBlock.Hook -> block.value.isNotBlank()
+            is MessageBlock.Context -> block.value.isNotBlank()
+            is MessageBlock.FileChangeSummary -> block.value.isNotBlank()
+            is MessageBlock.FileChangeMeta -> block.value.isNotBlank() || block.path.isNotBlank()
+            is MessageBlock.FileChangeDiff -> block.value.isNotBlank()
+        }
+    }
+}
+
 private fun ThreadMessage.isAssistantProcessMessage(): Boolean {
     return role == MessageRole.ASSISTANT &&
         blocks.isNotEmpty() &&
         blocks.all { it.isAssistantProcessBlock() }
+}
+
+private fun ThreadMessage.shouldAttachToAssistantProcessStream(): Boolean {
+    return when (role) {
+        MessageRole.SYSTEM -> true
+        MessageRole.ASSISTANT -> isAssistantProcessMessage()
+        MessageRole.USER -> false
+    }
+}
+
+private fun List<ThreadMessage>.hasCommandProcessMessage(): Boolean {
+    return any { message ->
+        message.role == MessageRole.ASSISTANT &&
+            message.blocks.any { block ->
+                block is MessageBlock.CommandSummary ||
+                    block is MessageBlock.CommandMeta ||
+                    (block is MessageBlock.Code && block.language.equals("shell", ignoreCase = true))
+            }
+    }
+}
+
+private fun List<ThreadMessage>.lastKnownDurationMs(): Long? {
+    return asReversed().firstNotNullOfOrNull { it.durationMs }
 }
 
 private fun runningThinkingMessage(runningAssistantKey: String): ThreadMessage {

@@ -1,4 +1,10 @@
-import type { AppServerApprovalPolicy, AppServerSandboxPolicy, TurnStartResult } from "./appServerTypes.js";
+import type {
+  AppServerApprovalPolicy,
+  AppServerSandboxPolicy,
+  CommandExecParams,
+  CommandExecResponse,
+  TurnStartResult,
+} from "./appServerTypes.js";
 import type { ThreadStartOptions } from "./protocol.js";
 
 export interface MentionInput {
@@ -98,6 +104,13 @@ export async function sendThreadShellCommand(
     threadId,
     command,
   });
+}
+
+export async function execCommand(
+  request: RequestFn,
+  params: CommandExecParams
+): Promise<CommandExecResponse> {
+  return await request("command/exec", params);
 }
 
 function extractMentionInputs(text: string): MentionInput[] {

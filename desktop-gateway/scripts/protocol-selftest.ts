@@ -3,6 +3,8 @@ import { EventEmitter } from "node:events";
 import { AppServerBridgeBackend } from "../src/bridgeBackend.js";
 import type {
   AppServerThread,
+  CommandExecParams,
+  CommandExecResponse,
   JsonRpcNotification,
   JsonRpcServerRequest,
   ThreadResumeResult,
@@ -14,7 +16,7 @@ type Listener<T> = (event: T) => void;
 class FakeAppServer {
   private readonly notifications = new EventEmitter();
   private readonly requests = new EventEmitter();
-  readonly shellCalls: Array<[string, string]> = [];
+  readonly execCalls: CommandExecParams[] = [];
   readonly archivedThreadIds: string[] = [];
   readonly unarchivedThreadIds: string[] = [];
   readonly rollbackCalls: Array<[string, number]> = [];
@@ -22,6 +24,7 @@ class FakeAppServer {
   private readonly threads = new Map<string, AppServerThread>();
   private readonly activeThreadIds = new Set<string>();
   private readonly archivedThreadIdsSet = new Set<string>();
+  private readonly pendingExecs = new Map<string, (result: CommandExecResponse) => void>();
   private nextThreadNumber = 1;
 
   async start(): Promise<void> {}
@@ -133,11 +136,19 @@ class FakeAppServer {
     });
   }
 
-  async threadShellCommand(threadId: string, command: string): Promise<void> {
-    this.shellCalls.push([threadId, command]);
+  async commandExec(params: CommandExecParams): Promise<CommandExecResponse> {
+    this.execCalls.push(params);
+    return await new Promise<CommandExecResponse>((resolve) => {
+      this.pendingExecs.set(params.processId ?? `process-${this.execCalls.length}`, resolve);
+    });
   }
 
   respond(): void {}
+
+  resolveExec(processId: string, result: CommandExecResponse): void {
+    this.pendingExecs.get(processId)?.(result);
+    this.pendingExecs.delete(processId);
+  }
 
   emitNotification(notification: JsonRpcNotification): void {
     this.notifications.emit("notification", notification);
@@ -175,27 +186,41 @@ async function main(): Promise<void> {
 
   await backend.sendPrompt(threadId, "!echo protocol-selftest");
   await backend.approveCurrent(threadId, false);
-  assert.deepEqual(fake.shellCalls, []);
+  assert.deepEqual(fake.execCalls, []);
 
   await backend.sendPrompt(threadId, "!echo protocol-selftest");
   await backend.approveCurrent(threadId, true);
-  assert.deepEqual(fake.shellCalls, [[threadId, "echo protocol-selftest"]]);
+  assert.equal(fake.execCalls.length, 1);
+  assert.equal(fake.execCalls[0]?.command.at(-1), "echo protocol-selftest");
+  const processId = fake.execCalls[0]?.processId;
+  assert.equal(typeof processId, "string");
 
   await backend.handleNotification({
-    method: "item/commandExecution/outputDelta",
-    params: { threadId, turnId: "turn-1", itemId: "command-1", delta: "one" },
+    method: "command/exec/outputDelta",
+    params: {
+      processId,
+      stream: "stdout",
+      deltaBase64: Buffer.from("one").toString("base64"),
+      capReached: false,
+    },
   });
   await backend.handleNotification({
-    method: "item/commandExecution/outputDelta",
-    params: { threadId, turnId: "turn-1", itemId: "command-1", delta: "\ntwo" },
+    method: "command/exec/outputDelta",
+    params: {
+      processId,
+      stream: "stdout",
+      deltaBase64: Buffer.from("\ntwo").toString("base64"),
+      capReached: false,
+    },
   });
   assert.equal(
     backend
       .getSnapshot(threadId)
-      .messages.find((message) => message.id === "command-1")
+      .messages.find((message) => message.id === processId)
       ?.blocks.find((block) => block.kind === "code")?.value,
     "one\ntwo"
   );
+  fake.resolveExec(processId!, { exitCode: 0, stdout: "", stderr: "" });
 
   await backend.handleNotification({
     method: "thread/goal/updated",

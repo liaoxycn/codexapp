@@ -54,12 +54,12 @@ class SessionRemoteMutationsTest {
     }
 
     @Test
-    fun optimisticPromptAppendsPlaceholderOnlyWhenIdle() {
+    fun optimisticPromptAppendsUserMessageOnlyWhenIdle() {
         val next = SessionRemoteState().withOptimisticPrompt("hello", nowMillis = 42L)
 
-        assertEquals(2, next.messages.size)
+        assertEquals(1, next.messages.size)
         assertEquals("user-42", next.messages[0].id)
-        assertEquals(MessageRole.ASSISTANT, next.messages[1].role)
+        assertEquals(MessageRole.USER, next.messages[0].role)
         assertTrue(next.isGenerating)
     }
 

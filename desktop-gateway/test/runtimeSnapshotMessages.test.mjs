@@ -59,7 +59,7 @@ test("normalizeAllCompactMessages cleans historical duplicate compact status run
   );
 });
 
-test("mergeSnapshotMessages drops live assistant placeholder after real assistant text arrives", () => {
+test("mergeSnapshotMessages drops duplicate live assistant text after real assistant text arrives", () => {
   const baseMessages = [
     {
       id: "assistant-real",
@@ -71,13 +71,41 @@ test("mergeSnapshotMessages drops live assistant placeholder after real assistan
     {
       id: "assistant-live-turn-1",
       role: "assistant",
-      blocks: [{ kind: "reasoning", value: "正在思考" }],
+      blocks: [{ kind: "text", value: "final" }],
     },
   ];
 
   const merged = mergeSnapshotMessages(baseMessages, liveMessages);
 
   assert.deepEqual(merged, baseMessages);
+});
+
+test("mergeSnapshotMessages merges assistant-live process blocks into final history text", () => {
+  const baseMessages = [
+    {
+      id: "assistant-real",
+      role: "assistant",
+      blocks: [{ kind: "text", value: "final answer" }],
+    },
+  ];
+  const liveMessages = [
+    {
+      id: "assistant-live-turn-1",
+      role: "assistant",
+      blocks: [
+        { kind: "reasoning", value: "正在思考" },
+        { kind: "commandSummary", value: "已运行命令" },
+        { kind: "text", value: "final" },
+      ],
+    },
+  ];
+
+  const merged = mergeSnapshotMessages(baseMessages, liveMessages);
+
+  assert.deepEqual(
+    merged.map((message) => [message.id, message.blocks.map((block) => block.kind)]),
+    [["assistant-real", ["text", "reasoning", "commandSummary"]]]
+  );
 });
 
 test("mergeSnapshotMessages preserves live process items before final history text", () => {
@@ -145,7 +173,7 @@ test("mergeSnapshotMessages keeps older base history before live-only process it
   );
 });
 
-test("collectThreadMessages marks only completed assistant text as final", () => {
+test("collectThreadMessages marks completed assistant terminal message as final", () => {
   const messages = collectThreadMessages({
     id: "thread-1",
     preview: "",
@@ -174,6 +202,33 @@ test("collectThreadMessages marks only completed assistant text as final", () =>
   assert.equal(messages.find((message) => message.id === "assistant-running")?.isFinal, undefined);
   assert.equal(messages.find((message) => message.id === "assistant-final")?.isFinal, true);
   assert.equal(messages.find((message) => message.id === "assistant-final")?.durationMs, 61000);
+});
+
+test("collectThreadMessages marks completed shell-only assistant message as final", () => {
+  const messages = collectThreadMessages({
+    id: "thread-1",
+    preview: "",
+    status: "idle",
+    cwd: "D:/Projects/Test",
+    updatedAt: 1,
+    name: null,
+    modelProvider: "openai",
+    turns: [
+      {
+        id: "turn-done",
+        status: "completed",
+        completedAt: 2,
+        durationMs: 2000,
+        items: [
+          { type: "userMessage", id: "user-1", content: [{ type: "text", text: "!powershell -NoProfile -Command Get-Random" }] },
+          { type: "commandExecution", id: "cmd-1", command: "powershell -NoProfile -Command Get-Random", status: "completed", aggregatedOutput: "12345" },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(messages.find((message) => message.id === "cmd-1")?.isFinal, true);
+  assert.equal(messages.find((message) => message.id === "cmd-1")?.durationMs, 2000);
 });
 
 test("collectThreadMessages keeps completed commentary above the final answer", () => {

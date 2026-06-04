@@ -401,17 +401,15 @@ test("bridge backend turns shell prompt into pending approval", async () => {
 
 test("bridge backend executes approved shell command through app-server", async () => {
   const backend = new AppServerBridgeBackend();
-  const shellCalls = [];
+  const execCalls = [];
+  let resolveExec;
   backend.appServer = {
     threadStart: async (cwd) => startedThreadResponse("approved-shell-thread", cwd),
     threadRead: async (threadId) => thread(threadId, { cwd: "D:/Projects/ApprovedShell" }),
-    threadShellCommand: async (threadId, command) => {
-      shellCalls.push([threadId, command]);
-      const state = backend.threads.get(threadId);
-      state.snapshot.messages = state.snapshot.messages.concat({
-        id: "cmd-shell-1",
-        role: "assistant",
-        blocks: [{ kind: "commandSummary", value: "已运行命令" }],
+    commandExec: async (params) => {
+      execCalls.push(params);
+      return await new Promise((resolve) => {
+        resolveExec = resolve;
       });
     },
   };
@@ -420,9 +418,28 @@ test("bridge backend executes approved shell command through app-server", async 
   await backend.sendPrompt("approved-shell-thread", "!dir");
   const snapshot = await backend.approveCurrent("approved-shell-thread", true);
   await new Promise((resolve) => setTimeout(resolve, 0));
-  const settledSnapshot = backend.getSnapshot("approved-shell-thread");
 
-  assert.deepEqual(shellCalls, [["approved-shell-thread", "dir"]]);
+  assert.equal(execCalls.length, 1);
+  assert.equal(execCalls[0].command.at(-1), "dir");
+  await backend.handleNotification({
+    method: "command/exec/outputDelta",
+    params: {
+      processId: execCalls[0].processId,
+      stream: "stdout",
+      deltaBase64: Buffer.from("file-a\n").toString("base64"),
+      capReached: false,
+    },
+  });
+  const runningSnapshot = backend.getSnapshot("approved-shell-thread");
+  assert.equal(runningSnapshot.isGenerating, true);
+  assert.equal(
+    runningSnapshot.messages.find((message) => message.id === execCalls[0].processId)
+      ?.blocks.find((block) => block.kind === "code")?.value,
+    "file-a\n"
+  );
+  resolveExec({ exitCode: 0, stdout: "", stderr: "" });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const settledSnapshot = backend.getSnapshot("approved-shell-thread");
   assert.equal(snapshot.pendingApproval, null);
   assert.equal(snapshot.isGenerating, true);
   assert.equal(snapshot.messages.some((message) =>
@@ -431,31 +448,19 @@ test("bridge backend executes approved shell command through app-server", async 
   assert.equal(settledSnapshot.isGenerating, false);
   assert.equal(
     settledSnapshot.messages.some((message) =>
-      message.blocks.some((block) => block.kind === "commandSummary" && block.value === "已运行命令")
+      message.blocks.some((block) => block.kind === "commandSummary" && block.value === "已运行 1 条命令")
     ),
     true
   );
 });
 
-test("bridge backend ignores refresh failure after approved shell command", async () => {
+test("bridge backend keeps approved shell command process message without thread history refresh", async () => {
   const backend = new AppServerBridgeBackend();
-  let readCount = 0;
   backend.appServer = {
     threadStart: async (cwd) => startedThreadResponse("approved-shell-refresh-failure", cwd),
-    threadRead: async (threadId) => {
-      readCount += 1;
-      if (readCount === 1) {
-        return thread(threadId, { cwd: "D:/Projects/ApprovedShell" });
-      }
-      throw new Error("rollout is empty");
-    },
-    threadShellCommand: async (threadId) => {
-      const state = backend.threads.get(threadId);
-      state.snapshot.messages = state.snapshot.messages.concat({
-        id: "cmd-shell-refresh-failure",
-        role: "assistant",
-        blocks: [{ kind: "commandSummary", value: "已运行命令" }],
-      });
+    threadRead: async (threadId) => thread(threadId, { cwd: "D:/Projects/ApprovedShell" }),
+    commandExec: async () => {
+      return { exitCode: 0, stdout: "", stderr: "" };
     },
   };
 
@@ -468,7 +473,7 @@ test("bridge backend ignores refresh failure after approved shell command", asyn
   assert.equal(settledSnapshot.isGenerating, false);
   assert.equal(
     settledSnapshot.messages.some((message) =>
-      message.blocks.some((block) => block.kind === "commandSummary" && block.value === "已运行命令")
+      message.blocks.some((block) => block.kind === "commandSummary" && block.value === "已运行 1 条命令")
     ),
     true
   );
@@ -998,6 +1003,10 @@ test("bridge backend accumulates command output deltas from notification stream"
   });
 
   const snapshot = backend.getSnapshot("command-delta-thread");
+  assert.equal(
+    snapshot.messages.find((message) => message.id === "command-1")?.blocks.find((block) => block.kind === "commandSummary")?.value,
+    "命令执行中"
+  );
   assert.equal(
     snapshot.messages.find((message) => message.id === "command-1")?.blocks.find((block) => block.kind === "code")?.value,
     "one\ntwo"

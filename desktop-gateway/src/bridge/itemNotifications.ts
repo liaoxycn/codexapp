@@ -8,6 +8,7 @@ import {
   appendOrMergeCodeMessage,
   appendOrMergeMessage,
   replaceOrAppendMessage,
+  upsertGatewayShellMessage,
 } from "./runtimeMessageStore.js";
 import { mergeThreadItem, replaceOrReuseLiveAssistantMessage } from "./runtimeMessages.js";
 import { clearRunningLease, markRunningSignal } from "./runningLease.js";
@@ -158,8 +159,40 @@ export function handleCommandExecutionOutputDelta(
   }
 
   markRuntimeActivity(threadId, state, deps, turnId);
-  appendOrMergeCodeMessage(state, itemId, delta, "shell", "命令执行中");
+  appendOrMergeCodeMessage(state, itemId, delta, "shell", "命令执行中", "commandSummary");
   deps.emitChanged();
+}
+
+export function handleCommandExecOutputDelta(
+  notification: JsonRpcNotification,
+  deps: BridgeNotificationDeps
+): void {
+  const { processId, deltaBase64, capReached } = notification.params as {
+    processId: string;
+    stream: string;
+    deltaBase64: string;
+    capReached: boolean;
+  };
+  const decodedDelta = decodeCommandExecDelta(deltaBase64);
+  for (const [threadId, state] of deps.threads) {
+    const session = state.gatewayShellSession;
+    if (!session || session.processId !== processId || state.transientOperation === "compact") {
+      continue;
+    }
+
+    state.currentTurnId = session.turnId;
+    markCurrentTurnStarted(state, session.startedAtMs, Date.now(), false);
+    markRuntimeTurnStarted(state, session.turnId);
+    markRunningSignal(state);
+    touchThreadActivity(state, Date.now());
+    upsertGatewayShellMessage(state, session.messageId, {
+      command: session.command,
+      appendOutput: `${decodedDelta}${capReached ? "\n…输出已截断" : ""}`,
+    });
+    deps.updateSummaryStatus(threadId, resolveRuntimeStatus(state));
+    deps.emitChanged();
+    return;
+  }
 }
 
 export function handleTerminalInteraction(
@@ -179,7 +212,7 @@ export function handleTerminalInteraction(
   }
 
   markRuntimeActivity(threadId, state, deps, turnId);
-  appendOrMergeCodeMessage(state, itemId, `\nstdin> ${stdin}`, "shell", "终端交互");
+  appendOrMergeCodeMessage(state, itemId, `\nstdin> ${stdin}`, "shell", "终端交互", "commandSummary");
   deps.emitChanged();
 }
 
@@ -199,7 +232,7 @@ export function handleFileChangeOutputDelta(
   }
 
   markRuntimeActivity(threadId, state, deps, turnId);
-  appendOrMergeCodeMessage(state, itemId, delta, "diff", "文件改动中");
+  appendOrMergeCodeMessage(state, itemId, delta, "diff", "文件改动中", "fileChangeSummary");
   deps.emitChanged();
 }
 
@@ -657,4 +690,12 @@ function markRuntimeActivity(
   }
   markRunningSignal(state);
   deps.updateSummaryStatus(threadId, resolveRuntimeStatus(state));
+}
+
+function decodeCommandExecDelta(deltaBase64: string): string {
+  try {
+    return Buffer.from(deltaBase64, "base64").toString("utf8");
+  } catch {
+    return "";
+  }
 }
