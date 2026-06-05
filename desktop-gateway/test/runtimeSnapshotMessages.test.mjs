@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   normalizeAllCompactMessages,
   normalizeCompactMessages,
+  normalizeDuplicateOptimisticUserMessages,
   collectThreadMessages,
   mergeSnapshotMessages,
 } from "../dist/bridge/runtimeSnapshotMessages.js";
@@ -56,6 +57,26 @@ test("normalizeAllCompactMessages cleans historical duplicate compact status run
   assert.deepEqual(
     state.snapshot.messages.map((message) => message.blocks[0].value),
     ["已请求压缩上下文", "上下文已压缩", "done", "上下文已压缩"]
+  );
+});
+
+test("normalizeDuplicateOptimisticUserMessages removes replaced user and assistant final duplicates", () => {
+  const state = {
+    snapshot: {
+      messages: [
+        { id: "4aecb6f4-b145", role: "user", blocks: [{ kind: "text", value: "markdown request" }] },
+        { id: "msg_assistant", role: "assistant", blocks: [{ kind: "text", value: "# Agent Markdown" }] },
+        { id: "item-1", role: "user", rollbackNumTurns: 1, blocks: [{ kind: "text", value: "markdown request" }] },
+        { id: "item-2", role: "assistant", isFinal: true, blocks: [{ kind: "text", value: "# Agent Markdown" }] },
+      ],
+    },
+  };
+
+  normalizeDuplicateOptimisticUserMessages(state);
+
+  assert.deepEqual(
+    state.snapshot.messages.map((message) => message.id),
+    ["item-1", "item-2"]
   );
 });
 

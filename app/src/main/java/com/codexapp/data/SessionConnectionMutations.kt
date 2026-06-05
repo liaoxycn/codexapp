@@ -4,6 +4,7 @@ import com.codexapp.model.ConnectionStatus
 import com.codexapp.model.StateDiagnostics
 import com.codexapp.model.GatewayConfig
 import com.codexapp.model.SessionRemoteState
+import com.codexapp.model.ThreadStatus
 
 internal fun SessionRemoteState.withBlankGatewayUrl(config: GatewayConfig): SessionRemoteState {
     return copy(
@@ -39,6 +40,7 @@ internal fun SessionRemoteState.withHelloSendFailure(): SessionRemoteState {
 }
 
 internal fun SessionRemoteState.withDisconnectedGateway(reason: String): SessionRemoteState {
+    val keepGenerating = shouldKeepSelectedGeneratingAfterConnectionLoss()
     return copy(
         connectionStatus = ConnectionStatus.DISCONNECTED,
         connectionDetail = if (reason.isBlank()) "desktop gateway 已断开" else reason,
@@ -48,13 +50,17 @@ internal fun SessionRemoteState.withDisconnectedGateway(reason: String): Session
         isThreadSwitching = false,
         isLoadingOlder = false,
         isManualRefreshing = false,
-        isGenerating = false,
+        isGenerating = keepGenerating,
         pendingApproval = null,
-        diagnostics = diagnostics.clearedAfterConnectionLoss()
+        diagnostics = diagnostics.clearedAfterConnectionLoss(
+            keepGenerating = keepGenerating,
+            selectedThreadId = selectedThreadId
+        )
     )
 }
 
 internal fun SessionRemoteState.withConnectionFailure(detail: String): SessionRemoteState {
+    val keepGenerating = shouldKeepSelectedGeneratingAfterConnectionLoss()
     return copy(
         connectionStatus = ConnectionStatus.ERROR,
         connectionDetail = detail,
@@ -64,13 +70,17 @@ internal fun SessionRemoteState.withConnectionFailure(detail: String): SessionRe
         isThreadSwitching = false,
         isLoadingOlder = false,
         isManualRefreshing = false,
-        isGenerating = false,
+        isGenerating = keepGenerating,
         pendingApproval = null,
-        diagnostics = diagnostics.clearedAfterConnectionLoss()
+        diagnostics = diagnostics.clearedAfterConnectionLoss(
+            keepGenerating = keepGenerating,
+            selectedThreadId = selectedThreadId
+        )
     )
 }
 
 internal fun SessionRemoteState.withManualDisconnect(): SessionRemoteState {
+    val keepGenerating = shouldKeepSelectedGeneratingAfterConnectionLoss()
     return copy(
         connectionStatus = ConnectionStatus.DISCONNECTED,
         connectionDetail = "已断开 desktop gateway",
@@ -80,9 +90,12 @@ internal fun SessionRemoteState.withManualDisconnect(): SessionRemoteState {
         isThreadSwitching = false,
         isLoadingOlder = false,
         isManualRefreshing = false,
-        isGenerating = false,
+        isGenerating = keepGenerating,
         pendingApproval = null,
-        diagnostics = diagnostics.clearedAfterConnectionLoss()
+        diagnostics = diagnostics.clearedAfterConnectionLoss(
+            keepGenerating = keepGenerating,
+            selectedThreadId = selectedThreadId
+        )
     )
 }
 
@@ -106,6 +119,7 @@ internal fun SessionRemoteState.withManualRefreshing(refreshing: Boolean): Sessi
 }
 
 internal fun SessionRemoteState.withInboundDecodeFailure(message: String?): SessionRemoteState {
+    val keepGenerating = shouldKeepSelectedGeneratingAfterConnectionLoss()
     return copy(
         connectionStatus = ConnectionStatus.ERROR,
         connectionDetail = "网关消息解析失败: $message",
@@ -115,17 +129,41 @@ internal fun SessionRemoteState.withInboundDecodeFailure(message: String?): Sess
         isThreadSwitching = false,
         isLoadingOlder = false,
         isManualRefreshing = false,
-        isGenerating = false,
+        isGenerating = keepGenerating,
         pendingApproval = null,
-        diagnostics = diagnostics.clearedAfterConnectionLoss()
+        diagnostics = diagnostics.clearedAfterConnectionLoss(
+            keepGenerating = keepGenerating,
+            selectedThreadId = selectedThreadId
+        )
     )
 }
 
-private fun StateDiagnostics.clearedAfterConnectionLoss(): StateDiagnostics {
+private fun SessionRemoteState.shouldKeepSelectedGeneratingAfterConnectionLoss(): Boolean {
+    if (selectedThreadId.isBlank()) {
+        return false
+    }
+    val selectedThreadRunning = threads.any { thread ->
+        thread.id == selectedThreadId && thread.status == ThreadStatus.RUNNING
+    }
+    val diagnosticsTargetsSelected = diagnostics.selectedThreadId.isBlank() ||
+        diagnostics.selectedThreadId == selectedThreadId
+    return selectedThreadRunning ||
+        diagnostics.runningThreadIds.contains(selectedThreadId) ||
+        (diagnostics.isGenerating && diagnosticsTargetsSelected)
+}
+
+private fun StateDiagnostics.clearedAfterConnectionLoss(
+    keepGenerating: Boolean,
+    selectedThreadId: String
+): StateDiagnostics {
     return copy(
         pendingSelectionThreadId = "",
-        isGenerating = false,
-        runningThreadIds = emptyList(),
+        isGenerating = keepGenerating,
+        runningThreadIds = if (keepGenerating && selectedThreadId.isNotBlank()) {
+            listOf(selectedThreadId)
+        } else {
+            emptyList()
+        },
         actionTraceId = "",
         actionType = "",
         actionStatus = "",

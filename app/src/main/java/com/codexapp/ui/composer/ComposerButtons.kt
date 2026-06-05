@@ -16,6 +16,7 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -75,6 +76,7 @@ internal fun ComposerIconButton(
     Box(
         modifier = Modifier
             .size(size)
+            .alpha(if (enabled) 1f else 0.46f)
             .clip(shape)
             .background(if (enabled) fill else CodexTheme.colors.surfaceSubtle)
             .clickable(enabled = enabled, onClick = onClick)

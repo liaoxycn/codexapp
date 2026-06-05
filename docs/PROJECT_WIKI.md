@@ -6,6 +6,9 @@
 codexapp/
 ├─ app/                                  Android 客户端工程，负责手机端界面、连接和交互
 │  ├─ src/main/java/com/codex/mobile/
+│  │  ├─ debug/                          debug 构建端侧 Agent 远程调试桥，仅本机回环监听
+│  │  │  ├─ AgentDebugBridge.kt          127.0.0.1 HTTP 调试端口，状态读取与安全动作分发
+│  │  │  └─ AgentDebugState.kt           HomeUiState -> Agent 调试 JSON 摘要
 │  │  ├─ model/                          Android 端 UI/会话领域模型
 │  │  │  ├─ ThreadModels.kt              线程摘要、分组、状态
 │  │  │  ├─ MessageModels.kt             消息、消息块、角色
@@ -182,17 +185,21 @@ codexapp/
 │  ├─ run-gateway-dev.mjs                gateway 开发模式启动辅助
 │  ├─ poke-desktop.mjs                   本地触发 `/poke`/Desktop 唤起逻辑的验证脚本
 │  ├─ pre-release-check.mjs              发布前一键检查，串联 Android/Gateway/协议自测，可选 dev-run
+│  ├─ agent-debug.mjs                    adb forward + 调用 App 端 Agent debug bridge，支持等待/截图/UI dump/场景证据包
+│  ├─ agent-debug-lib.mjs                Agent debug 脚本的 payload、等待条件、状态摘要和场景计划工具
 │  ├─ github-release.mjs                 提交当前阶段改动、写版本/更新说明、推送 tag 触发 Actions；关键步骤写入 scripts/logs，latest 摘要写入 scripts/logs/github-release-latest.json
 │  ├─ script-utils.test.mjs              脚本共享参数解析等工具的 Node 单测
 │  ├─ script-utils.mjs                   脚本共享工具
 │  └─ logs/                              脚本本地运行日志，默认不提交
 ├─ docs/                                 项目文档、规范、wiki、调研资料入口
 │  ├─ MOBILE_GATEWAY_PROTOCOL.md         Android App 与 desktop-gateway 对接协议、payload 与高频流程测试清单
+│  ├─ ANDROID_AGENT_DEBUG.md             Android debug 构建的 Agent 远程调试桥、CLI 调用和证据包说明
 │  ├─ MOBILE_GATEWAY_FLOW_PROGRESS.md    高频用户流程测试、发现问题与修复进度记录
 │  └─ research/                          调研资料、外部协议资料、生成型参考数据
 │     └─ codex-app-server-protocol/
 │        ├─ types/                       Codex App Server 协议生成的 TypeScript 类型
 │        └─ schema/                      Codex App Server 协议生成的 JSON Schema
+├─ tmp/                                  Agent 调试证据包和本地临时输出，默认不提交
 ├─ artifacts/                            构建或发布过程产生的临时成果物，默认不提交
 ├─ build/                                Gradle 根构建输出，默认不提交
 ├─ gradle/                               Gradle Wrapper 配置

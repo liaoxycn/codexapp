@@ -123,7 +123,7 @@ export function upsertThreadState({
       selectedThreadId: thread.id,
       messages: trimMessagesToWindow(mergedMessages, historyWindow),
       hasMoreHistory: mergedMessages.length > historyWindow,
-      pendingApproval: existing?.pendingApproval?.text ?? null,
+      pendingApproval: retainRuntimeOverlay ? existing?.pendingApproval?.text ?? null : null,
       tokenUsage: retainRuntimeOverlay ? existing?.tokenUsage ?? null : null,
       isGenerating,
     },

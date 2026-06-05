@@ -17,8 +17,10 @@ internal fun HandleThreadAutoScroll(
 ) {
     val userWasAtBottom = rememberSaveable(state.selectedThreadId) { mutableStateOf(true) }
 
-    LaunchedEffect(isAtBottom) {
-        userWasAtBottom.value = isAtBottom
+    LaunchedEffect(isAtBottom, state.isGenerating) {
+        if (isAtBottom || !state.isGenerating) {
+            userWasAtBottom.value = isAtBottom
+        }
     }
 
     LaunchedEffect(

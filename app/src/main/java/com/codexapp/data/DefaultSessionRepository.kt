@@ -43,7 +43,9 @@ class DefaultSessionRepository(
     private val commandSender = GatewayCommandSender(json, gatewayClient::send)
     private val commandMutex = Mutex()
     private val _state = MutableStateFlow(
-        emptyRemoteState(settingsStore.load())
+        emptyRemoteState(settingsStore.load()).copy(
+            selectedThreadId = settingsStore.loadLastSelectedThreadId()
+        )
     )
     private val inboundQueue = Channel<QueuedInboundMessage>(capacity = Channel.UNLIMITED)
     @Volatile
@@ -183,6 +185,7 @@ class DefaultSessionRepository(
                 onSnapshotPatchMismatch = { shouldRequestFullSnapshot = true }
             )
         }
+        persistLastSelectedThread(_state.value)
         if (shouldRequestFullSnapshot) {
             commandSender.refreshThreads(forceSnapshot = true)
         }
@@ -190,6 +193,10 @@ class DefaultSessionRepository(
 
     override fun markManualRefreshing(refreshing: Boolean) {
         commandActions.markManualRefreshing(refreshing)
+    }
+
+    private fun persistLastSelectedThread(state: SessionRemoteState) {
+        settingsStore.saveLastSelectedThreadId(state.selectedThreadId)
     }
 }
 

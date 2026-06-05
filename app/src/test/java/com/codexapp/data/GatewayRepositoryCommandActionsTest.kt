@@ -109,7 +109,7 @@ class GatewayRepositoryCommandActionsTest {
         assertTrue(accepted)
         assertTrue(sentMessages.single().contains("\"type\":\"send_prompt\""))
         assertTrue(sentMessages.single().contains("\"threadId\":\"thread-1\""))
-        assertEquals(2, state.messages.size)
+        assertEquals(1, state.messages.size)
         assertTrue(state.isGenerating)
     }
 
@@ -149,7 +149,7 @@ class GatewayRepositoryCommandActionsTest {
         assertTrue(sentMessages.single().contains("\"approvalPolicy\":\"on-request\""))
         assertTrue(sentMessages.single().contains("\"approvalsReviewer\":\"user\""))
         assertTrue(sentMessages.single().contains("\"sandboxMode\":\"workspace-write\""))
-        assertEquals(2, state.messages.size)
+        assertEquals(1, state.messages.size)
         assertEquals("", state.selectedThreadId)
         assertEquals("新会话", state.pendingThreadTitle)
         assertTrue(state.isThreadSwitching)
@@ -217,6 +217,48 @@ class GatewayRepositoryCommandActionsTest {
         assertTrue(sentMessages[2].contains("\"type\":\"archive_thread\""))
         assertTrue(sentMessages[3].contains("\"type\":\"unarchive_thread\""))
         assertTrue(sentMessages[4].contains("\"type\":\"restart_desktop\""))
+    }
+
+    @Test
+    fun archiveCurrentThreadClearsLocalSelectedThreadAfterSend() {
+        var state = SessionRemoteState(
+            connectionStatus = ConnectionStatus.CONNECTED,
+            selectedThreadId = "thread-1",
+            threads = listOf(
+                ThreadSummary(
+                    id = "thread-1",
+                    title = "Archived",
+                    preview = "",
+                    status = ThreadStatus.IDLE
+                )
+            ),
+            messages = listOf(
+                com.codexapp.model.ThreadMessage(
+                    id = "user-1",
+                    role = com.codexapp.model.MessageRole.USER,
+                    blocks = listOf(com.codexapp.model.MessageBlock.Text("hello"))
+                )
+            )
+        )
+        val sentMessages = mutableListOf<String>()
+        val actions = GatewayRepositoryCommandActions(
+            commandSender = GatewayCommandSender(json) { payload ->
+                sentMessages += payload
+                true
+            },
+            readState = { state },
+            updateState = { transform -> state = transform(state) },
+            logDebug = {}
+        )
+
+        val accepted = actions.archiveThread("thread-1")
+
+        assertTrue(accepted)
+        assertTrue(sentMessages.single().contains("\"type\":\"archive_thread\""))
+        assertEquals("", state.selectedThreadId)
+        assertTrue(state.threads.isEmpty())
+        assertTrue(state.messages.isEmpty())
+        assertFalse(state.isGenerating)
     }
 
     @Test

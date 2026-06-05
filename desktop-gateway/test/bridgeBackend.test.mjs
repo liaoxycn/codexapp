@@ -399,6 +399,43 @@ test("bridge backend turns shell prompt into pending approval", async () => {
   assert.equal(snapshot.threads.find((item) => item.id === "shell-thread")?.status, "needs_approval");
 });
 
+test("bridge backend preserves shell pending approval across catalog refresh", async () => {
+  const backend = new AppServerBridgeBackend();
+  const execCalls = [];
+  const refreshedThread = thread("shell-refresh-thread", {
+    cwd: "D:/Projects/ShellRefresh",
+    updatedAt: 300,
+  });
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("shell-refresh-thread", cwd),
+    threadRead: async () => refreshedThread,
+    threadList: async () => [refreshedThread],
+    commandExec: async (params) => {
+      execCalls.push(params);
+      return { exitCode: 0, stdout: "ok\n", stderr: "" };
+    },
+  };
+
+  await backend.createThread("D:/Projects/ShellRefresh");
+  const pending = await backend.sendPrompt("shell-refresh-thread", "!echo refreshed");
+  assert.match(pending.pendingApproval, /echo refreshed/);
+
+  const refreshed = await backend.refreshThreads("shell-refresh-thread");
+  assert.match(refreshed.pendingApproval, /echo refreshed/);
+
+  const approved = await backend.approveCurrent("shell-refresh-thread", true);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(execCalls.length, 1);
+  assert.equal(approved.isGenerating, true);
+  assert.equal(
+    backend.getSnapshot("shell-refresh-thread").messages.some((message) =>
+      message.blocks.some((block) => block.kind === "commandSummary")
+    ),
+    true
+  );
+});
+
 test("bridge backend executes approved shell command through app-server", async () => {
   const backend = new AppServerBridgeBackend();
   const execCalls = [];
@@ -949,6 +986,56 @@ test("bridge backend can stop a resumed in-progress turn", async () => {
   assert.equal(snapshot.isGenerating, true);
 });
 
+test("bridge backend stop finalization removes optimistic duplicate user and thinking placeholder", async () => {
+  const backend = new AppServerBridgeBackend();
+  const prompt = "stop duplicate prompt";
+  let currentThread = thread("stop-dedupe-thread", {
+    cwd: "D:/Projects/StopDedupe",
+    updatedAt: 200,
+    turns: [],
+  });
+  backend.appServer = {
+    threadStart: async (cwd) => startedThreadResponse("stop-dedupe-thread", cwd, currentThread),
+    threadRead: async () => currentThread,
+    turnStart: async () => "turn-stop",
+    turnInterrupt: async () => {
+      currentThread = thread("stop-dedupe-thread", {
+        cwd: "D:/Projects/StopDedupe",
+        updatedAt: 300,
+        turns: [
+          {
+            id: "turn-stop",
+            status: "completed",
+            completedAt: 301,
+            items: [
+              { type: "userMessage", id: "item-1", content: [{ type: "text", text: prompt }] },
+            ],
+          },
+        ],
+      });
+    },
+  };
+
+  await backend.createThread("D:/Projects/StopDedupe");
+  await backend.sendPrompt("stop-dedupe-thread", prompt);
+  await backend.stopTurn("stop-dedupe-thread");
+  await backend.handleNotification({
+    method: "turn/completed",
+    params: { threadId: "stop-dedupe-thread", turn: { id: "turn-stop", status: "completed", completedAt: 301 } },
+  });
+
+  const snapshot = backend.getSnapshot("stop-dedupe-thread");
+  assert.equal(snapshot.isGenerating, false);
+  assert.deepEqual(snapshot.messages.filter((message) => message.role === "user").map((message) => message.id), ["item-1"]);
+  assert.equal(snapshot.messages.some((message) => message.id.startsWith("assistant-live-")), false);
+  assert.equal(
+    snapshot.messages.some((message) =>
+      message.blocks.some((block) => block.kind === "status" && block.value === "已停止，本轮可继续补充输入。")
+    ),
+    true
+  );
+});
+
 test("bridge backend steers a resumed in-progress turn instead of starting another one", async () => {
   const backend = new AppServerBridgeBackend();
   const steerCalls = [];
@@ -1044,6 +1131,105 @@ test("bridge backend archives current thread and returns to draft state", async 
   assert.equal(snapshot.cwd, "");
   assert.deepEqual(snapshot.messages, []);
   assert.deepEqual(snapshot.threads.map((item) => item.id), ["thread-a"]);
+});
+
+test("bridge backend locally archives command-only runtime thread when app-server archive rejects", async () => {
+  const backend = new AppServerBridgeBackend();
+  const threadId = "local-command-thread";
+  const summary = {
+    id: threadId,
+    title: "Codex 会话",
+    preview: "",
+    status: "idle",
+    updatedAt: 100,
+    groupKind: "project",
+    groupLabel: "home",
+    cwd: "D:/Projects/home",
+    archived: false,
+  };
+  const messages = [
+    {
+      id: "user-live-command",
+      role: "user",
+      blocks: [{ kind: "text", value: "! echo codexapp-agent-command" }],
+    },
+    {
+      id: "gateway-shell-command",
+      role: "assistant",
+      blocks: [
+        { kind: "commandSummary", value: "已运行 1 条命令" },
+        { kind: "commandMeta", value: "命令: echo codexapp-agent-command" },
+        { kind: "code", language: "shell", value: "codexapp-agent-command" },
+      ],
+    },
+  ];
+  backend.threads.set(threadId, {
+    summary,
+    thread: thread(threadId, { cwd: "D:/Projects/home" }),
+    isSubscribed: false,
+    isLocalCatalogEntry: false,
+    lastActivityAtMs: 100,
+    historyWindow: 80,
+    currentTurnId: null,
+    currentTurnStartedAtMs: null,
+    activeAssistantMessageId: null,
+    liveAssistantItemId: null,
+    transientOperation: "shell",
+    gatewayShellSession: null,
+    pendingApproval: null,
+    stopRequested: false,
+    isFinalizing: false,
+    runningSignalUntilMs: 0,
+    turnCompletionGraceUntilMs: 0,
+    runtimeStatus: "idle",
+    activeTurnIds: [],
+    activeHookIds: [],
+    runtimeStatusSeq: 0,
+    runtimeTerminalSeq: 0,
+    model: null,
+    modelProvider: null,
+    instructionSources: [],
+    approvalPolicy: null,
+    approvalsReviewer: null,
+    sandbox: null,
+    reasoningEffort: null,
+    tokenUsage: null,
+    snapshot: {
+      threads: [summary],
+      selectedThreadId: threadId,
+      messages,
+      hasMoreHistory: false,
+      pendingApproval: null,
+      chips: [],
+      files: [],
+      slashCommands: [],
+      cwd: "D:/Projects/home",
+      permissionSummary: "danger-full-access · never",
+      sessionConfig: {},
+      configOptions: fakeConfigOptions(),
+      desktopRestartRequired: false,
+      operationalNotices: [],
+      isGenerating: false,
+    },
+  });
+  let hydrateCalled = false;
+  backend.appServer = {
+    threadArchive: async () => {
+      throw new Error("thread is not archivable by app-server");
+    },
+    threadList: async () => {
+      hydrateCalled = true;
+      return [];
+    },
+  };
+
+  const snapshot = await backend.archiveThread(threadId);
+
+  assert.equal(hydrateCalled, false);
+  assert.equal(snapshot.selectedThreadId, "");
+  assert.equal(snapshot.cwd, "");
+  assert.deepEqual(snapshot.messages, []);
+  assert.equal(snapshot.threads.some((thread) => thread.id === threadId), false);
 });
 
 test("bridge backend selects a thread again after unarchive refresh", async () => {

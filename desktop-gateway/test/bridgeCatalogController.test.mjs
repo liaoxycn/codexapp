@@ -95,3 +95,21 @@ test("BridgeRuntimeStore explicit empty snapshot keeps catalog in draft state", 
   assert.deepEqual(snapshot.messages, []);
   assert.deepEqual(snapshot.threads.map((thread) => thread.id), ["thread-a"]);
 });
+
+test("BridgeCatalogController refreshThreads preserves explicit draft selection", async () => {
+  const runtime = new BridgeRuntimeStore();
+  runtime.currentThreadId = "thread-a";
+  runtime.threads.set("thread-a", existingState("thread-a"));
+  const appServer = {
+    threadList: async () => [existingState("thread-a").thread, existingState("thread-b").thread],
+    threadRead: async (threadId) => existingState(threadId).thread,
+  };
+  const controller = new BridgeCatalogController(runtime, () => appServer);
+
+  const snapshot = await controller.refreshThreads("");
+
+  assert.equal(runtime.currentThreadId, "thread-a");
+  assert.equal(snapshot.selectedThreadId, "");
+  assert.deepEqual(snapshot.messages, []);
+  assert.deepEqual(snapshot.threads.map((thread) => thread.id), ["thread-a", "thread-b"]);
+});

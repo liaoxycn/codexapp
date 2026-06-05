@@ -30,3 +30,22 @@ internal fun SessionRemoteState.startSelectingThread(id: String, title: String?)
 internal fun SessionRemoteState.startLoadingOlderMessages(): SessionRemoteState {
     return copy(isLoadingOlder = true)
 }
+
+internal fun SessionRemoteState.withArchivedThreadLocally(id: String): SessionRemoteState {
+    val nextThreads = threads.filterNot { it.id == id }
+    if (selectedThreadId != id) {
+        return copy(threads = nextThreads)
+    }
+    return copy(
+        threads = nextThreads,
+        selectedThreadId = "",
+        pendingSelectionThreadId = null,
+        pendingThreadTitle = null,
+        isThreadSwitching = false,
+        messages = emptyList(),
+        hasMoreHistory = false,
+        isLoadingOlder = false,
+        isGenerating = false,
+        pendingApproval = null
+    )
+}

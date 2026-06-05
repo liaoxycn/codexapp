@@ -40,6 +40,49 @@ class MessageTurnActionsTest {
     }
 
     @Test
+    fun stoppedProcessOnlyTurnKeepsAssistantAnchorVisible() {
+        val messages = listOf(
+            user("u1"),
+            assistant("reasoning", MessageBlock.Reasoning("正在思考"))
+        )
+
+        val items = messages.toTurnMessageItems(currentTurnRunning = false)
+
+        assertEquals(listOf("u1", "u1:assistant-process"), items.map { it.message.id })
+        assertEquals(listOf("reasoning"), items.last().processMessages.map { it.id })
+        assertEquals(false, items.last().assistantTurnRunning)
+        assertEquals(false, items.last().showAssistantActions)
+    }
+
+    @Test
+    fun turnItemsKeepLazyKeysUniqueWhenGatewayRepeatsMessageIds() {
+        val messages = listOf(
+            user("item-1"),
+            assistant("item-1", MessageBlock.Reasoning("正在思考")),
+            assistant("item-1", MessageBlock.Text("OK"), isFinal = true)
+        )
+
+        val items = messages.toTurnMessageItems(currentTurnRunning = false)
+
+        assertEquals(listOf("item-1", "item-1"), items.map { it.message.id })
+        assertEquals(listOf("item-1", "item-1#1"), items.map { it.stableKey })
+    }
+
+    @Test
+    fun completedTurnDropsNonFinalAssistantTailAfterFinalReply() {
+        val messages = listOf(
+            user("u1"),
+            assistant("final", MessageBlock.Text("OK"), isFinal = true),
+            assistant("stale-tail", MessageBlock.Text("OK"))
+        )
+
+        val items = messages.toTurnMessageItems(currentTurnRunning = false)
+
+        assertEquals(listOf("u1", "final"), items.map { it.message.id })
+        assertEquals(true, items.last().showAssistantActions)
+    }
+
+    @Test
     fun runningTurnKeepsStreamingAssistantTextVisibleUntilTurnStops() {
         val messages = listOf(
             user("u1"),
@@ -277,6 +320,29 @@ class MessageTurnActionsTest {
         assertFalse(model.canFork)
         assertFalse(model.showFooterActions)
         assertTrue(model.preferPlainText)
+    }
+
+    @Test
+    fun assistantTurnUiModelHidesForkWhenFinalTextIsEmpty() {
+        val model = buildAssistantTurnUiModel(
+            message = ThreadMessage(
+                id = "assistant-process-only",
+                role = MessageRole.ASSISTANT,
+                blocks = listOf(MessageBlock.CommandSummary("已运行命令")),
+                forkNumTurns = 2,
+                durationMs = 5_000L,
+                isFinal = true
+            ),
+            processMessages = emptyList(),
+            isRunning = false,
+            showActions = true,
+            enableFinalActions = true,
+            preferPlainText = true
+        )
+
+        assertFalse(model.canCopy)
+        assertFalse(model.canFork)
+        assertFalse(model.showFooterActions)
     }
 
     @Test

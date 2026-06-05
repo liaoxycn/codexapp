@@ -55,6 +55,7 @@ export async function finalizeTurnRuntimeState({
     }
 
     rebaseSnapshotMessagesFromThread(state);
+    pruneCompletedArtifacts(state);
     const nextTurnStarted =
       completedTurnId != null && state.currentTurnId != null && state.currentTurnId !== completedTurnId;
     const hasOtherActiveWork = Boolean(

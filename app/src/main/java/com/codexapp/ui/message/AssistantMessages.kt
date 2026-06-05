@@ -110,6 +110,7 @@ internal fun AssistantMessage(
             AssistantProcessSlot(
                 messages = turn.processMessages,
                 visible = processExpanded && turn.hasProcess,
+                isRunning = turn.isRunning,
                 compactMode = compactMode
             )
 
@@ -125,6 +126,10 @@ internal fun AssistantMessage(
                     messageId = turn.id,
                     messageIndex = messageIndex
                 )
+            }
+
+            if (turn.isRunning) {
+                RunningThinkingFooter(compactMode = compactMode)
             }
 
             AssistantTurnFooterActions(
@@ -200,6 +205,7 @@ private fun AssistantProcessedHeader(
 private fun AssistantProcessSlot(
     messages: List<ThreadMessage>,
     visible: Boolean,
+    isRunning: Boolean,
     compactMode: Boolean
 ) {
     if (!visible) {
@@ -207,6 +213,7 @@ private fun AssistantProcessSlot(
     }
     AssistantProcessStream(
         messages = messages,
+        isRunning = isRunning,
         compactMode = compactMode
     )
 }

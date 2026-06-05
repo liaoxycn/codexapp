@@ -128,7 +128,59 @@ export function rebaseSnapshotMessagesFromThread(state: ThreadRuntimeState): voi
   const mergedMessages = mergeSnapshotMessages(allMessages, state.snapshot.messages);
   state.snapshot.messages = trimMessagesToWindow(mergedMessages, state.historyWindow);
   state.snapshot.hasMoreHistory = mergedMessages.length > state.historyWindow;
+  normalizeDuplicateOptimisticUserMessages(state);
   normalizeAllCompactMessages(state);
+}
+
+export function normalizeDuplicateOptimisticUserMessages(state: ThreadRuntimeState): void {
+  const realUserMessages = state.snapshot.messages.filter((message) =>
+    message.role === "user" && !isOptimisticUserMessage(message)
+  );
+  const messages = state.snapshot.messages;
+
+  state.snapshot.messages = messages.filter((message, index) => {
+    if (isOptimisticUserMessage(message)) {
+      return !realUserMessages.some((realUser) => isSameUserMessage(realUser, message));
+    }
+
+    if (message.role === "user" && !isCanonicalUserMessage(message)) {
+      const text = normalizeMessageText(message);
+      if (
+        text.length > 0 &&
+        messages.some((candidate, candidateIndex) =>
+          candidateIndex > index &&
+          isCanonicalUserMessage(candidate) &&
+          normalizeMessageText(candidate) === text
+        )
+      ) {
+        return false;
+      }
+    }
+
+    if (message.role === "assistant" && message.isFinal !== true) {
+      const text = normalizeMessageText(message);
+      if (
+        text.length > 0 &&
+        messages.some((candidate, candidateIndex) =>
+          candidateIndex > index &&
+          candidate.role === "assistant" &&
+          candidate.isFinal === true &&
+          normalizeMessageText(candidate) === text
+        )
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+}
+
+function isCanonicalUserMessage(message: GatewayMessagePayload): boolean {
+  return (
+    message.role === "user" &&
+    (message.id.startsWith("item-") || (typeof message.rollbackNumTurns === "number" && message.rollbackNumTurns > 0))
+  );
 }
 
 export function collectThreadMessages(thread: AppServerThread): GatewayMessagePayload[] {

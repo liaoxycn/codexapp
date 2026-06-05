@@ -14,8 +14,8 @@ android {
         applicationId = "com.codexapp"
         minSdk = 28
         targetSdk = 35
-        versionCode = 64
-        versionName = "0.2.44"
+        versionCode = 65
+        versionName = "0.2.45"
         ndk {
             abiFilters += "arm64-v8a"
         }

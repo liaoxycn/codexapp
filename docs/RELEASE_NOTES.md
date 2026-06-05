@@ -1,1 +1,1 @@
-优化移动端 assistant 消息流：补齐已运行命令过程类型，命令-only turn 不再丢失；完善过程图标、文件改动展开去重、MCP 工具默认折叠；修复完成态过程保留与展示。
+增强 Android Agent Debug 远程测试框架；修复 App 重启后当前会话恢复、running/reconnect 收口等会话状态问题；完善 assistant 消息流、命令/文件/MCP 过程展示与截图回归。

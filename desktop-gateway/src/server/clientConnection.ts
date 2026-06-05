@@ -30,7 +30,7 @@ export function createGatewayClientContext({
 }: CreateGatewayClientContextArgs): ClientContext {
   const context: ClientContext = {
     socket,
-    selectedThreadId: backend().getDefaultThreadId(),
+    selectedThreadId: "",
     selectionVersion: 0,
     authenticated: false,
     snapshotTimer: null,

@@ -10,3 +10,60 @@ master
 [2026-06-04T04:44:50.810Z] EXIT git query local tag: code=1 signal=
 [2026-06-04T04:44:50.824Z] update Android version and release notes
 [2026-06-04T04:44:50.827Z] RUN git add: git add -A
+[2026-06-04T04:44:50.924Z] EXIT git add: code=0 signal=
+[2026-06-04T04:44:50.925Z] STDERR git add:
+warning: in the working copy of 'app/build.gradle.kts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/main/java/com/codexapp/data/SessionMessageMutations.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/main/java/com/codexapp/data/gateway/GatewaySnapshotMapper.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/main/java/com/codexapp/ui/message/AssistantMessages.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/main/java/com/codexapp/ui/message/AssistantProcessStream.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/main/java/com/codexapp/ui/message/FileChangeRow.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/main/java/com/codexapp/ui/message/MarkdownMessages.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/main/java/com/codexapp/ui/message/MarkdownParsing.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/main/java/com/codexapp/ui/message/MessageTurnActions.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/main/java/com/codexapp/ui/message/SystemStatusMessages.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/test/java/com/codexapp/ui/GatewaySnapshotMapperTest.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/test/java/com/codexapp/ui/HomeUiStateStoreTest.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/test/java/com/codexapp/ui/MessageTurnActionsTest.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/src/test/java/com/codexapp/ui/SessionRemoteMutationsTest.kt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/scripts/protocol-selftest.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/appServerClient.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/appServerTurnRpc.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/appServerTypes.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/bridge/BridgeThreadController.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/bridge/approvalActions.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/bridge/itemNotifications.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/bridge/notifications.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/bridge/runtimeMessageStore.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/bridge/runtimeSnapshotMessages.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/bridge/runtimeState.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/src/bridge/runtimeSummaryState.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/test/bridgeBackend.test.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/test/notificationCoverage.test.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'desktop-gateway/test/runtimeSnapshotMessages.test.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/RELEASE_NOTES.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/release/github-release-2026-06-03T17-23-10-536Z.log', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/release/github-release-latest.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/release/github-release-2026-06-04T04-44-49-613Z.log', LF will be replaced by CRLF the next time Git touches it
+[2026-06-04T04:44:50.926Z] RUN git commit: git commit -m "Release v0.2.44"
+[2026-06-04T04:44:51.087Z] EXIT git commit: code=0 signal=
+[2026-06-04T04:44:51.087Z] STDOUT git commit:
+[master 2f8eb43] Release v0.2.44
+ 34 files changed, 1297 insertions(+), 307 deletions(-)
+ create mode 100644 scripts/release/github-release-2026-06-04T04-44-49-613Z.log
+[2026-06-04T04:44:51.088Z] RUN git push branch attempt 1/3: git push origin master
+[2026-06-04T04:44:54.415Z] EXIT git push branch attempt 1/3: code=0 signal=
+[2026-06-04T04:44:54.416Z] STDERR git push branch attempt 1/3:
+To https://github.com/liaoxycn/codexapp.git
+   8e5bb57..2f8eb43  master -> master
+[2026-06-04T04:44:54.416Z] RUN git tag: git tag -a v0.2.44 -m "Release v0.2.44"
+[2026-06-04T04:44:54.486Z] EXIT git tag: code=0 signal=
+[2026-06-04T04:44:54.487Z] RUN git push tag attempt 1/3: git push origin v0.2.44
+[2026-06-04T04:44:57.122Z] EXIT git push tag attempt 1/3: code=0 signal=
+[2026-06-04T04:44:57.123Z] STDERR git push tag attempt 1/3:
+To https://github.com/liaoxycn/codexapp.git
+ * [new tag]         v0.2.44 -> v0.2.44
+[2026-06-04T04:44:57.124Z] push result branch=ok tag=ok
+[2026-06-04T04:44:57.124Z] githubActionsTrigger=attempted
+[2026-06-04T04:44:57.128Z] externalExitCode=0
+[2026-06-04T04:44:57.128Z] END

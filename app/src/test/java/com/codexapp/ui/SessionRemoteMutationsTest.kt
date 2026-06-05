@@ -3,6 +3,7 @@ package com.codexapp.ui
 import com.codexapp.data.startCreatingThread
 import com.codexapp.data.startSelectingThread
 import com.codexapp.data.withConnectionFailure
+import com.codexapp.data.withArchivedThreadLocally
 import com.codexapp.data.withDisconnectedGateway
 import com.codexapp.data.withInboundDecodeFailure
 import com.codexapp.data.withManualDisconnect
@@ -14,6 +15,7 @@ import com.codexapp.model.MessageBlock
 import com.codexapp.model.MessageRole
 import com.codexapp.model.SessionRemoteState
 import com.codexapp.model.StateDiagnostics
+import com.codexapp.model.ThreadStatus
 import com.codexapp.model.ThreadMessage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -51,6 +53,52 @@ class SessionRemoteMutationsTest {
         assertEquals("thread-2", next.pendingSelectionThreadId)
         assertEquals("标题", next.pendingThreadTitle)
         assertTrue(next.isThreadSwitching)
+    }
+
+    @Test
+    fun localArchiveClearsSelectedConversationState() {
+        val next = SessionRemoteState(
+            selectedThreadId = "thread-1",
+            pendingSelectionThreadId = "thread-2",
+            pendingThreadTitle = "切换目标",
+            isThreadSwitching = true,
+            threads = listOf(
+                thread("thread-1"),
+                thread("thread-2")
+            ),
+            messages = listOf(message("user-1", MessageRole.USER)),
+            hasMoreHistory = true,
+            isLoadingOlder = true,
+            isGenerating = true,
+            pendingApproval = "approval"
+        ).withArchivedThreadLocally("thread-1")
+
+        assertEquals("", next.selectedThreadId)
+        assertEquals(listOf("thread-2"), next.threads.map { it.id })
+        assertNull(next.pendingSelectionThreadId)
+        assertNull(next.pendingThreadTitle)
+        assertFalse(next.isThreadSwitching)
+        assertTrue(next.messages.isEmpty())
+        assertFalse(next.hasMoreHistory)
+        assertFalse(next.isLoadingOlder)
+        assertFalse(next.isGenerating)
+        assertNull(next.pendingApproval)
+    }
+
+    @Test
+    fun localArchiveKeepsSelectedConversationWhenArchivingAnotherThread() {
+        val next = SessionRemoteState(
+            selectedThreadId = "thread-1",
+            threads = listOf(
+                thread("thread-1"),
+                thread("thread-2")
+            ),
+            messages = listOf(message("user-1", MessageRole.USER))
+        ).withArchivedThreadLocally("thread-2")
+
+        assertEquals("thread-1", next.selectedThreadId)
+        assertEquals(listOf("thread-1"), next.threads.map { it.id })
+        assertEquals(listOf("user-1"), next.messages.map { it.id })
     }
 
     @Test
@@ -136,6 +184,33 @@ class SessionRemoteMutationsTest {
         assertNull(next.pendingApproval)
         assertClearedConnectionTransients(next)
         assertEquals(listOf("user-1"), next.messages.map { it.id })
+    }
+
+    @Test
+    fun gatewayDisconnectKeepsGeneratingWhenSelectedThreadIsStillRunning() {
+        val next = SessionRemoteState(
+            connectionStatus = ConnectionStatus.CONNECTED,
+            isDemoMode = false,
+            selectedThreadId = "thread-1",
+            threads = listOf(thread("thread-1", ThreadStatus.RUNNING)),
+            isGenerating = true,
+            diagnostics = busyDiagnostics(),
+            messages = listOf(
+                message("user-1", MessageRole.USER),
+                ThreadMessage(
+                    id = "assistant-running",
+                    role = MessageRole.ASSISTANT,
+                    blocks = listOf(MessageBlock.CommandSummary("正在运行 ping"))
+                )
+            )
+        ).withManualDisconnect()
+
+        assertEquals(ConnectionStatus.DISCONNECTED, next.connectionStatus)
+        assertTrue(next.isGenerating)
+        assertTrue(next.diagnostics.isGenerating)
+        assertEquals(listOf("thread-1"), next.diagnostics.runningThreadIds)
+        assertEquals(ThreadStatus.RUNNING, next.threads.first().status)
+        assertEquals(listOf("user-1", "assistant-running"), next.messages.map { it.id })
     }
 
     @Test
@@ -236,4 +311,14 @@ class SessionRemoteMutationsTest {
             blocks = listOf(MessageBlock.Text(id))
         )
     }
+
+    private fun thread(
+        id: String,
+        status: ThreadStatus = ThreadStatus.IDLE
+    ) = com.codexapp.model.ThreadSummary(
+        id = id,
+        title = id,
+        preview = "",
+        status = status
+    )
 }

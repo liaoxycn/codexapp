@@ -2,6 +2,7 @@ package com.codexapp.ui.message
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -48,17 +49,19 @@ import com.codexapp.ui.theme.CodexTheme
 @Composable
 internal fun AssistantProcessStream(
     messages: List<ThreadMessage>,
+    isRunning: Boolean,
     compactMode: Boolean
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(if (compactMode) 5.dp else 7.dp)
+        verticalArrangement = Arrangement.spacedBy(if (compactMode) 3.dp else 4.dp)
     ) {
         messages.forEachIndexed { index, message ->
             AssistantProcessMessage(
                 message = message,
                 compactMode = compactMode,
-                messageIndex = index
+                messageIndex = index,
+                suppressThinkingPlaceholders = isRunning
             )
         }
     }
@@ -68,12 +71,13 @@ internal fun AssistantProcessStream(
 private fun AssistantProcessMessage(
     message: ThreadMessage,
     compactMode: Boolean,
-    messageIndex: Int
+    messageIndex: Int,
+    suppressThinkingPlaceholders: Boolean
 ) {
     val cards = remember(message.blocks) { deriveAssistantMessageCards(message.blocks) }
     val processRunning = remember(message.blocks) { message.blocks.isRunningProcessMessage() }
 
-    Column(verticalArrangement = Arrangement.spacedBy(if (compactMode) 4.dp else 6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(if (compactMode) 2.dp else 3.dp)) {
         if (message.role == MessageRole.SYSTEM) {
             SystemMessage(message, compactMode)
             return@Column
@@ -111,14 +115,16 @@ private fun AssistantProcessMessage(
 
                 is MessageBlock.Reasoning -> {
                     if (block.value.isThinkingPlaceholder()) {
-                        ProcessLine(
-                            text = "正在思考",
-                            visual = ProcessLineVisual(
-                                kind = ProcessLineKind.THINKING,
-                                running = true
-                            ),
-                            compactMode = compactMode
-                        )
+                        if (!suppressThinkingPlaceholders) {
+                            ProcessLine(
+                                text = "正在思考",
+                                visual = ProcessLineVisual(
+                                    kind = ProcessLineKind.THINKING,
+                                    running = true
+                                ),
+                                compactMode = compactMode
+                            )
+                        }
                     } else {
                         ProcessNarrativeText(
                             text = block.value,
@@ -185,6 +191,18 @@ private fun AssistantProcessMessage(
 }
 
 @Composable
+internal fun RunningThinkingFooter(compactMode: Boolean) {
+    ProcessLine(
+        text = "正在思考中",
+        visual = ProcessLineVisual(
+            kind = ProcessLineKind.THINKING,
+            running = true
+        ),
+        compactMode = compactMode
+    )
+}
+
+@Composable
 internal fun ProcessLineForBlock(
     block: MessageBlock,
     compactMode: Boolean
@@ -219,13 +237,13 @@ private fun ProcessNarrativeText(
         verticalAlignment = Alignment.Top,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = if (compactMode) 1.dp else 2.dp)
+            .padding(vertical = processRowVerticalPadding(compactMode))
     ) {
         ProcessLineLeadingVisual(
             visual = visual,
             compactMode = compactMode
         )
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(processIconTextGap(compactMode)))
         MarkdownText(
             text = text,
             expanded = true,
@@ -429,7 +447,7 @@ private fun ProcessExpandableLine(
     onToggle: () -> Unit,
     details: @Composable () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(if (compactMode) 3.dp else 4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(if (compactMode) 2.dp else 3.dp)) {
         Row(
             verticalAlignment = Alignment.Top,
             modifier = Modifier
@@ -445,13 +463,13 @@ private fun ProcessExpandableLine(
                         Modifier.semantics { contentDescription = text }
                     }
                 )
-                .padding(vertical = if (compactMode) 1.dp else 2.dp)
+                .padding(vertical = processRowVerticalPadding(compactMode))
         ) {
             ProcessLineLeadingVisual(
                 visual = visual,
                 compactMode = compactMode
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(processIconTextGap(compactMode)))
             Text(
                 text = text,
                 color = CodexTheme.colors.textSecondary,
@@ -479,7 +497,7 @@ private fun ProcessExpandableLine(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = processContentStartPadding(compactMode)),
-                verticalArrangement = Arrangement.spacedBy(if (compactMode) 3.dp else 4.dp)
+                verticalArrangement = Arrangement.spacedBy(if (compactMode) 2.dp else 3.dp)
             ) {
                 details()
             }
@@ -497,13 +515,13 @@ private fun ProcessLine(
         verticalAlignment = Alignment.Top,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = if (compactMode) 1.dp else 2.dp)
+            .padding(vertical = processRowVerticalPadding(compactMode))
     ) {
         ProcessLineLeadingVisual(
             visual = visual,
             compactMode = compactMode
         )
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(processIconTextGap(compactMode)))
         Text(
             text = text,
             color = CodexTheme.colors.textSecondary,
@@ -520,20 +538,27 @@ private fun ProcessLineLeadingVisual(
     visual: ProcessLineVisual,
     compactMode: Boolean
 ) {
-    if (visual.running) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(if (compactMode) 11.dp else 12.dp),
-            color = CodexTheme.colors.textTertiary,
-            strokeWidth = 1.6.dp
+    Box(
+        modifier = Modifier
+            .width(processLeadingVisualWidth(compactMode))
+            .padding(top = processIconTopPadding(compactMode)),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        if (visual.running) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(if (compactMode) 10.dp else 11.dp),
+                color = CodexTheme.colors.textTertiary,
+                strokeWidth = 1.5.dp
+            )
+            return@Box
+        }
+        Icon(
+            imageVector = visual.kind.icon,
+            contentDescription = null,
+            tint = visual.kind.tintColor(),
+            modifier = Modifier.size(if (compactMode) 11.dp else 12.dp)
         )
-        return
     }
-    Icon(
-        imageVector = visual.kind.icon,
-        contentDescription = null,
-        tint = visual.kind.tintColor(),
-        modifier = Modifier.size(if (compactMode) 12.dp else 13.dp)
-    )
 }
 
 private data class ProcessLineVisual(
@@ -639,4 +664,12 @@ private fun String.isThinkingPlaceholder(): Boolean {
         normalized == "思考中"
 }
 
-private fun processContentStartPadding(compactMode: Boolean) = if (compactMode) 18.dp else 19.dp
+private fun processRowVerticalPadding(compactMode: Boolean) = if (compactMode) 0.dp else 1.dp
+
+private fun processLeadingVisualWidth(compactMode: Boolean) = if (compactMode) 11.dp else 12.dp
+
+private fun processIconTextGap(compactMode: Boolean) = if (compactMode) 4.dp else 5.dp
+
+private fun processIconTopPadding(compactMode: Boolean) = if (compactMode) 2.dp else 2.5.dp
+
+private fun processContentStartPadding(compactMode: Boolean) = if (compactMode) 15.dp else 17.dp

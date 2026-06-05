@@ -251,6 +251,53 @@ class GatewaySnapshotMapperTest {
     }
 
     @Test
+    fun snapshotPatchAppendsUnconfirmedOptimisticUserMessageAfterHistory() {
+        val previous = SessionRemoteState(
+            snapshotRevision = 2L,
+            messages = listOf(
+                ThreadMessage(
+                    id = "old-user",
+                    role = MessageRole.USER,
+                    blocks = listOf(MessageBlock.Text("old prompt"))
+                ),
+                ThreadMessage(
+                    id = "old-assistant",
+                    role = MessageRole.ASSISTANT,
+                    blocks = listOf(MessageBlock.Text("old answer")),
+                    isFinal = true
+                ),
+                ThreadMessage(
+                    id = "user-optimistic",
+                    role = MessageRole.USER,
+                    blocks = listOf(MessageBlock.Text("new prompt"))
+                )
+            )
+        )
+        val patch = GatewaySnapshotPatchMessage(
+            baseRevision = 2L,
+            revision = 3L,
+            changed = listOf("messages"),
+            messages = listOf(
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "old-user",
+                    role = "user",
+                    blocks = listOf(GatewayBlockPayload(kind = "text", value = "old prompt"))
+                ),
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "old-assistant",
+                    role = "assistant",
+                    blocks = listOf(GatewayBlockPayload(kind = "text", value = "old answer")),
+                    isFinal = true
+                )
+            )
+        )
+
+        val next = patch.applyTo(previous)
+
+        assertEquals(listOf("old-user", "old-assistant", "user-optimistic"), next.messages.map { it.id })
+    }
+
+    @Test
     fun snapshotPatchKeepsGeneratingWhenSelectedAssistantTurnIsNotFinal() {
         val previous = SessionRemoteState(
             snapshotRevision = 10L,
@@ -404,6 +451,188 @@ class GatewaySnapshotMapperTest {
     }
 
     @Test
+    fun snapshotPatchClearsStaleGeneratingWhenDiagnosticsAreIdle() {
+        val previous = SessionRemoteState(
+            snapshotRevision = 13L,
+            selectedThreadId = "thread-1",
+            threads = listOf(
+                com.codexapp.model.ThreadSummary(
+                    id = "thread-1",
+                    title = "stop flow",
+                    preview = "",
+                    status = ThreadStatus.IDLE
+                )
+            ),
+            isGenerating = true,
+            messages = listOf(
+                ThreadMessage(
+                    id = "user-1",
+                    role = MessageRole.USER,
+                    blocks = listOf(MessageBlock.Text("stop me"))
+                )
+            )
+        )
+        val patch = GatewaySnapshotPatchMessage(
+            baseRevision = 13L,
+            revision = 14L,
+            changed = listOf("diagnostics"),
+            diagnostics = GatewayDiagnosticsPayload(
+                selectedThreadId = "thread-1",
+                isGenerating = false,
+                runningThreadIds = emptyList(),
+                snapshotRevision = 14L,
+                actionType = "stop_turn",
+                actionStatus = "succeeded"
+            )
+        )
+
+        val next = patch.applyTo(previous)
+
+        assertFalse(next.isGenerating)
+        assertFalse(next.diagnostics.isGenerating)
+        assertEquals(emptyList<String>(), next.diagnostics.runningThreadIds)
+    }
+
+    @Test
+    fun snapshotPatchClearsSelectedGeneratingWhenOnlyAnotherThreadRuns() {
+        val previous = SessionRemoteState(
+            snapshotRevision = 21L,
+            selectedThreadId = "thread-selected",
+            threads = listOf(
+                com.codexapp.model.ThreadSummary(
+                    id = "thread-selected",
+                    title = "selected",
+                    preview = "",
+                    status = ThreadStatus.IDLE
+                ),
+                com.codexapp.model.ThreadSummary(
+                    id = "thread-other",
+                    title = "other",
+                    preview = "",
+                    status = ThreadStatus.RUNNING
+                )
+            ),
+            isGenerating = true,
+            messages = listOf(
+                ThreadMessage(
+                    id = "user-1",
+                    role = MessageRole.USER,
+                    blocks = listOf(MessageBlock.Text("stop me"))
+                ),
+                ThreadMessage(
+                    id = "assistant-live",
+                    role = MessageRole.ASSISTANT,
+                    blocks = listOf(MessageBlock.Reasoning("正在思考"))
+                )
+            )
+        )
+        val patch = GatewaySnapshotPatchMessage(
+            baseRevision = 21L,
+            revision = 22L,
+            changed = listOf("diagnostics"),
+            diagnostics = GatewayDiagnosticsPayload(
+                selectedThreadId = "thread-selected",
+                isGenerating = false,
+                runningThreadIds = listOf("thread-other"),
+                snapshotRevision = 22L,
+                actionType = "stop_turn",
+                actionStatus = "succeeded"
+            )
+        )
+
+        val next = patch.applyTo(previous)
+
+        assertFalse(next.isGenerating)
+        assertEquals(listOf("thread-other"), next.diagnostics.runningThreadIds)
+    }
+
+    @Test
+    fun snapshotClearsStaleGeneratingWhenDiagnosticsAreIdle() {
+        val previous = emptyRemoteState(GatewayConfig(url = "ws://10.0.2.2:8765/mobile"))
+        val snapshot = GatewaySnapshotMessage(
+            revision = 15L,
+            selectedThreadId = "thread-1",
+            threads = listOf(
+                com.codexapp.data.gateway.GatewayThreadPayload(
+                    id = "thread-1",
+                    title = "stale generating",
+                    preview = "",
+                    status = "idle"
+                )
+            ),
+            messages = listOf(
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "user-1",
+                    role = "user",
+                    blocks = listOf(GatewayBlockPayload(kind = "text", value = "stop me"))
+                )
+            ),
+            diagnostics = GatewayDiagnosticsPayload(
+                selectedThreadId = "thread-1",
+                isGenerating = false,
+                runningThreadIds = emptyList(),
+                snapshotRevision = 15L,
+                actionType = "stop_turn",
+                actionStatus = "succeeded"
+            ),
+            isGenerating = true
+        )
+
+        val next = snapshot.applyTo(previous)
+
+        assertFalse(next.isGenerating)
+    }
+
+    @Test
+    fun snapshotClearsSelectedGeneratingWhenOnlyAnotherThreadRuns() {
+        val previous = emptyRemoteState(GatewayConfig(url = "ws://10.0.2.2:8765/mobile"))
+        val snapshot = GatewaySnapshotMessage(
+            revision = 23L,
+            selectedThreadId = "thread-selected",
+            threads = listOf(
+                com.codexapp.data.gateway.GatewayThreadPayload(
+                    id = "thread-selected",
+                    title = "selected",
+                    preview = "",
+                    status = "idle"
+                ),
+                com.codexapp.data.gateway.GatewayThreadPayload(
+                    id = "thread-other",
+                    title = "other",
+                    preview = "",
+                    status = "running"
+                )
+            ),
+            messages = listOf(
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "user-1",
+                    role = "user",
+                    blocks = listOf(GatewayBlockPayload(kind = "text", value = "stop me"))
+                ),
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "assistant-live",
+                    role = "assistant",
+                    blocks = listOf(GatewayBlockPayload(kind = "reasoning", value = "正在思考"))
+                )
+            ),
+            diagnostics = GatewayDiagnosticsPayload(
+                selectedThreadId = "thread-selected",
+                isGenerating = false,
+                runningThreadIds = listOf("thread-other"),
+                snapshotRevision = 23L,
+                actionType = "stop_turn",
+                actionStatus = "succeeded"
+            ),
+            isGenerating = true
+        )
+
+        val next = snapshot.applyTo(previous)
+
+        assertFalse(next.isGenerating)
+        assertEquals(listOf("thread-other"), next.diagnostics.runningThreadIds)
+    }
+
+    @Test
     fun snapshotPatchCollapsesAdjacentDuplicateUserMessages() {
         val previous = SessionRemoteState(snapshotRevision = 1L)
         val patch = GatewaySnapshotPatchMessage(
@@ -432,6 +661,69 @@ class GatewaySnapshotMapperTest {
         val next = patch.applyTo(previous)
 
         assertEquals(listOf("user-real", "assistant-live"), next.messages.map { it.id })
+    }
+
+    @Test
+    fun snapshotPatchCollapsesDuplicateUserMessagesInsideOpenTurn() {
+        val previous = SessionRemoteState(snapshotRevision = 1L)
+        val patch = GatewaySnapshotPatchMessage(
+            baseRevision = 1L,
+            revision = 2L,
+            changed = listOf("messages"),
+            messages = listOf(
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "optimistic-or-stream-user",
+                    role = "user",
+                    blocks = listOf(GatewayBlockPayload(kind = "text", value = "same prompt"))
+                ),
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "assistant-running",
+                    role = "assistant",
+                    blocks = listOf(GatewayBlockPayload(kind = "commentary", value = "streaming"))
+                ),
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "real-user",
+                    role = "user",
+                    blocks = listOf(GatewayBlockPayload(kind = "text", value = "same prompt"))
+                )
+            )
+        )
+
+        val next = patch.applyTo(previous)
+
+        assertEquals(listOf("real-user", "assistant-running"), next.messages.map { it.id })
+    }
+
+    @Test
+    fun snapshotPatchKeepsSameUserTextAcrossCompletedTurns() {
+        val previous = SessionRemoteState(snapshotRevision = 1L)
+        val patch = GatewaySnapshotPatchMessage(
+            baseRevision = 1L,
+            revision = 2L,
+            changed = listOf("messages"),
+            messages = listOf(
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "user-a",
+                    role = "user",
+                    blocks = listOf(GatewayBlockPayload(kind = "text", value = "repeat prompt"))
+                ),
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "assistant-a",
+                    role = "assistant",
+                    blocks = listOf(GatewayBlockPayload(kind = "text", value = "done")),
+                    isFinal = true
+                ),
+                com.codexapp.data.gateway.GatewayMessagePayload(
+                    id = "user-b",
+                    role = "user",
+                    blocks = listOf(GatewayBlockPayload(kind = "text", value = "repeat prompt"))
+                )
+            )
+        )
+
+        val next = patch.applyTo(previous)
+
+        assertEquals(listOf("user-a", "assistant-a", "user-b"), next.messages.map { it.id })
     }
 
     @Test

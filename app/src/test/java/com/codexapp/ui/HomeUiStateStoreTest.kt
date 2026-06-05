@@ -1,6 +1,8 @@
 package com.codexapp.ui
 
 import com.codexapp.model.ConnectionStatus
+import com.codexapp.model.GatewayConfigOption
+import com.codexapp.model.GatewayConfigOptions
 import com.codexapp.model.MessageBlock
 import com.codexapp.model.MessageRole
 import com.codexapp.model.PendingEditResendState
@@ -153,6 +155,161 @@ class HomeUiStateStoreTest {
             yield()
             assertEquals("", store.state.value.selectedThreadId)
             assertTrue(store.state.value.isNewThreadDraft)
+            collector.cancel()
+            scope.coroutineContext[Job]?.cancel()
+        }
+    }
+
+    @Test
+    fun initialDraftRestoresConnectedRemoteSelection() {
+        runBlocking {
+            val remoteState = MutableStateFlow(
+                SessionRemoteState(
+                    selectedThreadId = "thread-1",
+                    connectionStatus = ConnectionStatus.CONNECTED,
+                    threads = listOf(summary("thread-1")),
+                    messages = listOf(message("message-1"))
+                )
+            )
+            val composerText = MutableStateFlow("")
+            val scope = CoroutineScope(Dispatchers.Unconfined + Job())
+            val store = HomeUiStateStore(
+                remoteState = remoteState,
+                composerText = composerText,
+                scope = scope
+            )
+            val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) { store.state.collect {} }
+
+            yield()
+            assertTrue(store.state.value.isNewThreadDraft)
+            assertEquals("", store.state.value.selectedThreadId)
+
+            store.syncRemoteSelection(remoteState.value)
+            yield()
+
+            assertFalse(store.state.value.isNewThreadDraft)
+            assertEquals("thread-1", store.state.value.selectedThreadId)
+            assertEquals(listOf("message-1"), store.state.value.messages.map { it.id })
+            collector.cancel()
+            scope.coroutineContext[Job]?.cancel()
+        }
+    }
+
+    @Test
+    fun explicitNewThreadDraftDoesNotRestoreStaleRemoteSelection() {
+        runBlocking {
+            val remoteState = MutableStateFlow(
+                SessionRemoteState(
+                    selectedThreadId = "thread-1",
+                    connectionStatus = ConnectionStatus.CONNECTED,
+                    threads = listOf(summary("thread-1")),
+                    messages = listOf(message("message-1"))
+                )
+            )
+            val composerText = MutableStateFlow("")
+            val scope = CoroutineScope(Dispatchers.Unconfined + Job())
+            val store = HomeUiStateStore(
+                remoteState = remoteState,
+                composerText = composerText,
+                scope = scope
+            )
+            val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) { store.state.collect {} }
+
+            store.startNewThreadDraft()
+            store.syncRemoteSelection(remoteState.value)
+            yield()
+
+            assertTrue(store.state.value.isNewThreadDraft)
+            assertEquals("", store.state.value.selectedThreadId)
+            assertEquals(emptyList<String>(), store.state.value.messages.map { it.id })
+            collector.cancel()
+            scope.coroutineContext[Job]?.cancel()
+        }
+    }
+
+    @Test
+    fun newThreadDraftDefaultsToFullAccessWhenAvailable() {
+        runBlocking {
+            val remoteState = MutableStateFlow(
+                SessionRemoteState(
+                    selectedThreadId = "thread-1",
+                    configOptions = GatewayConfigOptions(
+                        sandboxModes = listOf(
+                            GatewayConfigOption(label = "workspace-write", value = "workspace-write"),
+                            GatewayConfigOption(label = "danger-full-access", value = "danger-full-access")
+                        )
+                    )
+                )
+            )
+            val composerText = MutableStateFlow("")
+            val scope = CoroutineScope(Dispatchers.Unconfined + Job())
+            val store = HomeUiStateStore(
+                remoteState = remoteState,
+                composerText = composerText,
+                scope = scope
+            )
+            val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) { store.state.collect {} }
+
+            store.syncDraftDefaults(remoteState.value)
+            yield()
+
+            assertEquals("full-access", store.state.value.newThreadDraft.permissionMode)
+            assertEquals("完全访问权限", store.state.value.permissionSummary)
+            collector.cancel()
+            scope.coroutineContext[Job]?.cancel()
+        }
+    }
+
+    @Test
+    fun startingNewThreadDraftResetsPermissionToFullAccess() {
+        runBlocking {
+            val remoteState = MutableStateFlow(SessionRemoteState(selectedThreadId = "thread-1"))
+            val composerText = MutableStateFlow("")
+            val scope = CoroutineScope(Dispatchers.Unconfined + Job())
+            val store = HomeUiStateStore(
+                remoteState = remoteState,
+                composerText = composerText,
+                scope = scope
+            )
+            val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) { store.state.collect {} }
+
+            store.updateNewThreadDraft { draft -> draft.copy(permissionMode = "default") }
+            store.exitNewThreadDraft()
+            store.startNewThreadDraft(cwd = " D:/Projects/App ")
+            yield()
+
+            assertEquals("full-access", store.state.value.newThreadDraft.permissionMode)
+            assertEquals("D:/Projects/App", store.state.value.newThreadDraft.cwd)
+            collector.cancel()
+            scope.coroutineContext[Job]?.cancel()
+        }
+    }
+
+    @Test
+    fun newThreadDraftFallsBackWhenFullAccessSandboxIsUnavailable() {
+        runBlocking {
+            val remoteState = MutableStateFlow(
+                SessionRemoteState(
+                    selectedThreadId = "thread-1",
+                    configOptions = GatewayConfigOptions(
+                        sandboxModes = listOf(GatewayConfigOption(label = "workspace-write", value = "workspace-write"))
+                    )
+                )
+            )
+            val composerText = MutableStateFlow("")
+            val scope = CoroutineScope(Dispatchers.Unconfined + Job())
+            val store = HomeUiStateStore(
+                remoteState = remoteState,
+                composerText = composerText,
+                scope = scope
+            )
+            val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) { store.state.collect {} }
+
+            store.syncDraftDefaults(remoteState.value)
+            yield()
+
+            assertEquals("default", store.state.value.newThreadDraft.permissionMode)
+            assertEquals("默认权限", store.state.value.permissionSummary)
             collector.cancel()
             scope.coroutineContext[Job]?.cancel()
         }

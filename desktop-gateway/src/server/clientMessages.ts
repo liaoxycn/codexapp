@@ -87,6 +87,7 @@ async function handleHello(
   context.authenticated = true;
   context.supportsSnapshotPatch = message.capabilities?.includes("snapshot_patch") ?? false;
   const requestedThreadId = message.selectedThreadId?.trim();
+  context.selectedThreadId = "";
   if (requestedThreadId && handlers.backend().hasThread(requestedThreadId)) {
     context.selectedThreadId = requestedThreadId;
   }

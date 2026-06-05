@@ -1,7 +1,31 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
-import { attachGatewayClientSocket, summarizeInboundMessage } from "../dist/server/clientConnection.js";
+import {
+  attachGatewayClientSocket,
+  createGatewayClientContext,
+  summarizeInboundMessage,
+} from "../dist/server/clientConnection.js";
+
+test("createGatewayClientContext starts in draft selection", () => {
+  let defaultThreadCalls = 0;
+  const backend = {
+    getDefaultThreadId: () => {
+      defaultThreadCalls += 1;
+      return "thread-default";
+    },
+    subscribe: () => () => {},
+  };
+
+  const context = createGatewayClientContext({
+    backend: () => backend,
+    socket: {},
+    sendSnapshot: () => {},
+  });
+
+  assert.equal(context.selectedThreadId, "");
+  assert.equal(defaultThreadCalls, 0);
+});
 
 test("summarizeInboundMessage redacts prompt text and pair token", () => {
   const summary = summarizeInboundMessage(JSON.stringify({

@@ -49,7 +49,7 @@ internal fun buildAssistantTurnUiModel(
         .trim()
     val canUseFinalActions = showActions && enableFinalActions && !isRunning && message.isFinal
     val canCopy = canUseFinalActions && finalText.isNotBlank()
-    val canFork = canUseFinalActions && message.forkNumTurns != null
+    val canFork = canUseFinalActions && finalText.isNotBlank() && message.forkNumTurns != null
     return AssistantTurnUiModel(
         id = message.id,
         bodyBlocks = bodyBlocks,

@@ -101,10 +101,15 @@ internal fun List<ThreadMessage>.toTurnMessageItems(currentTurnRunning: Boolean 
             val fallbackAssistantIndex = turnMessages.indexOfLast { it.isAssistantReplyText() }
             if (fallbackAssistantIndex < 0) {
                 val processMessages = turnMessages.filter { it.shouldAttachToAssistantProcessStream() }
-                if (processMessages.hasCommandProcessMessage()) {
+                if (processMessages.hasCommandProcessMessage() || processMessages.hasReasoningOnlyProcessMessage()) {
+                    val processAnchorId = if (processMessages.hasCommandProcessMessage()) {
+                        "${userMessage.id}:assistant-command-process"
+                    } else {
+                        "${userMessage.id}:assistant-process"
+                    }
                     items += TurnMessageItem(
                         message = ThreadMessage(
-                            id = "${userMessage.id}:assistant-command-process",
+                            id = processAnchorId,
                             role = MessageRole.ASSISTANT,
                             blocks = emptyList(),
                             durationMs = processMessages.lastKnownDurationMs()
@@ -151,7 +156,7 @@ internal fun List<ThreadMessage>.toTurnMessageItems(currentTurnRunning: Boolean 
                 turnIndex != finalAssistantIndex && turnMessage.shouldAttachToAssistantProcessStream()
             }
             val trailingMessages = turnMessages.drop(finalAssistantIndex + 1)
-                .filterNot { it.shouldAttachToAssistantProcessStream() }
+                .filterNot { it.shouldAttachToAssistantProcessStream() || it.isStaleAssistantTailAfterFinal() }
             items += TurnMessageItem(
                 message = finalMessage,
                 processMessages = processMessages,
@@ -166,7 +171,21 @@ internal fun List<ThreadMessage>.toTurnMessageItems(currentTurnRunning: Boolean 
             }
         }
     }
-    return items
+    return items.withUniqueStableKeys()
+}
+
+private fun List<TurnMessageItem>.withUniqueStableKeys(): List<TurnMessageItem> {
+    val seen = mutableMapOf<String, Int>()
+    return mapIndexed { index, item ->
+        val baseKey = item.stableKey.ifBlank { "message-$index" }
+        val duplicateIndex = seen[baseKey] ?: 0
+        seen[baseKey] = duplicateIndex + 1
+        if (duplicateIndex == 0 && baseKey == item.stableKey) {
+            item
+        } else {
+            item.copy(stableKey = "$baseKey#$duplicateIndex")
+        }
+    }
 }
 
 internal fun List<ThreadMessage>.isUserTurnActionMessage(index: Int): Boolean {
@@ -240,6 +259,10 @@ private fun ThreadMessage.shouldAttachToAssistantProcessStream(): Boolean {
     }
 }
 
+private fun ThreadMessage.isStaleAssistantTailAfterFinal(): Boolean {
+    return role == MessageRole.ASSISTANT && !isFinal
+}
+
 private fun List<ThreadMessage>.hasCommandProcessMessage(): Boolean {
     return any { message ->
         message.role == MessageRole.ASSISTANT &&
@@ -248,6 +271,14 @@ private fun List<ThreadMessage>.hasCommandProcessMessage(): Boolean {
                     block is MessageBlock.CommandMeta ||
                     (block is MessageBlock.Code && block.language.equals("shell", ignoreCase = true))
             }
+    }
+}
+
+private fun List<ThreadMessage>.hasReasoningOnlyProcessMessage(): Boolean {
+    return isNotEmpty() && all { message ->
+        message.role == MessageRole.ASSISTANT &&
+            message.blocks.isNotEmpty() &&
+            message.blocks.all { block -> block is MessageBlock.Reasoning }
     }
 }
 

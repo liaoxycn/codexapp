@@ -211,6 +211,9 @@ export function shouldRetainThreadRuntimeOverlay(
   if (hasActiveRuntimeSignal) {
     return true;
   }
+  if (existingRuntime?.pendingApproval?.text) {
+    return true;
+  }
   if (
     trackedTurnsResolved &&
     !existingRuntime?.transientOperation &&

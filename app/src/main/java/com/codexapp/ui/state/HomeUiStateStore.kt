@@ -4,6 +4,7 @@ import com.codexapp.model.HomeUiState
 import com.codexapp.model.AppUpdateState
 import com.codexapp.model.ConnectionStatus
 import com.codexapp.model.NewThreadDraft
+import com.codexapp.model.NewThreadPermissionPresets
 import com.codexapp.model.PendingEditResendState
 import com.codexapp.model.SessionRemoteState
 import com.codexapp.model.resolveSupportedNewThreadPermissionMode
@@ -28,6 +29,7 @@ internal class HomeUiStateStore(
     private val pendingThreadSelectionId = MutableStateFlow<String?>(null)
     private val pendingThreadTitle = MutableStateFlow<String?>(null)
     private val pendingArchive = MutableStateFlow<PendingArchiveState?>(null)
+    private var initialDraftCanFollowRemoteSelection = true
     private val pendingEditResend = MutableStateFlow<PendingEditResendState?>(null)
     private val newThreadDraft = MutableStateFlow(NewThreadDraft())
     private val currentThreadConfigDrafts = MutableStateFlow<Map<String, NewThreadDraft>>(emptyMap())
@@ -195,8 +197,12 @@ internal class HomeUiStateStore(
     }
 
     fun startNewThreadDraft(cwd: String? = null) {
+        initialDraftCanFollowRemoteSelection = false
         newThreadDraft.update { draft ->
-            draft.copy(cwd = cwd?.trim().orEmpty())
+            draft.copy(
+                cwd = cwd?.trim().orEmpty(),
+                permissionMode = NewThreadPermissionPresets.FullAccess.value
+            )
         }
         draftSubmissionInFlight.value = false
         isNewThreadDraft.value = true
@@ -207,6 +213,7 @@ internal class HomeUiStateStore(
     }
 
     fun exitNewThreadDraft() {
+        initialDraftCanFollowRemoteSelection = false
         draftSubmissionInFlight.value = false
         isNewThreadDraft.value = false
         pendingThreadSelectionId.value = null
@@ -278,6 +285,8 @@ internal class HomeUiStateStore(
         } else if (draftSubmissionInFlight.value && remote.selectedThreadId.isNotBlank()) {
             pendingThreadTitle.value = null
             exitNewThreadDraft()
+        } else if (shouldRestoreInitialDraftFromRemote(remote)) {
+            exitNewThreadDraft()
         }
         val sourceThreadId = forkingThreadId.value
         if (
@@ -289,6 +298,16 @@ internal class HomeUiStateStore(
             forkingThreadId.value = null
             exitNewThreadDraft()
         }
+    }
+
+    private fun shouldRestoreInitialDraftFromRemote(remote: SessionRemoteState): Boolean {
+        return initialDraftCanFollowRemoteSelection &&
+            isNewThreadDraft.value &&
+            !draftSubmissionInFlight.value &&
+            pendingThreadSelectionId.value == null &&
+            remote.connectionStatus == ConnectionStatus.CONNECTED &&
+            remote.selectedThreadId.isNotBlank() &&
+            remote.threads.any { it.id == remote.selectedThreadId }
     }
 
     fun updateNewThreadDraft(transform: (NewThreadDraft) -> NewThreadDraft) {

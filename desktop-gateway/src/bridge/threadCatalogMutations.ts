@@ -10,6 +10,7 @@ import {
   mapThreadToSummary,
 } from "./summaries.js";
 import type { ThreadCatalogActionDeps } from "./threadCatalogActions.js";
+import type { ThreadRuntimeState } from "./types.js";
 import type { ClientSnapshot, ThreadStartOptions } from "../protocol.js";
 
 export async function createCatalogThread(
@@ -141,10 +142,26 @@ export async function archiveCatalogThread(
   threadId: string
 ): Promise<ClientSnapshot> {
   const resolved = deps.resolveThreadId(threadId);
+  const entry = deps.threads.get(resolved);
+  let archivedRemotely = false;
 
-  await deps.appServer.threadArchive(resolved);
+  try {
+    await deps.appServer.threadArchive(resolved);
+    archivedRemotely = true;
+  } catch (error) {
+    if (!canDropLocalArchiveEntry(entry)) {
+      throw error;
+    }
+    console.warn(
+      `[gateway] falling back to local archive for transient thread ${resolved}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
   deps.threads.delete(resolved);
-  await deps.hydrateThreads();
+  if (archivedRemotely) {
+    await deps.hydrateThreads();
+  }
 
   deps.setCurrentThreadId("");
   deps.incrementSelectionVersion();
@@ -152,6 +169,19 @@ export async function archiveCatalogThread(
   deps.syncSelectedThread("");
   deps.emitChanged();
   return deps.getSnapshot("");
+}
+
+function canDropLocalArchiveEntry(entry: ThreadRuntimeState | undefined): boolean {
+  if (!entry) {
+    return false;
+  }
+  if (entry.isLocalCatalogEntry || entry.thread == null || entry.gatewayShellSession != null) {
+    return true;
+  }
+  return entry.snapshot.messages.some((message) =>
+    message.role === "assistant" &&
+    message.blocks.some((block) => block.kind === "commandSummary" || block.kind === "commandMeta")
+  );
 }
 
 export async function unarchiveCatalogThread(

@@ -57,9 +57,13 @@ internal class GatewayRepositoryCommandActions(
 
     fun archiveThread(id: String): Boolean {
         if (id.isBlank()) return false
-        return runConnectedAction("未连接 gateway，无法归档会话") {
+        val sent = runConnectedAction("未连接 gateway，无法归档会话") {
             commandSender.archiveThread(id)
         }
+        if (sent) {
+            updateState { it.withArchivedThreadLocally(id) }
+        }
+        return sent
     }
 
     fun unarchiveThread(id: String): Boolean {

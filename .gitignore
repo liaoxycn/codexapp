@@ -7,5 +7,6 @@
 /desktop-gateway/dist/
 /desktop-gateway/run-logs/
 /scripts/logs/
+/tmp/
 /artifacts/
 /desktop-gateway/build-sea/

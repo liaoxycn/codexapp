@@ -197,6 +197,53 @@ test("handleClientMessage resumes requested thread on hello so live status is re
   assert.equal(snapshots.at(-1).isGenerating, true);
 });
 
+test("handleClientMessage keeps draft selection when hello has no selected thread", async () => {
+  const context = createContext({ selectedThreadId: "thread-default" });
+  const selectCalls = [];
+  const { handlers, snapshots } = createHandlers({
+    backend: createBackend({
+      selectThread: async (threadId) => {
+        selectCalls.push(threadId);
+        return createSnapshot({ selectedThreadId: threadId });
+      },
+    }),
+  });
+
+  await handleClientMessage(
+    context,
+    JSON.stringify({ type: "hello", client: "android" }),
+    handlers
+  );
+
+  assert.equal(context.selectedThreadId, "");
+  assert.deepEqual(selectCalls, []);
+  assert.equal(snapshots.at(-1).selectedThreadId, "");
+});
+
+test("handleClientMessage keeps draft selection when hello selected thread is unavailable", async () => {
+  const context = createContext({ selectedThreadId: "thread-default" });
+  const selectCalls = [];
+  const { handlers, snapshots } = createHandlers({
+    backend: createBackend({
+      hasThread: () => false,
+      selectThread: async (threadId) => {
+        selectCalls.push(threadId);
+        return createSnapshot({ selectedThreadId: threadId });
+      },
+    }),
+  });
+
+  await handleClientMessage(
+    context,
+    JSON.stringify({ type: "hello", client: "android", selectedThreadId: "archived-thread" }),
+    handlers
+  );
+
+  assert.equal(context.selectedThreadId, "");
+  assert.deepEqual(selectCalls, []);
+  assert.equal(snapshots.at(-1).selectedThreadId, "");
+});
+
 test("handleClientMessage falls back to default thread when select target is missing", async () => {
   const context = createContext({ authenticated: true, selectedThreadId: "thread-1" });
   const { handlers, backend, snapshots } = createHandlers({

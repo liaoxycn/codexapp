@@ -49,6 +49,12 @@ export async function refreshCatalogThreads(
   selectedThreadId?: string,
   requestedSelectionVersion?: number
 ): Promise<ClientSnapshot> {
+  if (selectedThreadId === "") {
+    await deps.hydrateThreads({ preserveCurrentThread: true });
+    deps.emitChanged();
+    return deps.getSnapshot("");
+  }
+
   const requested = deps.resolveThreadId(selectedThreadId);
   const requestedVersion = requestedSelectionVersion ?? deps.getSelectionVersion();
 

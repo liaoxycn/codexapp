@@ -133,18 +133,27 @@ export function runProcess(file, args = [], options = {}) {
 export async function runCapture(file, args = [], options = {}) {
   return new Promise((resolve, reject) => {
     const child = startProcess(file, args, { ...options, stdio: ["ignore", "pipe", "pipe"] });
-    let stdout = "";
+    const captureBuffer = options.encoding === "buffer";
+    let stdout = captureBuffer ? [] : "";
     let stderr = "";
-    child.stdout.setEncoding("utf8");
+    if (!captureBuffer) {
+      child.stdout.setEncoding("utf8");
+    }
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
-      stdout += chunk;
+      if (captureBuffer) {
+        stdout.push(Buffer.from(chunk));
+      } else {
+        stdout += chunk;
+      }
     });
     child.stderr.on("data", (chunk) => {
       stderr += chunk;
     });
     child.on("error", reject);
-    child.on("close", (code, signal) => resolve({ code: code ?? -1, signal, stdout, stderr }));
+    child.on("close", (code, signal) =>
+      resolve({ code: code ?? -1, signal, stdout: captureBuffer ? Buffer.concat(stdout) : stdout, stderr })
+    );
   });
 }
 

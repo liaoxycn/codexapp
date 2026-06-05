@@ -86,6 +86,7 @@ internal fun GatewaySnapshotMessage.applyTo(
             revision = revision
         )
     }
+    val nextDiagnostics = diagnostics.toStateDiagnostics(revision ?: previous.snapshotRevision)
     return previous.copy(
         threads = threads,
         selectedThreadId = incomingSelectedThreadId,
@@ -111,9 +112,10 @@ internal fun GatewaySnapshotMessage.applyTo(
             threads = threads,
             messages = nextMessages,
             snapshotIsGenerating = isGenerating,
-            pendingApproval = pendingApproval
+            pendingApproval = pendingApproval,
+            diagnostics = nextDiagnostics
         ),
-        diagnostics = diagnostics.toStateDiagnostics(revision ?: previous.snapshotRevision),
+        diagnostics = nextDiagnostics,
         isManualRefreshing = false,
         connectionStatus = ConnectionStatus.CONNECTED,
         connectionDetail = if (threads.isEmpty()) "已连接，暂无会话" else "已同步 ${threads.size} 个会话",
@@ -159,6 +161,11 @@ internal fun GatewaySnapshotPatchMessage.applyTo(
         pendingApproval
     } else {
         previous.pendingApproval
+    }
+    val nextDiagnostics = if ("diagnostics" in changedFields) {
+        diagnostics?.toStateDiagnostics(revision) ?: previous.diagnostics.copy(snapshotRevision = revision)
+    } else {
+        previous.diagnostics.copy(snapshotRevision = revision)
     }
 
     return previous.copy(
@@ -206,13 +213,10 @@ internal fun GatewaySnapshotPatchMessage.applyTo(
             threads = nextThreads,
             messages = nextMessages,
             snapshotIsGenerating = patchIsGenerating,
-            pendingApproval = nextPendingApproval
+            pendingApproval = nextPendingApproval,
+            diagnostics = nextDiagnostics
         ),
-        diagnostics = if ("diagnostics" in changedFields) {
-            diagnostics?.toStateDiagnostics(revision) ?: previous.diagnostics.copy(snapshotRevision = revision)
-        } else {
-            previous.diagnostics.copy(snapshotRevision = revision)
-        },
+        diagnostics = nextDiagnostics,
         isManualRefreshing = if (acceptSelectedSnapshot) false else previous.isManualRefreshing,
         connectionStatus = ConnectionStatus.CONNECTED,
         connectionDetail = if (nextThreads.isEmpty()) "已连接，暂无会话" else "已同步 ${nextThreads.size} 个会话",
@@ -251,15 +255,42 @@ private fun resolveSelectedThreadGenerating(
     threads: List<ThreadSummary>,
     messages: List<ThreadMessage>,
     snapshotIsGenerating: Boolean,
-    pendingApproval: String?
+    pendingApproval: String?,
+    diagnostics: StateDiagnostics
 ): Boolean {
     if (pendingApproval != null) {
         return false
     }
-    if (snapshotIsGenerating) {
+    val selectedThreadStatus = threads.firstOrNull { it.id == selectedThreadId }?.status
+    if (selectedThreadStatus == ThreadStatus.RUNNING) {
         return true
     }
-    if (threads.any { it.id == selectedThreadId && it.status == ThreadStatus.RUNNING }) {
+    if (diagnostics.runningThreadIds.contains(selectedThreadId)) {
+        return true
+    }
+    val diagnosticsTargetsSelected = diagnostics.selectedThreadId.isBlank() ||
+        diagnostics.selectedThreadId == selectedThreadId
+    if (diagnostics.isGenerating && diagnosticsTargetsSelected) {
+        return true
+    }
+    val diagnosticsHasRuntimeSignal = diagnostics.snapshotRevision > 0L &&
+        (
+            diagnostics.selectedThreadId.isNotBlank() ||
+                diagnostics.actionTraceId.isNotBlank() ||
+                diagnostics.actionType.isNotBlank() ||
+                diagnostics.actionStatus.isNotBlank() ||
+                diagnostics.runningThreadIds.isNotEmpty() ||
+                diagnostics.isGenerating
+            )
+    val diagnosticsProvesSelectedIdle = diagnosticsHasRuntimeSignal &&
+        selectedThreadId.isNotBlank() &&
+        !diagnostics.runningThreadIds.contains(selectedThreadId) &&
+        (!diagnostics.isGenerating || !diagnosticsTargetsSelected) &&
+        (selectedThreadStatus == ThreadStatus.IDLE || diagnostics.selectedThreadId == selectedThreadId)
+    if (diagnosticsProvesSelectedIdle) {
+        return false
+    }
+    if (snapshotIsGenerating) {
         return true
     }
     return messages.hasOpenAssistantTurn()
@@ -352,8 +383,8 @@ private fun List<ThreadMessage>.mergeSnapshotMessages(
     snapshotMessages: List<ThreadMessage>
 ): List<ThreadMessage> {
     val merged = when {
-        isEmpty() || snapshotMessages.isEmpty() -> snapshotMessages.dedupeAdjacentDuplicateUserMessages()
-        none { it.isOptimisticUserMessage() } -> snapshotMessages.dedupeAdjacentDuplicateUserMessages()
+        isEmpty() || snapshotMessages.isEmpty() -> snapshotMessages.dedupeDuplicateUserMessagesWithinOpenTurns()
+        none { it.isOptimisticUserMessage() } -> snapshotMessages.dedupeDuplicateUserMessagesWithinOpenTurns()
         else -> {
             val snapshotUserTexts = snapshotMessages
                 .asSequence()
@@ -364,7 +395,7 @@ private fun List<ThreadMessage>.mergeSnapshotMessages(
             val carriedOptimisticMessages = filter { message ->
                 message.isOptimisticUserMessage() && message.normalizedText() !in snapshotUserTexts
             }
-            (carriedOptimisticMessages + snapshotMessages).dedupeAdjacentDuplicateUserMessages()
+            (snapshotMessages + carriedOptimisticMessages).dedupeDuplicateUserMessagesWithinOpenTurns()
         }
     }
     return reuseIfSameMessages(merged)
@@ -374,19 +405,27 @@ private fun ThreadMessage.isOptimisticUserMessage(): Boolean {
     return role == MessageRole.USER && id.startsWith("user-")
 }
 
-private fun List<ThreadMessage>.dedupeAdjacentDuplicateUserMessages(): List<ThreadMessage> {
+private fun List<ThreadMessage>.dedupeDuplicateUserMessagesWithinOpenTurns(): List<ThreadMessage> {
     val deduped = mutableListOf<ThreadMessage>()
+    val userTextIndexInOpenTurn = mutableMapOf<String, Int>()
     for (message in this) {
-        val previous = deduped.lastOrNull()
-        if (
-            previous != null &&
-            previous.role == MessageRole.USER &&
-            message.role == MessageRole.USER &&
-            previous.normalizedText() == message.normalizedText()
-        ) {
-            deduped[deduped.lastIndex] = message
-        } else {
+        if (message.role == MessageRole.USER) {
+            val text = message.normalizedText()
+            val previousIndex = userTextIndexInOpenTurn[text]
+            if (text.isNotBlank() && previousIndex != null) {
+                deduped[previousIndex] = message
+                continue
+            }
+            if (text.isNotBlank()) {
+                userTextIndexInOpenTurn[text] = deduped.size
+            }
             deduped += message
+            continue
+        }
+
+        deduped += message
+        if (message.role == MessageRole.ASSISTANT && message.isFinal && message.hasAssistantTerminalContent()) {
+            userTextIndexInOpenTurn.clear()
         }
     }
     return deduped

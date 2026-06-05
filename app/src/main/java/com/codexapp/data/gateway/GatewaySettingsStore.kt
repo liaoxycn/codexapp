@@ -23,4 +23,14 @@ internal class GatewaySettingsStore(
             .putString("pairToken", config.pairToken)
             .apply()
     }
+
+    fun loadLastSelectedThreadId(): String {
+        return prefs.getString("lastSelectedThreadId", "")?.trim().orEmpty()
+    }
+
+    fun saveLastSelectedThreadId(threadId: String) {
+        prefs.edit()
+            .putString("lastSelectedThreadId", threadId.trim())
+            .apply()
+    }
 }
